@@ -1,7 +1,8 @@
-from sklearn.model_selection import train_test_split
-import numpy.random as npr
-import jax.numpy as jnp
 from typing import Generator
+
+import jax.numpy as jnp
+import numpy.random as npr
+from sklearn.model_selection import train_test_split
 
 Array = jnp.ndarray
 rng_state = 0

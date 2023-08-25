@@ -1,17 +1,19 @@
 # copied here from the neos and relaxed package to keep track of changes
 # from __future__ import annotations
 
+from functools import partial
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 import pyhf
-from typing import Callable
-from functools import partial
 
 JAX_CHECK_TRACER_LEAKS = True
 
 
 Array = jnp.ndarray
+
 
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
 def hist(

@@ -1,15 +1,17 @@
-from jaxopt import OptaxSolver
-import optax
-from time import perf_counter
-import jax.numpy as jnp
-import pyhf
-import pipeline
-import relaxed
 from functools import partial
+from time import perf_counter
+
+import jax
+import jax.numpy as jnp
+import optax
+import pyhf
+import relaxed
+from jaxopt import OptaxSolver
+
+import hh_neos.pipeline
 
 Array = jnp.ndarray
-from typing import Callable, Any, Generator, Iterable
-import histograms
+import hh_neos.histograms
 
 
 def run(
@@ -21,13 +23,13 @@ def run(
     nn,
 ) -> tuple[Array, dict[str, list]]:
     loss = partial(
-        pipeline.pipeline,
+        hh_neos.pipeline.pipeline,
         nn=nn,
         sample_names=config.data_types,
         include_bins=config.include_bins,
         do_m_hh=config.do_m_hh,
+        loss=config.objective,
     )
-
     solver = OptaxSolver(loss, opt=optax.adam(config.lr), jit=True)
 
     pyhf.set_backend("jax", default=True)
@@ -50,7 +52,6 @@ def run(
                 state = solver.init_state(
                     init_pars,
                     data=data,
-                    loss=config.objective,
                     bandwidth=config.bandwidth,
                 )
             else:
@@ -60,7 +61,6 @@ def run(
                     init_pars,
                     bins=config.bins,
                     data=data,
-                    loss=config.bjective,
                     bandwidth=config.bandwidth,
                 )
 
@@ -70,7 +70,6 @@ def run(
             state,
             bins=config.bins,
             data=data,
-            loss=config.objective,
             bandwidth=config.bandwidth,
         )
         end = perf_counter()
@@ -91,7 +90,7 @@ def run(
         # for Z_A
 
         if "bins" in params and config.do_m_hh:
-            yields = histograms.hists_from_mhh(
+            yields = hh_neos.histograms.hists_from_mhh(
                 data={k: v for k, v in zip(config.data_types, data)},
                 bandwidth=1e-8,
                 bins=params["bins"],

@@ -1,5 +1,6 @@
-import pyhf
+import jax
 import jax.numpy as jnp
+import pyhf
 
 Array = jnp.ndarray
 
@@ -8,7 +9,7 @@ Array = jnp.ndarray
 # "bkg_down".
 def model_from_hists(hists: dict[str, Array]) -> pyhf.Model:
     """How to make your HistFactory model from your histograms."""
-    stat_err = jnp.sqrt(hists["bkg_nominal"])
+    # stat_err = jnp.sqrt(hists["bkg_nominal"])
 
     spec = {
         "channels": [

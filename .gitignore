@@ -1,0 +1,10 @@
+# build artifacts
+build
+__pycache__/
+*.egg-info
+dist
+python_install
+# macOS and VSCode related files
+*.DS_Store
+.vscode/*
+.pytest_cache
