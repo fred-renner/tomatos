@@ -33,7 +33,7 @@ def metrics(metrics, config):
     # plt.savefig(plot_path + "metrics.pdf")
 
 
-def hist(config, best_params, data, test):
+def hist(config, nn, best_params, data, test, data_min, data_max):
     if config.include_bins:
         bins = jnp.array([0, *best_params["bins"], 1])
         print(best_params["bins"])
@@ -74,9 +74,9 @@ def hist(config, best_params, data, test):
 
     else:
         # to get correct yields would also need to pass whole data
-        yields = hists_from_nn(
+        yields = hh_neos.histograms.hists_from_nn(
             pars=best_params["nn_pars"],
-            data={k: v for k, v in zip(config.data_types, test)},
+            data={k: v+1e-8 for k, v in zip(config.data_types, test)},
             nn=nn,
             bandwidth=1e-8,
             bins=jnp.array([0, *best_params["bins"], 1]),

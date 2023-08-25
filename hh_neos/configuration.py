@@ -4,7 +4,7 @@ import numpy as np
 
 class Setup:
     def __init__(self):
-        self.do_m_hh = True
+        self.do_m_hh = False
         self.include_bins = True
         self.vars = [
             "m_hh_NOSYS",
@@ -47,7 +47,7 @@ class Setup:
             )  # rel 21 analysis
 
         self.lr = 1e-2
-        self.num_steps = 100
+        self.num_steps = 2
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"
         self.test_metric = "discovery"

@@ -90,9 +90,9 @@ def prepare_data(config):
         # "ttbar": stack_inputs(files["ttbar"],config),
         "multijet": stack_inputs(files["run2"], config),
     }
-
+    data_min = 0
+    data_max = 1
     if config.include_bins:
-        global data_min, data_max
         data, data_min, data_max = min_max_norm(data)
 
     print([data[key].shape[0] for key in data.keys()])
@@ -115,4 +115,5 @@ def prepare_data(config):
     # replicate to have same size sample input
     data["multijet"] = np.asarray(np.resize(data["multijet"][:], data["sig"].shape))
 
-    return jnp.asarray(data["sig"]), jnp.asarray(data["multijet"])
+    data = (jnp.asarray(data["sig"]), jnp.asarray(data["multijet"]))
+    return data, data_min, data_max

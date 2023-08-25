@@ -89,12 +89,22 @@ def run(
             best_sig = metrics["discovery"][-1]
         # for Z_A
 
-        if "bins" in params and config.do_m_hh:
-            yields = hh_neos.histograms.hists_from_mhh(
-                data={k: v for k, v in zip(config.data_types, data)},
-                bandwidth=1e-8,
-                bins=params["bins"],
-            )
+        if "bins" in params:
+            data_dct = {k: v for k, v in zip(config.data_types, data)}
+            if config.do_m_hh:
+                yields = hh_neos.histograms.hists_from_mhh(
+                    data=data_dct,
+                    bandwidth=1e-8,
+                    bins=params["bins"],
+                )
+            else:
+                yields = hh_neos.histograms.hists_from_nn(
+                    pars=params["nn_pars"],
+                    nn=nn,
+                    data=data_dct,
+                    bandwidth=config.bandwidth,  # for the bKDEs
+                    bins=jnp.array([0, *params["bins"], 1]),
+                )
             this_z_a = relaxed.metrics.asimov_sig(
                 s=yields["sig"], b=yields["bkg_nominal"]
             )
