@@ -14,12 +14,8 @@ jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
 import numpy as np
 
-# matplotlib settings
-plt.rc("figure", figsize=(5, 3), dpi=150, facecolor="w")
-plt.rc("legend", fontsize=6)
 
 Array = jnp.ndarray
-
 
 def pipeline(
     pars: dict[str, Array],
