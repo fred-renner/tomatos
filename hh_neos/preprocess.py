@@ -1,7 +1,7 @@
-from sklearn.preprocessing import MinMaxScaler
 import h5py
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 w_CR = 0.007691879267891989
 err_w_CR = 0.0007230248761909538

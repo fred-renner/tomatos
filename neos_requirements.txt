@@ -6,7 +6,7 @@ jaxlib==0.3.14
 optax==0.1.2       
 plothelp==0.1
 flax==0.5.2
-git+http://github.com/scikit-hep/pyhf.git@make_difffable_model_ctor
+git+https://github.com/scikit-hep/pyhf.git@make_difffable_model_ctor
 git+https://github.com/fred-renner/relaxed.git@mle_fix
 git+https://gitlab.cern.ch/frenner/pyhh.git@master
 neos==0.3.0

@@ -1,12 +1,14 @@
+from functools import partial
+from typing import Callable, Iterable
+
 import jax
 import jax.numpy as jnp
-import pyhf
-from typing import Callable, Iterable
-from functools import partial
 import matplotlib.pyplot as plt
 import neos
-import workspace
-import histograms
+import pyhf
+
+import hh_neos.histograms
+import hh_neos.workspace
 
 jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
@@ -27,7 +29,6 @@ def pipeline(
     bandwidth: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
     bins: Array = None,  # in case you don't want to optimise binning
-    lumi: float = 10.0,  # overall scale factor
     include_bins=True,
     do_m_hh=False,
 ) -> float:
@@ -41,23 +42,22 @@ def pipeline(
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
     if do_m_hh:
-        hists = histograms.hists_from_mhh(
+        hists = hh_neos.histograms.hists_from_mhh(
             data=data_dct,
             bins=jnp.array([0, *pars["bins"], 1]) if "bins" in pars else bins,
             bandwidth=bandwidth,
             include_bins=include_bins,
         )
     else:
-        hists = histograms.hists_from_nn(
+        hists = hh_neos.histograms.hists_from_nn(
             pars=pars["nn_pars"],
             nn=nn,
             data=data_dct,
             bandwidth=bandwidth,  # for the bKDEs
             bins=jnp.array([0, *pars["bins"], 1]) if "bins" in pars else bins,
-            overall_scale=lumi,
         )
 
     # build our statistical model, and calculate the loss!
-    model = workspace.model_from_hists(hists)
+    model = hh_neos.workspace.model_from_hists(hists)
 
     return neos.loss_from_model(model, loss=loss)
