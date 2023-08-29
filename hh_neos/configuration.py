@@ -7,15 +7,26 @@ class Setup:
         self.do_m_hh = False
         self.include_bins = True
         self.vars = [
-            "m_hh_NOSYS",
-            "pt_hh_NOSYS",
-            "eta_hh_NOSYS",
-            "m_h1_NOSYS",
             "pt_h1_NOSYS",
             "eta_h1_NOSYS",
-            "m_h2_NOSYS",
+            # "phi_h1_NOSYS",
+            # "m_h1_NOSYS",
             "pt_h2_NOSYS",
             "eta_h2_NOSYS",
+            # "phi_h2_NOSYS",
+            # "m_h2_NOSYS",
+            "pt_hh_NOSYS",
+            "eta_hh_NOSYS",
+            # "phi_hh_NOSYS",
+            "m_hh_NOSYS",
+            "pt_j1_NOSYS",
+            "eta_j1_NOSYS",
+            # "phi_j1_NOSYS",
+            "E_j1_NOSYS",
+            "pt_j2_NOSYS",
+            "eta_j2_NOSYS",
+            # "phi_j2_NOSYS",
+            "E_j2_NOSYS",
         ]
 
         if self.do_m_hh:
@@ -26,10 +37,13 @@ class Setup:
                 0, 1, self.num_bins + 1
             )  # keep in [0,1] if using sigmoid activation
 
-        self.bandwidth = 0.2  # bandwidth ~ bin width is good choice
+        # bandwidth ~ bin width is a good choice
+        self.bandwidth = 0.2
 
         self.region = "SR_xbb_2"
-        self.plot_path = "/lustre/fs22/group/atlas/freder/hh/run/neos/"
+        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/neos/"
+        self.results_file_path = self.results_path + "saved_results.pkl"
+
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
                 [

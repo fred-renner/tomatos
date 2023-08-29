@@ -116,4 +116,6 @@ def prepare_data(config):
     data["multijet"] = np.asarray(np.resize(data["multijet"][:], data["sig"].shape))
 
     data = (jnp.asarray(data["sig"]), jnp.asarray(data["multijet"]))
-    return data, data_min, data_max
+    config.data_min = data_min
+    config.data_max = data_max
+    return data
