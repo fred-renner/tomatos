@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from functools import partial
+import pickle
 
 import jax
 import pyhf
@@ -19,7 +20,7 @@ pyhf.set_backend("jax")
 
 def run():
     config = hh_neos.configuration.Setup()
-    data, data_min, data_max = hh_neos.preprocess.prepare_data(config)
+    data = hh_neos.preprocess.prepare_data(config)
     print([x.shape for x in data])
     init_pars, nn = hh_neos.nn_architecture.init(config)
     train, test = hh_neos.batching.split_data(data, train_size=0.8)
@@ -33,9 +34,33 @@ def run():
         init_pars=init_pars,
         nn=nn,
     )
+    bins, yields = hh_neos.optimization.get_hist(config, nn, best_params, data, test)
+    hh_neos.plotting.plot_metrics(metrics, config)
+    hh_neos.plotting.hist(config, bins, yields)
 
-    hh_neos.plotting.metrics(metrics, config)
-    hh_neos.plotting.hist(config, nn, best_params, data, test, data_min, data_max)
+    results = {
+        "config": config,
+        "metrics": metrics,
+        "bins": bins,
+        "yields": yields,
+    }
+    with open(config.results_file_path, "wb") as file:
+        pickle.dump(results, file)
+
+    plot()
 
 
-# run()
+def plot():
+    config = hh_neos.configuration.Setup()
+    results = {}
+    with open(config.results_file_path, "rb") as file:
+        results = pickle.load(file)
+    hh_neos.plotting.plot_metrics(
+        results["metrics"],
+        results["config"],
+    )
+    hh_neos.plotting.hist(
+        results["config"],
+        results["bins"],
+        results["yields"],
+    )

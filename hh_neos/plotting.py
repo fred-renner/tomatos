@@ -9,7 +9,7 @@ import hh_neos.histograms
 import hh_neos.workspace
 
 
-def metrics(metrics, config):
+def plot_metrics(metrics, config):
     epoch_grid = range(1, config.num_steps + 1)
     print(epoch_grid)
     for k, v in metrics.items():
@@ -21,19 +21,79 @@ def metrics(metrics, config):
             plt.xlabel("epoch")
             plt.ylabel(k)
             plt.tight_layout()
-            plt.savefig(config.plot_path + k + ".pdf")
+            print(config.results_path + k + ".pdf")
+            plt.savefig(config.results_path + k + ".pdf")
         if k == "bins":
             plt.figure()
-            sns.heatmap(np.array(v).T, cmap="viridis")
+            for i, bins in enumerate(v):
+                if config.do_m_hh and config.include_bins:
+                    bins = (
+                        bins * (config.data_max - config.data_min)
+                    ) + config.data_min
+                    plt.xlabel("m$_{hh}$ (MeV)")
+                plt.vlines(x=bins, ymin=i, ymax=i + 1)
+                plt.ylabel("epoch")
+            plt.tight_layout()
+            print(config.results_path + k + ".pdf")
+            plt.savefig(config.results_path + k + ".pdf")
     # plt.yscale("log")
     # plt.legend()
     # plt.xlabel("epoch")
     # plt.ylabel("metric")
     # plt.tight_layout()
-    # plt.savefig(plot_path + "metrics.pdf")
+    # plt.savefig(results_path + "metrics.pdf")
 
 
-def hist(config, nn, best_params, data, test, data_min, data_max):
+def hist(config, bins, yields):
+    plt.figure()
+    for c, (l, a) in zip(
+        ["C0", "C1", "C2", "C3"], zip(yields, jnp.array(list(yields.values())))
+    ):
+        if config.do_m_hh:
+            if config.include_bins:
+                bins_unscaled = (
+                    bins * (config.data_max - config.data_min)
+                ) + config.data_min
+                print(bins_unscaled)
+                plt.stairs(
+                    a,
+                    bins_unscaled,
+                    label=l,
+                    alpha=0.4,
+                    fill=None,
+                    edgecolor=c,
+                    linewidth=2,
+                )
+            else:
+                plt.stairs(
+                    a[1:-1],
+                    bins[1:-1],
+                    label=l,
+                    alpha=0.4,
+                    fill=None,
+                    edgecolor=c,
+                    linewidth=2,
+                )
+            plt.xlabel("m$_{hh}$ (MeV)")
+        else:
+            plt.bar(
+                range(len(a)),
+                a,
+                label=l,
+                alpha=0.4,
+                fill=None,
+                edgecolor=c,
+                linewidth=2,
+            )
+            plt.xlabel("NN score")
+    plt.ylabel("Events")
+    plt.legend()
+    plt.tight_layout()
+    print(config.results_path + "hist.pdf")
+    plt.savefig(config.results_path + "hist.pdf")
+
+
+def get_hist(config, nn, best_params, data, test):
     if config.include_bins:
         bins = jnp.array([0, *best_params["bins"], 1])
         print(best_params["bins"])
@@ -73,10 +133,11 @@ def hist(config, nn, best_params, data, test, data_min, data_max):
         )
 
     else:
+        # original Asimov Significance:  2.5999689964036663
         # to get correct yields would also need to pass whole data
         yields = hh_neos.histograms.hists_from_nn(
             pars=best_params["nn_pars"],
-            data={k: v+1e-8 for k, v in zip(config.data_types, test)},
+            data={k: v + 1e-8 for k, v in zip(config.data_types, test)},
             nn=nn,
             bandwidth=1e-8,
             bins=jnp.array([0, *best_params["bins"], 1]),
@@ -89,49 +150,5 @@ def hist(config, nn, best_params, data, test, data_min, data_max):
         "Asimov Significance: ",
         relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"]),
     )
-    # original Asimov Significance:  2.5999689964036663
 
-    # print(data_max)
-    # print(data_min)
-    for c, (l, a) in zip(
-        ["C0", "C1", "C2", "C3"], zip(yields, jnp.array(list(yields.values())))
-    ):
-        if config.do_m_hh:
-            if config.include_bins:
-                bins_unscaled = (bins * (data_max - data_min)) + data_min
-                print(bins_unscaled)
-                plt.stairs(
-                    a,
-                    bins_unscaled,
-                    label=l,
-                    alpha=0.4,
-                    fill=None,
-                    edgecolor=c,
-                    linewidth=2,
-                )
-            else:
-                plt.stairs(
-                    a[1:-1],
-                    bins[1:-1],
-                    label=l,
-                    alpha=0.4,
-                    fill=None,
-                    edgecolor=c,
-                    linewidth=2,
-                )
-            plt.xlabel("m$_{hh}$ (MeV)")
-        else:
-            plt.bar(
-                range(len(a)),
-                a,
-                label=l,
-                alpha=0.4,
-                fill=None,
-                edgecolor=c,
-                linewidth=2,
-            )
-            plt.xlabel("NN score")
-    plt.ylabel("Events")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(config.plot_path + "hist.pdf")
+    return bins, yields

@@ -114,3 +114,64 @@ def run(
     metrics["Z_A"] = z_a
     metrics["bins"] = bins_per_step
     return best_params, metrics
+
+
+def get_hist(config, nn, best_params, data, test):
+    if config.include_bins:
+        bins = jnp.array([0, *best_params["bins"], 1])
+        print(best_params["bins"])
+    if config.do_m_hh:
+        # use whole data set to get correct norm
+        yields = hh_neos.histograms.hists_from_mhh(
+            data={k: v for k, v in zip(config.data_types, data)},
+            bandwidth=1e-8,
+            bins=bins,
+        )
+        model = hh_neos.workspace.model_from_hists(yields)
+
+        # this here gives the same cls! jay
+        print(model.expected_data([0, 1.0]))
+
+        CLs_obs, CLs_exp = pyhf.infer.hypotest(
+            1.0,  # null hypothesis
+            model.expected_data([0, 0.0]),
+            model,
+            test_stat="q",
+            return_expected_set=True,
+        )
+        print(f"      Observed CLs: {CLs_obs:.4f}")
+        for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
+            print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
+
+        print(
+            "relaxed cls: ",
+            relaxed.infer.hypotest(
+                test_poi=1.0,
+                data=model.expected_data([0, 0.0]),
+                model=model,
+                test_stat="q",
+                # expected_pars=hypothesis_pars,
+                lr=0.002,
+            ),
+        )
+
+    else:
+        # original Asimov Significance:  2.5999689964036663
+        # to get correct yields would also need to pass whole data
+        yields = hh_neos.histograms.hists_from_nn(
+            pars=best_params["nn_pars"],
+            data={k: v + 1e-8 for k, v in zip(config.data_types, test)},
+            nn=nn,
+            bandwidth=1e-8,
+            bins=jnp.array([0, *best_params["bins"], 1]),
+        )
+    print(
+        bins[1:-1],
+    )
+    print(yields)
+    print(
+        "Asimov Significance: ",
+        relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"]),
+    )
+
+    return bins, yields
