@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from functools import partial
 import pickle
 
 import jax
@@ -11,6 +10,8 @@ import hh_neos.nn_architecture
 import hh_neos.optimization
 import hh_neos.preprocess
 import hh_neos.plotting
+import hh_neos.utils
+from pprint import pprint
 
 JAX_CHECK_TRACER_LEAKS = True
 
@@ -20,6 +21,7 @@ pyhf.set_backend("jax")
 
 def run():
     config = hh_neos.configuration.Setup()
+    pprint(vars(config))
     data = hh_neos.preprocess.prepare_data(config)
     print([x.shape for x in data])
     init_pars, nn = hh_neos.nn_architecture.init(config)
@@ -34,9 +36,8 @@ def run():
         init_pars=init_pars,
         nn=nn,
     )
-    bins, yields = hh_neos.optimization.get_hist(config, nn, best_params, data, test)
-    hh_neos.plotting.plot_metrics(metrics, config)
-    hh_neos.plotting.hist(config, bins, yields)
+
+    bins, yields = hh_neos.utils.get_hist(config, nn, best_params, data)
 
     results = {
         "config": config,
@@ -64,3 +65,8 @@ def plot():
         results["bins"],
         results["yields"],
     )
+
+
+if __name__ == "__main__":
+    # run()
+    plot()

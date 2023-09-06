@@ -5,11 +5,6 @@ from sklearn.preprocessing import MinMaxScaler
 
 w_CR = 0.007691879267891989
 err_w_CR = 0.0007230248761909538
-files = {}
-files["SM"] = "/lustre/fs22/group/atlas/freder/hh/run/dump/dump-mc20_SM.h5"
-files["k2v0"] = "/lustre/fs22/group/atlas/freder/hh/run/dump/dump-mc20_k2v0.h5"
-files["ttbar"] = "/lustre/fs22/group/atlas/freder/hh/run/dump/dump-mc20_ttbar.h5"
-files["run2"] = "/lustre/fs22/group/atlas/freder/hh/run/dump/dump-run2.h5"
 
 
 def stack_inputs(filepath, config):
@@ -86,9 +81,9 @@ def append_weights(
 
 def prepare_data(config):
     data = {
-        "sig": stack_inputs(files["k2v0"], config),
-        # "ttbar": stack_inputs(files["ttbar"],config),
-        "multijet": stack_inputs(files["run2"], config),
+        "sig": stack_inputs(config.files["k2v0"], config),
+        # "ttbar": stack_inputs(config.files["ttbar"],config),
+        "multijet": stack_inputs(config.files["run2"], config),
     }
     data_min = 0
     data_max = 1
@@ -103,11 +98,11 @@ def prepare_data(config):
     # I know its bad to put the weights in the data, but there is so much
     # shuffling etc happening, that it is the easiest for now
     data = {
-        "sig": append_weights(data["sig"], files["k2v0"], config=config),
-        # "ttbar": append_weights(files["ttbar"]),
+        "sig": append_weights(data["sig"], config.files["k2v0"], config=config),
+        # "ttbar": append_weights(config.files["ttbar"]),
         "multijet": append_weights(
             data["multijet"],
-            files["run2"],
+            config.files["run2"],
             config=config,
             replicate_weight=replicate_weight * w_CR,
         ),

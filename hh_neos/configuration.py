@@ -1,11 +1,20 @@
 import jax.numpy as jnp
 import numpy as np
+import os
 
 
 class Setup:
     def __init__(self):
-        self.do_m_hh = False
-        self.include_bins = True
+        self.files = {
+            "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_SM.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_k2v0.h5",
+            "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_ttbar.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-run2.h5",
+        }
+
+        self.do_m_hh = True
+        self.include_bins = False
+        self.debug = False
         self.vars = [
             "pt_h1_NOSYS",
             "eta_h1_NOSYS",
@@ -41,8 +50,19 @@ class Setup:
         self.bandwidth = 0.2
 
         self.region = "SR_xbb_2"
-        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/neos/"
-        self.results_file_path = self.results_path + "saved_results.pkl"
+        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/"
+
+        if self.do_m_hh:
+            results_folder = "neos_m_hh/"
+        else:
+            results_folder = "neos_nn/"
+        if self.debug:
+            results_folder = "neos_debug/"
+        self.results_path += results_folder
+        if not os.path.isdir(self.results_path):
+            os.makedirs(self.results_path)
+
+        self.results_file_path = self.results_path + "/saved_results.pkl"
 
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
@@ -61,10 +81,13 @@ class Setup:
             )  # rel 21 analysis
 
         self.lr = 1e-2
-        self.num_steps = 2
+        if self.debug:
+            self.num_steps = 2
+        else:
+            self.num_steps = 300
+
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"
-        self.test_metric = "discovery"
 
         # the same keys you used in the model building step [model_from_hists]
         self.data_types = ["sig", "bkg_nominal"]  # , "ttbar"]

@@ -7,11 +7,10 @@ import seaborn as sns
 
 import hh_neos.histograms
 import hh_neos.workspace
-
+import hh_neos.utils
 
 def plot_metrics(metrics, config):
     epoch_grid = range(1, config.num_steps + 1)
-    print(epoch_grid)
     for k, v in metrics.items():
         # if k != "generalised_variance":
         if k == "cls" or k == "Z_A":
@@ -76,14 +75,15 @@ def hist(config, bins, yields):
                 )
             plt.xlabel("m$_{hh}$ (MeV)")
         else:
-            plt.bar(
-                range(len(a)),
-                a,
+            plt.stairs(
+                edges=bins,
+                values=a,
                 label=l,
                 alpha=0.4,
                 fill=None,
                 edgecolor=c,
                 linewidth=2,
+                # align="edge",
             )
             plt.xlabel("NN score")
     plt.ylabel("Events")
@@ -92,63 +92,4 @@ def hist(config, bins, yields):
     print(config.results_path + "hist.pdf")
     plt.savefig(config.results_path + "hist.pdf")
 
-
-def get_hist(config, nn, best_params, data, test):
-    if config.include_bins:
-        bins = jnp.array([0, *best_params["bins"], 1])
-        print(best_params["bins"])
-    if config.do_m_hh:
-        # use whole data set to get correct norm
-        yields = hh_neos.histograms.hists_from_mhh(
-            data={k: v for k, v in zip(config.data_types, data)},
-            bandwidth=1e-8,
-            bins=bins,
-        )
-        model = hh_neos.workspace.model_from_hists(yields)
-
-        # this here gives the same cls! jay
-        print(model.expected_data([0, 1.0]))
-
-        CLs_obs, CLs_exp = pyhf.infer.hypotest(
-            1.0,  # null hypothesis
-            model.expected_data([0, 0.0]),
-            model,
-            test_stat="q",
-            return_expected_set=True,
-        )
-        print(f"      Observed CLs: {CLs_obs:.4f}")
-        for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
-            print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
-
-        print(
-            "relaxed cls: ",
-            relaxed.infer.hypotest(
-                test_poi=1.0,
-                data=model.expected_data([0, 0.0]),
-                model=model,
-                test_stat="q",
-                # expected_pars=hypothesis_pars,
-                lr=0.002,
-            ),
-        )
-
-    else:
-        # original Asimov Significance:  2.5999689964036663
-        # to get correct yields would also need to pass whole data
-        yields = hh_neos.histograms.hists_from_nn(
-            pars=best_params["nn_pars"],
-            data={k: v + 1e-8 for k, v in zip(config.data_types, test)},
-            nn=nn,
-            bandwidth=1e-8,
-            bins=jnp.array([0, *best_params["bins"], 1]),
-        )
-    print(
-        bins[1:-1],
-    )
-    print(yields)
-    print(
-        "Asimov Significance: ",
-        relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"]),
-    )
-
-    return bins, yields
+    hh_neos.utils.print_cls(yields)

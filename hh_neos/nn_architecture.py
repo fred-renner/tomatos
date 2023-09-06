@@ -7,9 +7,11 @@ def init(config):
 
     # feel free to modify :)
     init_random_params, nn = stax.serial(
-        stax.Dense(1024),
+        stax.Dense(100),
         stax.Relu,
-        stax.Dense(1024),
+        stax.Dense(100),
+        stax.Relu,
+        stax.Dense(100),
         stax.Relu,
         stax.Dense(1),
         stax.Sigmoid,
