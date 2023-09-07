@@ -14,7 +14,7 @@ class Setup:
 
         self.do_m_hh = True
         self.include_bins = False
-        self.debug = False
+        self.debug = True
         self.vars = [
             "pt_h1_NOSYS",
             "eta_h1_NOSYS",

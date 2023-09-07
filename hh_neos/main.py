@@ -12,6 +12,7 @@ import hh_neos.preprocess
 import hh_neos.plotting
 import hh_neos.utils
 from pprint import pprint
+import sys
 
 JAX_CHECK_TRACER_LEAKS = True
 
@@ -21,6 +22,7 @@ pyhf.set_backend("jax")
 
 def run():
     config = hh_neos.configuration.Setup()
+    sys.stdout = hh_neos.utils.Logger(config)
     pprint(vars(config))
     data = hh_neos.preprocess.prepare_data(config)
     print([x.shape for x in data])
