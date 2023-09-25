@@ -5,16 +5,19 @@ import os
 
 class Setup:
     def __init__(self):
+        # fmt: off
         self.files = {
-            "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_SM.h5",
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_k2v0.h5",
-            "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-mc20_ttbar.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/bdt_vars/dump-run2.h5",
+            "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_SM.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_k2v0.h5",
+            "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_ttbar.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-run2.h5",
         }
+        # fmt: on
 
-        self.do_m_hh = True
-        self.include_bins = False
+        self.do_m_hh = False
+        self.include_bins = True
         self.debug = True
+
         self.vars = [
             "pt_h1_NOSYS",
             "eta_h1_NOSYS",
