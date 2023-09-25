@@ -31,18 +31,18 @@ def model_from_hists(hists: dict[str, Array]) -> pyhf.Model:
                         "name": "background",
                         "data": jnp.array(hists["bkg_nominal"]),  # background
                         "modifiers": [
-                            {
-                                "name": "multijet_shape_unc",
-                                "type": "histosys",
-                                "data": {
-                                    "hi_data": jnp.array(
-                                        hists["bkg_nominal"] * 1.1
-                                    ),  # up sample
-                                    "lo_data": jnp.array(
-                                        hists["bkg_nominal"] * 0.9
-                                    ),  # down sample
-                                },
-                            },
+                            # {
+                            #     "name": "multijet_shape_unc",
+                            #     "type": "histosys",
+                            #     "data": {
+                            #         "hi_data": jnp.array(
+                            #             hists["bkg_nominal"] * 1.1
+                            #         ),  # up sample
+                            #         "lo_data": jnp.array(
+                            #             hists["bkg_nominal"] * 0.9
+                            #         ),  # down sample
+                            #     },
+                            # },
                             # {
                             #     "name": "multijet_stat_unc",
                             #     "type": "histosys",

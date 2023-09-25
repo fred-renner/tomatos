@@ -28,7 +28,7 @@ def stack_inputs(filepath, config):
         config.region = "SR_xbb_2"
 
     with h5py.File(filepath, "r") as f:
-        # init array
+        # init matrix
         arr = np.zeros(
             (f[config.vars[0] + "." + config.region].shape[0], len(config.vars))
         )
@@ -68,12 +68,11 @@ def append_weights(
     config,
     replicate_weight=1,
 ):
-    if "run2" in filepath:
-        config.region = "SR_xbb_1"
-    else:
-        config.region = "SR_xbb_2"
     with h5py.File(filepath, "r") as f:
-        weights = f["weights." + config.region][:] * replicate_weight
+        if "run2" in filepath:
+            weights = np.ones(f["m_hh_NOSYS.SR_xbb_1"].shape) * replicate_weight
+        else:
+            weights = f["weights_NOSYS.SR_xbb_2"][:]
         weights = weights.reshape((weights.shape[0], 1))
         arr = np.append(arr, weights, axis=1)
     return arr
@@ -95,8 +94,7 @@ def prepare_data(config):
     # replicate to have same sample size as signal
     replicate_weight = 1 / (data["sig"].shape[0] / data["multijet"].shape[0])
 
-    # I know its bad to put the weights in the data, but there is so much
-    # shuffling etc happening, that it is the easiest for now
+    # weights in data maybe bad, but need to bookkeep per event through the whole thing
     data = {
         "sig": append_weights(data["sig"], config.files["k2v0"], config=config),
         # "ttbar": append_weights(config.files["ttbar"]),

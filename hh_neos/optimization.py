@@ -13,6 +13,25 @@ import hh_neos.pipeline
 Array = jnp.ndarray
 import hh_neos.histograms
 
+# import psutil
+import sys
+import gc
+
+
+# clear caches each update otherwise memory explodes
+# https://github.com/google/jax/issues/10828
+# doubles computation time, still filling up memory though but much slower
+def clear_caches():
+    # process = psutil.Process()
+    # if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
+    for module_name, module in sys.modules.items():
+        if module_name.startswith("jax"):
+            for obj_name in dir(module):
+                obj = getattr(module, obj_name)
+                if hasattr(obj, "cache_clear"):
+                    obj.cache_clear()
+    gc.collect()
+
 
 def run(
     config,
@@ -106,9 +125,10 @@ def run(
             )
         this_z_a = relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"])
         print("Z_A: ", this_z_a)
+        print()
+        clear_caches()
         z_a.append(this_z_a)
 
     metrics["Z_A"] = z_a
     metrics["bins"] = bins_per_step
     return best_params, metrics
-

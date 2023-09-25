@@ -10,9 +10,9 @@ import sys
 
 
 class Logger(object):
-    def __init__(self,config):
+    def __init__(self, config):
         self.terminal = sys.stdout
-        self.log = open(config.results_path+"log.txt", "a")
+        self.log = open(config.results_path + "log.txt", "a")
 
     def write(self, message):
         self.terminal.write(message)
