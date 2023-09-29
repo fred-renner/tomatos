@@ -7,8 +7,47 @@ w_CR = 0.007691879267891989
 err_w_CR = 0.0007230248761909538
 
 
-def stack_inputs(filepath, config):
-    """make matrix of input variables
+def stack_inputs(
+    filepath,
+    config,
+    sys="NOSYS",
+    use_NOSYS_weights=True,
+    custom_weights=1.0,
+):
+    """make array of input variables and attach desired weights to bookeep the
+    weights, so it gets the shape:
+
+    (n_events, 2, n_vars,)
+
+    so we get sth like e.g. with 3 features
+        val = np.array(
+            [
+                [0, 1, 2],
+                [3, 4, 5],
+                [6, 7, 8],
+            ]
+        )
+
+    with wights
+        w = np.array(
+            [
+                [90, 91, 92],
+                [93, 94, 95],
+                [96, 97, 98],
+            ]
+        )
+
+    put together like
+        data = np.array(
+            [
+                [
+                    [[0, 1, 2], [90, 91, 92]],
+                    [[3, 4, 5], [93, 94, 95]],
+                    [[6, 7, 8], [96, 97, 98]],
+                ]
+            ]
+        )
+
 
     Parameters
     ----------
@@ -16,32 +55,50 @@ def stack_inputs(filepath, config):
         path to file
     config : hh_neos.configuration.Setup
         config object
+    filepath : sys
+        systematic
+    use_NOSYS_weights : bool
+        attach NOSYS weights, but load given sys vars
 
     Returns
     -------
-    np.arrray
-        matrix of input variables per event
+    out : ndarray
+        array holding per event pairs of feature values and weights
+
     """
+
     if "run2" in filepath:
         config.region = "SR_xbb_1"
+        is_mc = False
     else:
         config.region = "SR_xbb_2"
+        is_mc = True
 
     with h5py.File(filepath, "r") as f:
-        # init matrix
-        arr = np.zeros(
-            (f[config.vars[0] + "." + config.region].shape[0], len(config.vars))
-        )
+        n_events = f[config.vars[0] + "_NOSYS" + "." + config.region].shape[0]
+        arr = np.zeros((n_events, 2, config.n_features))
+
+        if use_NOSYS_weights:
+            w_sys = "NOSYS"
+        else:
+            w_sys = sys
+
         for i, var in enumerate(config.vars):
-            # put in matrix
-            arr[:, i] = f[var + "." + config.region][:]
+            # fill
+            var_name = var + "_" + sys + "." + config.region
+            w_name = "weights_" + w_sys + "." + config.region
+            arr[:, 0, i] = f[var_name][:]
+            if is_mc:
+                arr[:, 1, i] = f[w_name][:]
+            else:
+                arr[:, 1, i] = np.full(n_events, custom_weights)
 
         return arr
 
 
 def min_max_norm(data):
     # need to concatenate to find overall min max
-    data_ = np.concatenate([data[key] for key in data.keys()])
+    data_ = np.concatenate([data[key][:, 0, :] for key in data.keys()])
 
     shapes = [data[key].shape[0] for key in data.keys()]
     shapes_cumulative = np.cumsum(shapes)
@@ -57,58 +114,57 @@ def min_max_norm(data):
     scaled_data_splitted = np.split(scaled_data, shapes_cumulative[:-1])
 
     for i, key in enumerate(data.keys()):
-        data[key] = scaled_data_splitted[i]
+        data[key][:, 0, :] = scaled_data_splitted[i]
 
     return data, data_min, data_max
 
 
-def append_weights(
-    arr,
-    filepath,
-    config,
-    replicate_weight=1,
-):
+def get_n_events(filepath, var):
     with h5py.File(filepath, "r") as f:
-        if "run2" in filepath:
-            weights = np.ones(f["m_hh_NOSYS.SR_xbb_1"].shape) * replicate_weight
-        else:
-            weights = f["weights_NOSYS.SR_xbb_2"][:]
-        weights = weights.reshape((weights.shape[0], 1))
-        arr = np.append(arr, weights, axis=1)
-    return arr
+        return f[var].shape[0]
 
 
 def prepare_data(config):
-    data = {
-        "sig": stack_inputs(config.files["k2v0"], config),
-        # "ttbar": stack_inputs(config.files["ttbar"],config),
-        "multijet": stack_inputs(config.files["run2"], config),
-    }
+    data = {}
+
+    # as we are upscaling the background to match the number of events in the
+    # signal, need to account for in weights
+
+    replicate_weight = 1 / (
+        get_n_events(filepath=config.files["k2v0"], var="m_hh_NOSYS.SR_xbb_2")
+        / get_n_events(filepath=config.files["run2"], var="m_hh_NOSYS.SR_xbb_1")
+    )
+    data["bkg"] = stack_inputs(
+        config.files["run2"],
+        config,
+        custom_weights=replicate_weight * w_CR,
+    )
+
+    for sys in config.systematics:
+        if "NOSYS" in sys:
+            use_NOSYS_weights = True
+        else:
+            use_NOSYS_weights = False
+        data[sys] = stack_inputs(
+            config.files["k2v0"],
+            config,
+            use_NOSYS_weights=use_NOSYS_weights,
+            sys=sys,
+        )
+
     data_min = 0
     data_max = 1
     if config.include_bins:
         data, data_min, data_max = min_max_norm(data)
+    # print([data[key].shape[0] for key in data.keys()])
 
-    print([data[key].shape[0] for key in data.keys()])
-
-    # replicate to have same sample size as signal
-    replicate_weight = 1 / (data["sig"].shape[0] / data["multijet"].shape[0])
-
-    # weights in data maybe bad, but need to bookkeep per event through the whole thing
-    data = {
-        "sig": append_weights(data["sig"], config.files["k2v0"], config=config),
-        # "ttbar": append_weights(config.files["ttbar"]),
-        "multijet": append_weights(
-            data["multijet"],
-            config.files["run2"],
-            config=config,
-            replicate_weight=replicate_weight * w_CR,
-        ),
-    }
     # replicate to have same size sample input
-    data["multijet"] = np.asarray(np.resize(data["multijet"][:], data["sig"].shape))
-
-    data = (jnp.asarray(data["sig"]), jnp.asarray(data["multijet"]))
+    data["bkg"] = np.asarray(np.resize(data["bkg"][:], data["NOSYS"].shape))
+    # print([data[key].shape for key in data.keys()])
+    jnp_data = []
+    for k in data.keys():
+        jnp_data += [jnp.asarray(data[k])]
+    # data = (jnp.asarray(data["NOSYS"]), jnp.asarray(data["bkg"]))
     config.data_min = data_min
     config.data_max = data_max
-    return data
+    return jnp_data
