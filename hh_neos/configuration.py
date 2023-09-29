@@ -19,30 +19,49 @@ class Setup:
         self.debug = True
 
         self.vars = [
-            "pt_h1_NOSYS",
-            "eta_h1_NOSYS",
-            # "phi_h1_NOSYS",
-            # "m_h1_NOSYS",
-            "pt_h2_NOSYS",
-            "eta_h2_NOSYS",
-            # "phi_h2_NOSYS",
-            # "m_h2_NOSYS",
-            "pt_hh_NOSYS",
-            "eta_hh_NOSYS",
-            # "phi_hh_NOSYS",
-            "m_hh_NOSYS",
-            "pt_j1_NOSYS",
-            "eta_j1_NOSYS",
-            # "phi_j1_NOSYS",
-            "E_j1_NOSYS",
-            "pt_j2_NOSYS",
-            "eta_j2_NOSYS",
-            # "phi_j2_NOSYS",
-            "E_j2_NOSYS",
+            "pt_h1",
+            "eta_h1",
+            # "phi_h1",
+            # "m_h1",
+            "pt_h2",
+            "eta_h2",
+            # "phi_h2",
+            # "m_h2",
+            "pt_hh",
+            "eta_hh",
+            # "phi_hh",
+            "m_hh",
+            "pt_j1",
+            "eta_j1",
+            # "phi_j1",
+            "E_j1",
+            "pt_j2",
+            "eta_j2",
+            # "phi_j2",
+            "E_j2",
+        ]
+        self.n_features = len(self.vars)
+        self.systematics = [
+            "NOSYS",
+            "xbb_pt_bin_0__1up",
+            "xbb_pt_bin_0__1down",
+            # "xbb_pt_bin_1__1up",
+            # "xbb_pt_bin_1__1down",
+            # "xbb_pt_bin_2__1up",
+            # "xbb_pt_bin_2__1down",
+            # "xbb_pt_bin_3__1up",
+            # "xbb_pt_bin_3__1down",
+            # "GEN_MUR05_MUF05_PDF260000",
+            # "GEN_MUR05_MUF10_PDF260000",
+            # "GEN_MUR10_MUF05_PDF260000",
+            # "GEN_MUR10_MUF10_PDF260000",
+            # "GEN_MUR10_MUF20_PDF260000",
+            # "GEN_MUR20_MUF10_PDF260000",
+            # "GEN_MUR20_MUF20_PDF260000",
         ]
 
         if self.do_m_hh:
-            self.vars = ["m_hh_NOSYS"]
+            self.vars = ["m_hh"]
         if self.include_bins:
             self.num_bins = 7
             self.bins = jnp.linspace(

@@ -49,6 +49,7 @@ def run():
     }
     with open(config.results_file_path, "wb") as file:
         pickle.dump(results, file)
+        pickle.dump(nn, file)
 
     plot()
 
