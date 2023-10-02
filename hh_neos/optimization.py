@@ -20,7 +20,7 @@ import gc
 
 # clear caches each update otherwise memory explodes
 # https://github.com/google/jax/issues/10828
-# doubles computation time, still filling up memory though but much slower
+# doubles computation time, still filling up memory but much slower
 def clear_caches():
     # process = psutil.Process()
     # if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage

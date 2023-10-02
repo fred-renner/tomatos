@@ -10,8 +10,8 @@ batch_size = 1_000_000  # change me if you want!
 
 
 def split_data(data, train_size):
-
     split = train_test_split(data, train_size=train_size, random_state=rng_state)
+    print(len(split))
     # X_train, X_test, y_train, y_test = train_test_split()
     train, test = split[::2], split[1::2]
     return train, test
@@ -19,7 +19,7 @@ def split_data(data, train_size):
 
 def make_iterator(train):
     def batches(training_data: Array, batch_size: int) -> Generator:
-        print(training_data)
+        # print(training_data)
         num_train = training_data[0].shape[0]
         num_complete_batches, leftover = divmod(num_train, batch_size)
         num_batches = num_complete_batches + bool(leftover)
