@@ -54,7 +54,7 @@ def hist(
     # get cumulative counts (area under kde) for each set of bin edges
 
     cdf = jsp.stats.norm.cdf(bins.reshape(-1, 1), loc=data, scale=bandwidth)
-    # multiply with weights
+    # multiply with weight
     cdf = cdf * weights
     # sum kde contributions in each bin
     counts = (cdf[1:, :] - cdf[:-1, :]).sum(axis=1)
@@ -82,10 +82,10 @@ def hists_from_nn(
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs yields."""
 
-    # retrieve weights
-    weights = {k: data[k][:, -1] for k in data}
-    # remove weights for training
-    data = {k: data[k][:, :-1] for k in data}
+    values = {k: data[k][:, 0, :] for k in data}
+    #
+    weights = {k: data[k][:, 1, 0] for k in data}
+
     bins_new = jnp.concatenate(
         (
             jnp.array([bins[0]]),
@@ -97,11 +97,10 @@ def hists_from_nn(
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins_new)
 
-    # scale_factors = scale_factors or {k: 1.0 for k in nn_output}
-
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
-    nn_output = {k: nn(pars, data[k][:]).ravel() for k in data}
+    nn_output = {k: nn(pars, values[k]).ravel() for k in values}
+
     hists = {
         k: make_hist(data=nn_output[k], weights=weights[k])
         for k, v in nn_output.items()
@@ -116,10 +115,10 @@ def hists_from_mhh(
     bandwidth: float,
     include_bins=False,
 ):
-    # retrieve weights
-    weights = {k: data[k][:, -1] for k in data}
-    # remove weights for training
-    data = {k: data[k][:, :-1] for k in data}
+    values = {k: data[k][:, 0, :] for k in data}
+
+    weights = {k: data[k][:, 1, 0] for k in data}
+
     if include_bins:
         bins = jnp.concatenate(
             (
@@ -131,7 +130,8 @@ def hists_from_mhh(
 
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
     hists = {
-        k: make_hist(data=data[k].ravel(), weights=weights[k]) for k, v in data.items()
+        k: make_hist(data=values[k].ravel(), weights=weights[k])
+        for k, v in data.items()
     }
 
     return hists

@@ -31,9 +31,9 @@ def stack_inputs(
     with wights
         w = np.array(
             [
-                [90, 91, 92],
-                [93, 94, 95],
-                [96, 97, 98],
+                [90, 90, 90],
+                [91, 91, 91],
+                [92, 92, 92],
             ]
         )
 
@@ -41,9 +41,9 @@ def stack_inputs(
         data = np.array(
             [
                 [
-                    [[0, 1, 2], [90, 91, 92]],
-                    [[3, 4, 5], [93, 94, 95]],
-                    [[6, 7, 8], [96, 97, 98]],
+                    [[0, 1, 2], [90, 90, 90]],
+                    [[3, 4, 5], [91, 91, 91]],
+                    [[6, 7, 8], [92, 92, 92]],
                 ]
             ]
         )
@@ -125,11 +125,11 @@ def get_n_events(filepath, var):
 
 
 def prepare_data(config):
+    
     data = {}
 
     # as we are upscaling the background to match the number of events in the
     # signal, need to account for in weights
-
     replicate_weight = 1 / (
         get_n_events(filepath=config.files["k2v0"], var="m_hh_NOSYS.SR_xbb_2")
         / get_n_events(filepath=config.files["run2"], var="m_hh_NOSYS.SR_xbb_1")
@@ -154,6 +154,7 @@ def prepare_data(config):
 
     data_min = 0
     data_max = 1
+
     if config.include_bins:
         data, data_min, data_max = min_max_norm(data)
     # print([data[key].shape[0] for key in data.keys()])
@@ -161,10 +162,14 @@ def prepare_data(config):
     # replicate to have same size sample input
     data["bkg"] = np.asarray(np.resize(data["bkg"][:], data["NOSYS"].shape))
     # print([data[key].shape for key in data.keys()])
+    config.data_types = []
     jnp_data = []
     for k in data.keys():
+        config.data_types += [k]
         jnp_data += [jnp.asarray(data[k])]
-    # data = (jnp.asarray(data["NOSYS"]), jnp.asarray(data["bkg"]))
+
     config.data_min = data_min
     config.data_max = data_max
+
+    # samples, events, features
     return jnp_data

@@ -17,9 +17,7 @@ def init(config):
         stax.Sigmoid,
     )
 
-    # we have one less because of weights
-    num_features = len(config.vars)
-    _, init = init_random_params(PRNGKey(rng_state), (-1, num_features))
+    _, init = init_random_params(PRNGKey(rng_state), (-1, config.n_features))
     init_pars = dict(nn_pars=init)
     return init_pars, nn
 
