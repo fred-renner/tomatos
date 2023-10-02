@@ -40,17 +40,17 @@ class Setup:
             # "phi_j2",
             "E_j2",
         ]
-        self.n_features = len(self.vars)
+
         self.systematics = [
             "NOSYS",
             "xbb_pt_bin_0__1up",
             "xbb_pt_bin_0__1down",
-            # "xbb_pt_bin_1__1up",
-            # "xbb_pt_bin_1__1down",
-            # "xbb_pt_bin_2__1up",
-            # "xbb_pt_bin_2__1down",
-            # "xbb_pt_bin_3__1up",
-            # "xbb_pt_bin_3__1down",
+            "xbb_pt_bin_1__1up",
+            "xbb_pt_bin_1__1down",
+            "xbb_pt_bin_2__1up",
+            "xbb_pt_bin_2__1down",
+            "xbb_pt_bin_3__1up",
+            "xbb_pt_bin_3__1down",
             # "GEN_MUR05_MUF05_PDF260000",
             # "GEN_MUR05_MUF10_PDF260000",
             # "GEN_MUR10_MUF05_PDF260000",
@@ -62,11 +62,13 @@ class Setup:
 
         if self.do_m_hh:
             self.vars = ["m_hh"]
+
+        self.n_features = len(self.vars)
+
         if self.include_bins:
-            self.num_bins = 7
-            self.bins = jnp.linspace(
-                0, 1, self.num_bins + 1
-            )  # keep in [0,1] if using sigmoid activation
+            self.num_bins = 8
+            # keep in [0,1] if using sigmoid activation
+            self.bins = jnp.linspace(0, 1, self.num_bins)
 
         # bandwidth ~ bin width is a good choice
         self.bandwidth = 0.2
@@ -110,6 +112,3 @@ class Setup:
 
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"
-
-        # the same keys you used in the model building step [model_from_hists]
-        self.data_types = ["sig", "bkg_nominal"]  # , "ttbar"]

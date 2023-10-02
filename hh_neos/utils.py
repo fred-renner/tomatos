@@ -54,7 +54,7 @@ def get_hist(config, nn, best_params, data):
     print(yields)
     print(
         "Asimov Significance: ",
-        relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"]),
+        relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
     )
 
     return bins, yields

@@ -123,7 +123,7 @@ def run(
                 bandwidth=config.bandwidth,  # for the bKDEs
                 bins=jnp.array([0, *params["bins"], 1]),
             )
-        this_z_a = relaxed.metrics.asimov_sig(s=yields["sig"], b=yields["bkg_nominal"])
+        this_z_a = relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
         print("Z_A: ", this_z_a)
         print()
         clear_caches()
