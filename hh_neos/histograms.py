@@ -99,7 +99,8 @@ def hists_from_nn(
 
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
-    nn_output = {k: nn(pars, values[k]).ravel() for k in values}
+    nn_apply = partial(nn, pars)
+    nn_output = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
 
     hists = {
         k: make_hist(data=nn_output[k], weights=weights[k])

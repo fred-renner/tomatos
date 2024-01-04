@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 Array = jnp.ndarray
 rng_state = 0
-batch_size = int(1e1)  # change me if you want!
+batch_size = int(1e5)  # change me if you want!
 
 
 def split_data(data, train_size):

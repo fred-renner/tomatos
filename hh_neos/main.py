@@ -18,15 +18,21 @@ JAX_CHECK_TRACER_LEAKS = True
 
 jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--bins", type=int)
+args = parser.parse_args()
 
 
 def run():
-    config = hh_neos.configuration.Setup()
+    config = hh_neos.configuration.Setup(args)
     sys.stdout = hh_neos.utils.Logger(config)
     pprint(vars(config))
     data = hh_neos.preprocess.prepare_data(config)
     print([x.shape for x in data])
     init_pars, nn = hh_neos.nn_architecture.init(config)
+    print(init_pars)
     train, test = hh_neos.batching.split_data(data, train_size=0.8)
     batch_iterator = hh_neos.batching.make_iterator(train)
 
@@ -46,17 +52,17 @@ def run():
         "metrics": metrics,
         "bins": bins,
         "yields": yields,
+        "best_params": best_params,
     }
+
     with open(config.results_file_path, "wb") as file:
         pickle.dump(results, file)
-        # needs fix:
-        # pickle.dump(nn, file)
 
     plot()
 
 
 def plot():
-    config = hh_neos.configuration.Setup()
+    config = hh_neos.configuration.Setup(args)
     results = {}
     with open(config.results_file_path, "rb") as file:
         results = pickle.load(file)
