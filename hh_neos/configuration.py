@@ -4,7 +4,7 @@ import os
 
 
 class Setup:
-    def __init__(self):
+    def __init__(self, args):
         # fmt: off
         self.files = {
             "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_SM.h5",
@@ -16,7 +16,7 @@ class Setup:
 
         self.do_m_hh = False
         self.include_bins = True
-        self.debug = True
+        self.debug = False
 
         self.vars = [
             "pt_h1",
@@ -51,6 +51,11 @@ class Setup:
             "xbb_pt_bin_2__1down",
             "xbb_pt_bin_3__1up",
             "xbb_pt_bin_3__1down",
+            # "JET_Comb_Modelling_mass__1up",
+            # "JET_Comb_Modelling_mass__1down",
+            # "JET_Rtrk_Modelling_pT__1up",
+            # "JET_Rtrk_Modelling_pT__1down",
+            # could figure out which ones are largest and smallest...
             # "GEN_MUR05_MUF05_PDF260000",
             # "GEN_MUR05_MUF10_PDF260000",
             # "GEN_MUR10_MUF05_PDF260000",
@@ -66,9 +71,13 @@ class Setup:
         self.n_features = len(self.vars)
 
         if self.include_bins:
-            self.num_bins = 8
             # keep in [0,1] if using sigmoid activation
-            self.bins = jnp.linspace(0, 1, self.num_bins)
+            self.bins = np.linspace(0, 1, args.bins + 1)
+            # bad_edges = np.linspace(0.9900, 0.9999, args.bins - 1)
+            # bad_edges = np.insert(bad_edges, 0, 0)
+            # edges = np.append(bad_edges, 1)
+            # self.bins = jnp.array(edges)
+            # print(self.bins)
 
         # bandwidth ~ bin width is a good choice
         self.bandwidth = 0.2
@@ -79,7 +88,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "neos_m_hh/"
         else:
-            results_folder = "neos_nn/"
+            results_folder = f"neos_nn_{len(self.bins)-1}_bins/"
         if self.debug:
             results_folder = "neos_debug/"
         self.results_path += results_folder
@@ -108,7 +117,7 @@ class Setup:
         if self.debug:
             self.num_steps = 2
         else:
-            self.num_steps = 300
+            self.num_steps = 10
 
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"

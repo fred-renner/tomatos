@@ -9,6 +9,7 @@ import hh_neos.histograms
 import hh_neos.workspace
 import hh_neos.utils
 
+
 def plot_metrics(metrics, config):
     epoch_grid = range(1, config.num_steps + 1)
     for k, v in metrics.items():
@@ -30,6 +31,9 @@ def plot_metrics(metrics, config):
                         bins * (config.data_max - config.data_min)
                     ) + config.data_min
                     plt.xlabel("m$_{hh}$ (MeV)")
+                else:
+                    plt.xlabel("NN score")
+                    plt.xlim([0, 1])
                 plt.vlines(x=bins, ymin=i, ymax=i + 1)
                 plt.ylabel("epoch")
             plt.tight_layout()
@@ -45,9 +49,7 @@ def plot_metrics(metrics, config):
 
 def hist(config, bins, yields):
     plt.figure()
-    for c, (l, a) in zip(
-        ["C0", "C1", "C2", "C3"], zip(yields, jnp.array(list(yields.values())))
-    ):
+    for l, a in zip(yields, jnp.array(list(yields.values()))):
         if config.do_m_hh:
             if config.include_bins:
                 bins_unscaled = (
@@ -60,7 +62,6 @@ def hist(config, bins, yields):
                     label=l,
                     alpha=0.4,
                     fill=None,
-                    edgecolor=c,
                     linewidth=2,
                 )
             else:
@@ -70,7 +71,6 @@ def hist(config, bins, yields):
                     label=l,
                     alpha=0.4,
                     fill=None,
-                    edgecolor=c,
                     linewidth=2,
                 )
             plt.xlabel("m$_{hh}$ (MeV)")
@@ -81,7 +81,6 @@ def hist(config, bins, yields):
                 label=l,
                 alpha=0.4,
                 fill=None,
-                edgecolor=c,
                 linewidth=2,
                 # align="edge",
             )
@@ -92,4 +91,4 @@ def hist(config, bins, yields):
     print(config.results_path + "hist.pdf")
     plt.savefig(config.results_path + "hist.pdf")
 
-    hh_neos.utils.print_cls(yields)
+    hh_neos.utils.print_cls(config, yields)

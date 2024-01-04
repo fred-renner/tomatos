@@ -60,8 +60,8 @@ def get_hist(config, nn, best_params, data):
     return bins, yields
 
 
-def print_cls(yields):
-    model = hh_neos.workspace.model_from_hists(yields)
+def print_cls(config, yields):
+    model = hh_neos.workspace.model_from_hists(config, yields)
 
     CLs_obs, CLs_exp = pyhf.infer.hypotest(
         1.0,  # null hypothesis

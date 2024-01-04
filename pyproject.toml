@@ -14,7 +14,7 @@ dependencies = [
     "jaxlib==0.3.14",
     "optax==0.1.2",
     "plothelp==0.1",
-    "flax==0.5.2",
+    "equinox==0.5.5",
     "pyhf @ git+https://github.com/scikit-hep/pyhf.git@make_difffable_model_ctor",
     "relaxed @ git+https://github.com/fred-renner/relaxed.git@mle_fix",
     "neos==0.3.0",
@@ -27,3 +27,4 @@ find = {}  # Scan the project directory with the default parameters
 
 [project.scripts]
 hh_neos = "hh_neos.main:run"
+hh_neos_plot = "hh_neos.main:plot"

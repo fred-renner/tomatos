@@ -17,6 +17,7 @@ import numpy as np
 
 Array = jnp.ndarray
 
+
 def pipeline(
     pars: dict[str, Array],
     data: tuple[Array, ...],
@@ -34,6 +35,10 @@ def pipeline(
     # if you want s/b discrimination, no need to do anything complex!
     if loss.lower() in ["bce", "binary cross-entropy"]:
         return neos.losses.bce(data=data_dct, pars=pars["nn_pars"], nn=nn)
+
+    # make sure bins don't overlap
+    if "bins" in pars:
+        pars["bins"] = jnp.sort(pars["bins"])
 
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
@@ -54,6 +59,6 @@ def pipeline(
         )
 
     # build our statistical model, and calculate the loss!
-    model = hh_neos.workspace.model_from_hists(hists)
+    model = hh_neos.workspace.model_from_hists(do_m_hh, hists)
 
     return neos.loss_from_model(model, loss=loss)
