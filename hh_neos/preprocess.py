@@ -166,7 +166,7 @@ def prepare_data(config):
     jnp_data = []
     for k in data.keys():
         config.data_types += [k]
-        jnp_data += [jnp.asarray(data[k])]
+        jnp_data += [np.asarray(data[k])]
 
     config.data_min = data_min
     config.data_max = data_max

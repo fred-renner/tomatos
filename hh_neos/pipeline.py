@@ -12,7 +12,6 @@ import hh_neos.workspace
 
 jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
-import numpy as np
 
 
 Array = jnp.ndarray

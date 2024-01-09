@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyhf
 import relaxed
-import seaborn as sns
 
 import hh_neos.histograms
 import hh_neos.workspace

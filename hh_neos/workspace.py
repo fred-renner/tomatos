@@ -42,7 +42,19 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
             ],
         }
     else:
-        # stat_err = jnp.sqrt(hists["bkg_nominal"])
+        # stat_err_signal = jnp.sqrt(hists["NOSYS"])
+        # stat_err_bkg = jnp.sqrt(hists["bkg"])
+        # xbb_syst_modifiers = [
+        #     {
+        #         "name": f"xbb_pt_bin_{bin}",
+        #         "type": "histosys",
+        #         "data": {
+        #             "hi_data": hists[f"xbb_pt_bin_{bin}__1up"],  # up sample
+        #             "lo_data": hists[f"xbb_pt_bin_{bin}__1down"],  # down sample
+        #         },
+        #     }
+        #     for bin in [0, 1, 2, 3]
+        # ]
         spec = {
             "channels": [
                 {
@@ -57,6 +69,14 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                                     "type": "normfactor",
                                     "data": None,
                                 },  # our signal strength modifier (parameter of interest)
+                                # {
+                                #     "name": "signal_stat",
+                                #     "type": "histosys",
+                                #     "data": {
+                                #         "hi_data": hists["NOSYS"] + stat_err_signal,
+                                #         "lo_data": hists["NOSYS"] - stat_err_signal,
+                                #     },
+                                # },
                             ],
                         },
                         {
@@ -76,6 +96,15 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                                     },
                                 }
                                 for bin in [0, 1, 2, 3]
+                                # *xbb_syst_modifiers,
+                                # {
+                                #     "name": "signal_stat",
+                                #     "type": "histosys",
+                                #     "data": {
+                                #         "hi_data": hists["NOSYS"] + stat_err_signal,
+                                #         "lo_data": hists["NOSYS"] - stat_err_signal,
+                                #     },
+                                # },
                             ],
                         },
                         # {
