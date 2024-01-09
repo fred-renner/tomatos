@@ -1,5 +1,3 @@
-import jax.example_libraries.stax as stax
-from jax.random import PRNGKey
 import equinox as eqx
 import jax
 
@@ -9,7 +7,7 @@ class NeuralNetwork(eqx.Module):
 
     def __init__(self, n_features):
         rng_state = 0
-        key = PRNGKey(rng_state)
+        key = jax.random.PRNGKey(rng_state)
         key1, key2, key3 = jax.random.split(key, 3)
         # These contain trainable parameters.
         self.layers = [
@@ -27,9 +25,10 @@ class NeuralNetwork(eqx.Module):
         return x
 
 
+# https://docs.kidger.site/equinox/examples/init_apply/
 def make_nn(in_size):
-    nn = NeuralNetwork(in_size)
-    params, static = eqx.partition(nn, eqx.is_inexact_array)
+    model = NeuralNetwork(in_size)
+    params, static = eqx.partition(model, eqx.is_inexact_array)
 
     def init_fn():
         return params
@@ -38,11 +37,11 @@ def make_nn(in_size):
         model = eqx.combine(_params, static)
         return model(x)
 
-    return init_fn, apply_fn
+    return init_fn, apply_fn, static
 
 
 def init(config):
-    init_random_params, nn = make_nn(in_size=config.n_features)
+    init_random_params, nn, nn_setup = make_nn(in_size=config.n_features)
     init_pars = dict(nn_pars=init_random_params())
 
-    return init_pars, nn
+    return init_pars, nn, nn_setup

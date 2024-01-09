@@ -5,8 +5,11 @@ git clone https://gitlab.cern.ch/frenner/hh_neos.git
 # do the next two lines if you want to work from a virtual environment
 python -m venv ./neos_env
 source ./neos_env/bin/activate
-cd neos_env
-# install packages
+cd hh_neos
+# avoid a conflict
+export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
+# install dependencies
 pip install --editable .
+
 hh_neos
 ```

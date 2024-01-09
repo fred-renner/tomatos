@@ -115,7 +115,7 @@ class Setup:
 
         self.lr = 1e-2
         if self.debug:
-            self.num_steps = 2
+            self.num_steps = 1
         else:
             self.num_steps = 10
 
