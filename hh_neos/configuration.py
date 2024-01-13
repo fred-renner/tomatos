@@ -95,7 +95,7 @@ class Setup:
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
 
-        self.results_file_path = self.results_path + "/saved_results.pkl"
+        self.metadata_file_path = self.results_path + "metadata.json"
 
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
@@ -115,9 +115,12 @@ class Setup:
 
         self.lr = 1e-2
         if self.debug:
-            self.num_steps = 1
+            self.num_steps = 2
         else:
             self.num_steps = 10
+    
+        # share of data used for training vs testing
+        self.train_data_ratio=0.8
 
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"

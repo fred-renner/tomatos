@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import pickle
-
+import json
 import jax
 import pyhf
 
@@ -18,6 +18,8 @@ import equinox as eqx
 
 JAX_CHECK_TRACER_LEAKS = True
 import numpy as np
+import jax.numpy as jnp
+
 # jax.config.update("jax_enable_x64", True)
 
 parser = argparse.ArgumentParser()
@@ -33,7 +35,7 @@ def run():
     print([x.shape for x in data])
     init_pars, nn, nn_setup = hh_neos.nn_architecture.init(config)
     print(init_pars)
-    train, test = hh_neos.batching.split_data(data, train_size=0.8)
+    train, test = hh_neos.batching.split_data(data, train_size=config.train_data_ratio)
     batch_iterator = hh_neos.batching.make_iterator(train)
 
     best_params, metrics = hh_neos.optimization.run(
@@ -48,19 +50,20 @@ def run():
     bins, yields = hh_neos.utils.get_hist(config, nn, best_params, data)
 
     results = {
-        "config": config,
-        "metrics": metrics,
-        "bins": bins,
-        "yields": yields,
-        "best_params": best_params,
+        "config": hh_neos.utils.to_python_lists(config.__dict__),
+        "metrics": hh_neos.utils.to_python_lists(metrics),
+        "bins": hh_neos.utils.to_python_lists(bins),
+        "yields": hh_neos.utils.to_python_lists(yields),
     }
 
     # save model to file
     model = eqx.combine(best_params["nn_pars"], nn_setup)
     eqx.tree_serialise_leaves(config.results_path + "neos_model.eqx", model)
 
-    with open(config.results_file_path, "wb") as file:
-        pickle.dump(results, file)
+    # save metadata
+    with open(config.metadata_file_path, "w") as file:
+        json.dump(results, file)
+        print(config.metadata_file_path)
 
     plot()
 
@@ -68,8 +71,9 @@ def run():
 def plot():
     config = hh_neos.configuration.Setup(args)
     results = {}
-    with open(config.results_file_path, "rb") as file:
-        results = pickle.load(file)
+    with open(config.metadata_file_path, "r") as file:
+        results = json.load(file)
+
     hh_neos.plotting.plot_metrics(
         results["metrics"],
         results["config"],
@@ -84,3 +88,4 @@ def plot():
 if __name__ == "__main__":
     # run()
     plot()
+
