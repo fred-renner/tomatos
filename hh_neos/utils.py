@@ -73,3 +73,30 @@ def print_cls(config, yields):
     print(f"      Observed CLs: {CLs_obs:.6f}")
     for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
         print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.6f}")
+
+
+def to_python_lists(obj):
+    """converts (also nested) nd.array or jax.array into a list living in dicts
+
+    Parameters
+    ----------
+    obj : dict
+        input dict
+
+    Returns
+    -------
+    dict
+        output dict
+    """
+    if isinstance(obj, (np.ndarray, jnp.DeviceArray)):
+        # Convert arrays to Python lists
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        # Recursively process each dictionary value
+        return {k: to_python_lists(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        # Recursively process each list element
+        return [to_python_lists(x) for x in obj]
+    else:
+        # Return other objects as is
+        return obj

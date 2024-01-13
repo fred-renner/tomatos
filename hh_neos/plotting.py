@@ -10,7 +10,7 @@ import hh_neos.utils
 
 
 def plot_metrics(metrics, config):
-    epoch_grid = range(1, config.num_steps + 1)
+    epoch_grid = range(1, config["num_steps"] + 1)
     for k, v in metrics.items():
         # if k != "generalised_variance":
         if k == "cls" or k == "Z_A":
@@ -20,15 +20,15 @@ def plot_metrics(metrics, config):
             plt.xlabel("epoch")
             plt.ylabel(k)
             plt.tight_layout()
-            print(config.results_path + k + ".pdf")
-            plt.savefig(config.results_path + k + ".pdf")
+            print(config["results_path"] + k + ".pdf")
+            plt.savefig(config["results_path"] + k + ".pdf")
         if k == "bins":
             plt.figure()
             for i, bins in enumerate(v):
-                if config.do_m_hh and config.include_bins:
+                if config["do_m_hh"] and config["include_bins"]:
                     bins = (
-                        bins * (config.data_max - config.data_min)
-                    ) + config.data_min
+                        bins * (config["data_max"] - config["data_min"])
+                    ) + config["data_min"]
                     plt.xlabel("m$_{hh}$ (MeV)")
                 else:
                     plt.xlabel("NN score")
@@ -36,8 +36,8 @@ def plot_metrics(metrics, config):
                 plt.vlines(x=bins, ymin=i, ymax=i + 1)
                 plt.ylabel("epoch")
             plt.tight_layout()
-            print(config.results_path + k + ".pdf")
-            plt.savefig(config.results_path + k + ".pdf")
+            print(config["results_path"] + k + ".pdf")
+            plt.savefig(config["results_path"] + k + ".pdf")
     # plt.yscale("log")
     # plt.legend()
     # plt.xlabel("epoch")
@@ -49,11 +49,11 @@ def plot_metrics(metrics, config):
 def hist(config, bins, yields):
     plt.figure()
     for l, a in zip(yields, jnp.array(list(yields.values()))):
-        if config.do_m_hh:
-            if config.include_bins:
+        if config["do_m_hh"]:
+            if config["include_bins"]:
                 bins_unscaled = (
-                    bins * (config.data_max - config.data_min)
-                ) + config.data_min
+                    bins * (config["data_max"] - config["data_min"])
+                ) + config["data_min"]
                 print(bins_unscaled)
                 plt.stairs(
                     a,
@@ -87,7 +87,6 @@ def hist(config, bins, yields):
     plt.ylabel("Events")
     plt.legend()
     plt.tight_layout()
-    print(config.results_path + "hist.pdf")
-    plt.savefig(config.results_path + "hist.pdf")
+    print(config["results_path"] + "hist.pdf")
+    plt.savefig(config["results_path"] + "hist.pdf")
 
-    hh_neos.utils.print_cls(config, yields)
