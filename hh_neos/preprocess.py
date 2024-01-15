@@ -106,8 +106,6 @@ def min_max_norm(data):
     scaler = MinMaxScaler()
     # find min max in columns
     scaler.fit(data_)
-    data_min = scaler.data_min_
-    data_max = scaler.data_max_
     # apply
     scaled_data = scaler.transform(data_)
     # split to original samples
@@ -116,7 +114,7 @@ def min_max_norm(data):
     for i, key in enumerate(data.keys()):
         data[key][:, 0, :] = scaled_data_splitted[i]
 
-    return data, data_min, data_max
+    return data, scaler
 
 
 def get_n_events(filepath, var):
@@ -125,7 +123,6 @@ def get_n_events(filepath, var):
 
 
 def prepare_data(config):
-    
     data = {}
 
     # as we are upscaling the background to match the number of events in the
@@ -152,11 +149,8 @@ def prepare_data(config):
             sys=sys,
         )
 
-    data_min = 0
-    data_max = 1
-
-    if config.include_bins:
-        data, data_min, data_max = min_max_norm(data)
+    # if config.include_bins:
+    data, scaler = min_max_norm(data)
     # print([data[key].shape[0] for key in data.keys()])
 
     # replicate to have same size sample input
@@ -168,8 +162,8 @@ def prepare_data(config):
         config.data_types += [k]
         jnp_data += [np.asarray(data[k])]
 
-    config.data_min = data_min
-    config.data_max = data_max
+    config.scaler_scale = scaler.scale_
+    config.scaler_min = scaler.min_
 
     # samples, events, features
     return jnp_data

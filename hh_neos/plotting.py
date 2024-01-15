@@ -26,9 +26,9 @@ def plot_metrics(metrics, config):
             plt.figure()
             for i, bins in enumerate(v):
                 if config["do_m_hh"] and config["include_bins"]:
-                    bins = (
-                        bins * (config["data_max"] - config["data_min"])
-                    ) + config["data_min"]
+                    bins = (np.array(bins) - config["scaler_min"][0]) / config[
+                        "scaler_scale"
+                    ][0]
                     plt.xlabel("m$_{hh}$ (MeV)")
                 else:
                     plt.xlabel("NN score")
@@ -51,10 +51,9 @@ def hist(config, bins, yields):
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         if config["do_m_hh"]:
             if config["include_bins"]:
-                bins_unscaled = (
-                    bins * (config["data_max"] - config["data_min"])
-                ) + config["data_min"]
-                print(bins_unscaled)
+                bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
+                    "scaler_scale"
+                ][0]
                 plt.stairs(
                     a,
                     bins_unscaled,
@@ -89,4 +88,3 @@ def hist(config, bins, yields):
     plt.tight_layout()
     print(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")
-
