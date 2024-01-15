@@ -73,11 +73,15 @@ class Setup:
         if self.include_bins:
             # keep in [0,1] if using sigmoid activation
             self.bins = np.linspace(0, 1, args.bins + 1)
+            
+            # some bad bin settings for testing
+            # self.bins = np.array([0, 0.061, 0.142, 0.889, 1, 1])
+            # self.bins = np.array([0, 0.0594, 0.133, 0.975, 0.969, 1])
             # bad_edges = np.linspace(0.9900, 0.9999, args.bins - 1)
             # bad_edges = np.insert(bad_edges, 0, 0)
             # edges = np.append(bad_edges, 1)
             # self.bins = jnp.array(edges)
-            # print(self.bins)
+
 
         # bandwidth ~ bin width is a good choice
         self.bandwidth = 0.2
@@ -117,10 +121,10 @@ class Setup:
         if self.debug:
             self.num_steps = 2
         else:
-            self.num_steps = 10
-    
+            self.num_steps = 400
+
         # share of data used for training vs testing
-        self.train_data_ratio=0.8
+        self.train_data_ratio = 0.8
 
         # can choose from "CLs", "discovery", "poi_uncert" [approx. uncert. on mu], "bce" [classifier]
         self.objective = "cls"

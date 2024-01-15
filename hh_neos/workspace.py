@@ -68,14 +68,14 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                                     "type": "normfactor",
                                     "data": None,
                                 },  # our signal strength modifier (parameter of interest)
-                                {
-                                    "name": "signal_stat",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": stat_err_signal["hi"],
-                                        "lo_data": stat_err_signal["low"],
-                                    },
-                                },
+                                # {
+                                #     "name": "signal_stat",
+                                #     "type": "histosys",
+                                #     "data": {
+                                #         "hi_data": stat_err_signal["hi"],
+                                #         "lo_data": stat_err_signal["low"],
+                                #     },
+                                # },
                             ],
                         },
                         {
@@ -130,14 +130,15 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                                         ],  # down sample
                                     },
                                 },
-                                {
-                                    "name": "signal_stat",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": stat_err_bkg["hi"],
-                                        "lo_data": stat_err_bkg["low"],
-                                    },
-                                },
+                                
+                                # {
+                                #     "name": "signal_stat",
+                                #     "type": "histosys",
+                                #     "data": {
+                                #         "hi_data": stat_err_bkg["hi"],
+                                #         "lo_data": stat_err_bkg["low"],
+                                #     },
+                                # },
                             ],
                         },
                         # {

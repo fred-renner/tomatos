@@ -49,9 +49,11 @@ def run(
         do_m_hh=config.do_m_hh,
         loss=config.objective,
     )
+
+    # adagrad is better for bad gradients
     solver = OptaxSolver(loss, opt=optax.adam(config.lr), jit=True)
 
-    pyhf.set_backend("jax", default=True)
+    pyhf.set_backend("jax", default=True, precision="64b")
 
     params = init_pars
     best_params = init_pars

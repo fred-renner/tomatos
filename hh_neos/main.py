@@ -20,7 +20,7 @@ JAX_CHECK_TRACER_LEAKS = True
 import numpy as np
 import jax.numpy as jnp
 
-# jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int)
