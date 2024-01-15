@@ -35,29 +35,25 @@ def pipeline(
     if loss.lower() in ["bce", "binary cross-entropy"]:
         return neos.losses.bce(data=data_dct, pars=pars["nn_pars"], nn=nn)
 
-    # make sure bins don't overlap and are unique, cannot find another way as
-    # with all this jnp.where
+    # make sure bins don't overlap and are unique, need to avoid loops and
+    # whatnot since this is a jitted function --> jnp.where
     if "bins" in pars:
+        # take care of out of bound
+        pars["bins"] = jnp.where(pars["bins"] > 0, pars["bins"], 0.99)
+        pars["bins"] = jnp.where(pars["bins"] < 1, pars["bins"], 0.01)
         # find duplicates
-        is_not_duplicate = pars["bins"][:-1] != pars["bins"][1:]
-        # comparison does not include first value for condition
-        is_not_duplicate = jnp.concatenate((jnp.array([False]), is_not_duplicate))
-        # pad duplicates uniquely, smaller padding breaks the whole thing...
+        is_not_duplicate = pars["bins"][1:] != pars["bins"][:-1]
+        # comparison does not include last value for condition
+        is_not_duplicate = jnp.concatenate((is_not_duplicate, jnp.array([True])))
+        # pad duplicates
         unique_increment = jnp.arange(pars["bins"].size) * 0.001
         # now return former values or pad if duplicate
         pars["bins"] = jnp.where(
             is_not_duplicate, pars["bins"], pars["bins"] + unique_increment
         )
-        # take care of 0 and 1 
-        pars["bins"] = jnp.where(
-            pars["bins"]>0, pars["bins"], pars["bins"] + 0.1
-        )
-        pars["bins"] = jnp.where(
-            pars["bins"]<1, pars["bins"], pars["bins"] - 0.1
-        )
         # monotonically increase
         pars["bins"] = jnp.sort(pars["bins"])
-        
+
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
     if do_m_hh:
@@ -79,4 +75,4 @@ def pipeline(
     # build our statistical model, and calculate the loss!
     model = hh_neos.workspace.model_from_hists(do_m_hh, hists)
 
-    return neos.loss_from_model(model, loss=loss)
+    return neos.loss_from_model(model, loss=loss, fit_lr=1e-5)

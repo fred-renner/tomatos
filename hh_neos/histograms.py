@@ -86,16 +86,8 @@ def hists_from_nn(
     #
     weights = {k: data[k][:, 1, 0] for k in data}
 
-    bins_new = jnp.concatenate(
-        (
-            jnp.array([bins[0]]),
-            jnp.where(bins[1:] > bins[:-1], bins[1:], bins[:-1] + 1e-4),
-        ),
-        axis=0,
-    )
-
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
-    make_hist = partial(hist, bandwidth=bandwidth, bins=bins_new)
+    make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
 
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
