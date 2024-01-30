@@ -11,11 +11,12 @@ from jaxopt import OptaxSolver
 import hh_neos.pipeline
 
 Array = jnp.ndarray
-import hh_neos.histograms
+import gc
 
 # import psutil
 import sys
-import gc
+
+import hh_neos.histograms
 
 
 # clear caches each update otherwise memory explodes
@@ -48,6 +49,7 @@ def run(
         include_bins=config.include_bins,
         do_m_hh=config.do_m_hh,
         loss=config.objective,
+        config=config,
     )
 
     # adagrad is better for bad gradients
@@ -123,7 +125,9 @@ def run(
                 nn=nn,
                 data=data_dct,
                 bandwidth=config.bandwidth,  # for the bKDEs
-                bins=jnp.array([0, *params["bins"], 1]),
+                bins=jnp.array([0, *params["bins"], 1])
+                if config.include_bins
+                else config.bins,
             )
         this_z_a = relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
         print("Z_A: ", this_z_a)

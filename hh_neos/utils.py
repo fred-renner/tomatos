@@ -1,12 +1,13 @@
 import jax.numpy as jnp
 import pyhf
 import relaxed
-
+import sys
+import numpy as np
+import hh_neos.histograms
+from functools import partial
+import jax
 
 Array = jnp.ndarray
-import hh_neos.histograms
-import numpy as np
-import sys
 
 
 class Logger(object):
@@ -46,7 +47,9 @@ def get_hist(config, nn, best_params, data):
             data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
             nn=nn,
             bandwidth=1e-8,
-            bins=jnp.array([0, *best_params["bins"], 1]),
+            bins=jnp.array([0, *best_params["bins"], 1])
+            if config.include_bins
+            else config.bins,
         )
     print(
         bins[1:-1],
@@ -100,3 +103,41 @@ def to_python_lists(obj):
     else:
         # Return other objects as is
         return obj
+
+
+# this is for conservative NN training tests
+
+
+def sigmoid_cross_entropy_with_logits(preds, labels):
+    return jnp.mean(
+        jnp.maximum(preds, 0) - preds * labels + jnp.log1p(jnp.exp(-jnp.abs(preds)))
+    )
+
+
+def bce(data, nn, pars):
+    values = {k: data[k][:, 0, :] for k in data}
+
+    # apply the neural network to each data sample, and keep track of the
+    # sample names in a dict
+    nn_apply = partial(nn, pars)
+    preds = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
+    print(preds.keys())
+    bkg = preds["bkg"]
+    sig = preds["NOSYS"]
+    # I have no clue why learning only works with opposite labels?
+    labels = jnp.concatenate([jnp.zeros_like(bkg),jnp.ones_like(sig)])
+    preds =  jnp.concatenate((sig, bkg))
+
+    return sigmoid_cross_entropy_with_logits(preds, labels).mean()
+
+
+
+
+# def bce(data, nn, pars):
+#     preds = {k: nn(pars, data[k]).ravel() for k in data}
+#     bkg = jnp.concatenate([preds[k] for k in preds if "sig" not in k])
+#     sig = preds["sig"]
+#     labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
+#     return sigmoid_cross_entropy_with_logits(
+#         jnp.concatenate(list(preds.values())).ravel(), labels
+#     ).mean()

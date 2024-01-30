@@ -5,8 +5,8 @@ import pyhf
 import relaxed
 
 import hh_neos.histograms
-import hh_neos.workspace
 import hh_neos.utils
+import hh_neos.workspace
 
 
 def plot_metrics(metrics, config):
@@ -19,6 +19,8 @@ def plot_metrics(metrics, config):
             plt.legend()
             plt.xlabel("epoch")
             plt.ylabel(k)
+            # ax = plt.gca()
+            # ax.set_yscale('log')
             plt.tight_layout()
             print(config["results_path"] + k + ".pdf")
             plt.savefig(config["results_path"] + k + ".pdf")
@@ -83,8 +85,10 @@ def hist(config, bins, yields):
                 # align="edge",
             )
             plt.xlabel("NN score")
+        # if l=="NOSYS":
+        #     break
     plt.ylabel("Events")
-    plt.legend()
+    plt.legend(prop={"size": 6})
     plt.tight_layout()
     print(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")

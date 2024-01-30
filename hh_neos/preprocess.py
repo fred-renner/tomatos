@@ -10,11 +10,12 @@ err_w_CR = 0.0007230248761909538
 def stack_inputs(
     filepath,
     config,
+    n_events=0,
     sys="NOSYS",
     use_NOSYS_weights=True,
     custom_weights=1.0,
 ):
-    """make array of input variables and attach desired weights to bookeep the
+    """make array of input variables and attach desired weights to bookkeep the
     weights, so it gets the shape:
 
     (n_events, 2, n_vars,)
@@ -68,14 +69,13 @@ def stack_inputs(
     """
 
     if "run2" in filepath:
-        config.region = "SR_xbb_1"
+        region = "SR_xbb_1"
         is_mc = False
     else:
-        config.region = "SR_xbb_2"
+        region = "SR_xbb_2"
         is_mc = True
 
     with h5py.File(filepath, "r") as f:
-        n_events = f[config.vars[0] + "_NOSYS" + "." + config.region].shape[0]
         arr = np.zeros((n_events, 2, config.n_features))
 
         if use_NOSYS_weights:
@@ -85,11 +85,12 @@ def stack_inputs(
 
         for i, var in enumerate(config.vars):
             # fill
-            var_name = var + "_" + sys + "." + config.region
-            w_name = "weights_" + w_sys + "." + config.region
-            arr[:, 0, i] = f[var_name][:]
+            var_name = var + "_" + sys + "." + region
+            w_name = "weights_" + w_sys + "." + region
+            # auto up and down scale
+            arr[:, 0, i] = np.resize(f[var_name][:], (n_events))
             if is_mc:
-                arr[:, 1, i] = f[w_name][:]
+                arr[:, 1, i] = np.resize(f[w_name][:], (n_events))
             else:
                 arr[:, 1, i] = np.full(n_events, custom_weights)
 
@@ -125,26 +126,39 @@ def get_n_events(filepath, var):
 def prepare_data(config):
     data = {}
 
+    # find the sys with the largest number of events for upscaling
+    max_events = 0
+    for var in config.vars:
+        for sys in config.systematics:
+            var_sys = var + "_" + sys + ".SR_xbb_2"
+            n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
+            if n > max_events:
+                max_events = n
+                max_var_sys = var_sys
+
     # as we are upscaling the background to match the number of events in the
     # signal, need to account for in weights
+    # for both the actual resampling and the bkg estimate
     replicate_weight = 1 / (
-        get_n_events(filepath=config.files["k2v0"], var="m_hh_NOSYS.SR_xbb_2")
+        get_n_events(filepath=config.files["k2v0"], var=max_var_sys)
         / get_n_events(filepath=config.files["run2"], var="m_hh_NOSYS.SR_xbb_1")
     )
     data["bkg"] = stack_inputs(
         config.files["run2"],
         config,
+        n_events=max_events,
         custom_weights=replicate_weight * w_CR,
     )
 
     for sys in config.systematics:
-        if "NOSYS" in sys:
-            use_NOSYS_weights = True
-        else:
+        use_NOSYS_weights = True
+        if "xbb" in sys:
             use_NOSYS_weights = False
+
         data[sys] = stack_inputs(
             config.files["k2v0"],
             config,
+            n_events=max_events,
             use_NOSYS_weights=use_NOSYS_weights,
             sys=sys,
         )

@@ -1,15 +1,16 @@
+import os
+
 import jax.numpy as jnp
 import numpy as np
-import os
 
 
 class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_SM.h5",
+            # "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_SM.h5",
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_k2v0.h5",
-            "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_ttbar.h5",
+            # "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_ttbar.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-run2.h5",
         }
         # fmt: on
@@ -18,26 +19,49 @@ class Setup:
         self.include_bins = True
         self.debug = False
 
+        # # rel 21
+        # self.vars = [
+        #     "pt_h1",
+        #     "eta_h1",
+        #     # "phi_h1",
+        #     # "m_h1",
+        #     "pt_h2",
+        #     "eta_h2",
+        #     # "phi_h2",
+        #     # "m_h2",
+        #     "pt_hh",
+        #     "eta_hh",
+        #     # "phi_hh",
+        #     "m_hh",
+        #     "pt_j1",
+        #     "eta_j1",
+        #     # "phi_j1",
+        #     "E_j1",
+        #     "pt_j2",
+        #     "eta_j2",
+        #     # "phi_j2",
+        #     "E_j2",
+        # ]
         self.vars = [
+            "m_hh",
             "pt_h1",
             "eta_h1",
-            # "phi_h1",
-            # "m_h1",
+            "phi_h1",
+            "m_h1",
             "pt_h2",
             "eta_h2",
-            # "phi_h2",
-            # "m_h2",
+            "phi_h2",
+            "m_h2",
             "pt_hh",
             "eta_hh",
-            # "phi_hh",
-            "m_hh",
+            "phi_hh",
             "pt_j1",
             "eta_j1",
-            # "phi_j1",
+            "phi_j1",
             "E_j1",
             "pt_j2",
             "eta_j2",
-            # "phi_j2",
+            "phi_j2",
             "E_j2",
         ]
 
@@ -51,37 +75,49 @@ class Setup:
             "xbb_pt_bin_2__1down",
             "xbb_pt_bin_3__1up",
             "xbb_pt_bin_3__1down",
-            # "JET_Comb_Modelling_mass__1up",
-            # "JET_Comb_Modelling_mass__1down",
-            # "JET_Rtrk_Modelling_pT__1up",
-            # "JET_Rtrk_Modelling_pT__1down",
-            # could figure out which ones are largest and smallest...
-            # "GEN_MUR05_MUF05_PDF260000",
-            # "GEN_MUR05_MUF10_PDF260000",
-            # "GEN_MUR10_MUF05_PDF260000",
-            # "GEN_MUR10_MUF10_PDF260000",
-            # "GEN_MUR10_MUF20_PDF260000",
-            # "GEN_MUR20_MUF10_PDF260000",
-            # "GEN_MUR20_MUF20_PDF260000",
+            "JET_MassRes_Top__1up",
+            "JET_MassRes_Hbb__1up",
+            "JET_MassRes_WZ__1up",
+            "JET_Rtrk_Modelling_pT__1up",
+            "JET_Comb_Modelling_mass__1up",
+            "JET_MassRes_Top__1down",
+            "JET_MassRes_Hbb__1down",
+            "JET_MassRes_WZ__1down",
+            "JET_Rtrk_Modelling_pT__1down",
+            "JET_Comb_Modelling_mass__1down",
+            "JET_Flavor_Composition__1up",
+            "JET_Flavor_Composition__1down",
+            "GEN_MUR05_MUF05_PDF260000",
+            "GEN_MUR05_MUF10_PDF260000",
+            "GEN_MUR10_MUF05_PDF260000",
+            "GEN_MUR10_MUF10_PDF260000",
+            "GEN_MUR10_MUF20_PDF260000",
+            "GEN_MUR20_MUF10_PDF260000",
+            "GEN_MUR20_MUF20_PDF260000",
         ]
+
+        self.systematics_raw = []
+
+        for sys in self.systematics:
+            if "1up" in sys:
+                self.systematics_raw += [sys.split("__")[0]]
 
         if self.do_m_hh:
             self.vars = ["m_hh"]
 
         self.n_features = len(self.vars)
 
-        if self.include_bins:
-            # keep in [0,1] if using sigmoid activation
-            self.bins = np.linspace(0, 1, args.bins + 1)
-            
-            # some bad bin settings for testing
-            # self.bins = np.array([0, 0.061, 0.142, 0.889, 1, 1])
-            # self.bins = np.array([0, 0.0594, 0.133, 0.975, 0.969, 1])
-            # bad_edges = np.linspace(0.9900, 0.9999, args.bins - 1)
-            # bad_edges = np.insert(bad_edges, 0, 0)
-            # edges = np.append(bad_edges, 1)
-            # self.bins = jnp.array(edges)
+        # if self.include_bins:
+        # keep in [0,1] if using sigmoid activation
+        self.bins = np.linspace(0, 1, args.bins + 1)
 
+        # some bad bin settings for testing
+        # self.bins = np.array([0, 0.061, 0.142, 0.889, 1, 1])
+        # self.bins = np.array([0, 0.0594, 0.133, 0.975, 0.969, 1])
+        # bad_edges = np.linspace(0.9900, 0.9999, args.bins - 1)
+        # bad_edges = np.insert(bad_edges, 0, 0)
+        # edges = np.append(bad_edges, 1)
+        # self.bins = jnp.array(edges)
 
         # bandwidth ~ bin width is a good choice
         self.bandwidth = 0.2
@@ -92,7 +128,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "neos_m_hh/"
         else:
-            results_folder = f"neos_nn_{len(self.bins)-1}_bins/"
+            results_folder = f"neos_nn_{args.bins}_bins/"
         if self.debug:
             results_folder = "neos_debug/"
         self.results_path += results_folder
@@ -119,7 +155,7 @@ class Setup:
 
         self.lr = 1e-2
         if self.debug:
-            self.num_steps = 2
+            self.num_steps = 10
         else:
             self.num_steps = 400
 
