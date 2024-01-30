@@ -5,10 +5,12 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import neos
-import pyhf
 import numpy as np
+import pyhf
+
 import hh_neos.histograms
 import hh_neos.workspace
+import hh_neos.utils
 
 jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
@@ -24,6 +26,7 @@ def pipeline(
     loss: str,
     bandwidth: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
+    config: object,
     bins: Array = None,  # in case you don't want to optimise binning
     include_bins=True,
     do_m_hh=False,
@@ -33,7 +36,7 @@ def pipeline(
 
     # if you want s/b discrimination, no need to do anything complex!
     if loss.lower() in ["bce", "binary cross-entropy"]:
-        return neos.losses.bce(data=data_dct, pars=pars["nn_pars"], nn=nn)
+        return hh_neos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn)
 
     # make sure bins don't overlap and are unique, need to avoid loops and
     # whatnot since this is a jitted function --> jnp.where
@@ -73,6 +76,6 @@ def pipeline(
         )
 
     # build our statistical model, and calculate the loss!
-    model = hh_neos.workspace.model_from_hists(do_m_hh, hists)
+    model = hh_neos.workspace.model_from_hists(do_m_hh, hists,config)
 
     return neos.loss_from_model(model, loss=loss, fit_lr=1e-5)

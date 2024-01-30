@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-import pickle
+import argparse
 import json
+import pickle
+import sys
+from pprint import pprint
+
+import equinox as eqx
 import jax
 import pyhf
 
@@ -8,17 +13,13 @@ import hh_neos.batching
 import hh_neos.configuration
 import hh_neos.nn_architecture
 import hh_neos.optimization
-import hh_neos.preprocess
 import hh_neos.plotting
+import hh_neos.preprocess
 import hh_neos.utils
-from pprint import pprint
-import sys
-import argparse
-import equinox as eqx
 
 JAX_CHECK_TRACER_LEAKS = True
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 

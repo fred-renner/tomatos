@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import pyhf
+import numpy as np
 
 Array = jnp.ndarray
 
@@ -14,10 +15,55 @@ def make_stat_err(hist):
     return {"hi": hi, "low": low}
 
 
+def get_generator_weight_envelope(hists):
+    nominal = hists["NOSYS"]
+    gens = [
+        "GEN_MUR05_MUF05_PDF260000",
+        "GEN_MUR05_MUF10_PDF260000",
+        "GEN_MUR10_MUF05_PDF260000",
+        "GEN_MUR10_MUF10_PDF260000",
+        "GEN_MUR10_MUF20_PDF260000",
+        "GEN_MUR20_MUF10_PDF260000",
+        "GEN_MUR20_MUF20_PDF260000",
+    ]
+    diffs = jnp.zeros((len(gens), nominal.shape[0]))
+    for i, gen in enumerate(gens):
+        diffs.at[i].set(jnp.abs(hists[gen] - nominal))
+    max_diffs = jnp.max(diffs, axis=0)
+    envelope_up = jnp.array(nominal + max_diffs)
+    envelope_down = jnp.array(nominal - max_diffs)
+    return envelope_up, envelope_down
+
+
 # assume we give a dict of histograms with keys "sig", "bkg_nominal", "bkg_up",
 # "bkg_down".
-def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
+def model_from_hists(do_m_hh, hists: dict[str, Array],config:object) -> pyhf.Model:
     """How to make your HistFactory model from your histograms."""
+
+    signal_modifiers = []
+    for sys in config.systematics_raw:
+        signal_modifiers += (
+            {
+                "name": sys,
+                "type": "histosys",
+                "data": {
+                    "hi_data": hists[f"{sys}__1up"],
+                    "lo_data": hists[f"{sys}__1down"],
+                },
+            },
+        )
+    if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
+        gen_up, gen_down = get_generator_weight_envelope(hists)
+        signal_modifiers += (
+            {
+                "name": "scale_variations",
+                "type": "histosys",
+                "data": {
+                    "hi_data": gen_up,
+                    "lo_data": gen_down,
+                },
+            },
+        )
 
     if do_m_hh:
         spec = {
@@ -68,6 +114,7 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                                     "type": "normfactor",
                                     "data": None,
                                 },  # our signal strength modifier (parameter of interest)
+                                *signal_modifiers,
                                 # {
                                 #     "name": "signal_stat",
                                 #     "type": "histosys",
@@ -82,57 +129,8 @@ def model_from_hists(do_m_hh, hists: dict[str, Array]) -> pyhf.Model:
                             "name": "background",
                             "data": hists["bkg"],  # background
                             "modifiers": [
-                                {
-                                    "name": f"xbb_pt_bin_0",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": hists[
-                                            f"xbb_pt_bin_0__1up"
-                                        ],  # up sample
-                                        "lo_data": hists[
-                                            f"xbb_pt_bin_0__1down"
-                                        ],  # down sample
-                                    },
-                                },
-                                {
-                                    "name": f"xbb_pt_bin_1",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": hists[
-                                            f"xbb_pt_bin_1__1up"
-                                        ],  # up sample
-                                        "lo_data": hists[
-                                            f"xbb_pt_bin_1__1down"
-                                        ],  # down sample
-                                    },
-                                },
-                                {
-                                    "name": f"xbb_pt_bin_2",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": hists[
-                                            f"xbb_pt_bin_2__1up"
-                                        ],  # up sample
-                                        "lo_data": hists[
-                                            f"xbb_pt_bin_2__1down"
-                                        ],  # down sample
-                                    },
-                                },
-                                {
-                                    "name": f"xbb_pt_bin_3",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": hists[
-                                            f"xbb_pt_bin_3__1up"
-                                        ],  # up sample
-                                        "lo_data": hists[
-                                            f"xbb_pt_bin_3__1down"
-                                        ],  # down sample
-                                    },
-                                },
-                                
                                 # {
-                                #     "name": "signal_stat",
+                                #     "name": "background_stat",
                                 #     "type": "histosys",
                                 #     "data": {
                                 #         "hi_data": stat_err_bkg["hi"],
