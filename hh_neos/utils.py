@@ -1,35 +1,20 @@
 import jax.numpy as jnp
 import pyhf
 import relaxed
-import sys
+
 import numpy as np
 import hh_neos.histograms
 from functools import partial
 import jax
+import logging
 
 Array = jnp.ndarray
-
-
-class Logger(object):
-    def __init__(self, config):
-        self.terminal = sys.stdout
-        self.log = open(config.results_path + "log.txt", "a")
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        # this flush method is needed for python 3 compatibility.
-        # this handles the flush command by doing nothing.
-        # you might want to specify some extra behavior here.
-        pass
 
 
 def get_hist(config, nn, best_params, data):
     if config.include_bins:
         bins = jnp.array([0, *best_params["bins"], 1])
-        print(best_params["bins"])
+        logging.info(best_params["bins"])
     else:
         bins = config.bins
     if config.do_m_hh:
@@ -51,13 +36,15 @@ def get_hist(config, nn, best_params, data):
             if config.include_bins
             else config.bins,
         )
-    print(
+    logging.info(
         bins[1:-1],
     )
-    print(yields)
-    print(
-        "Asimov Significance: ",
-        relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
+    logging.info(yields)
+    logging.info(
+        (
+            "Asimov Significance: ",
+            relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
+        )
     )
 
     return bins, yields
@@ -73,9 +60,9 @@ def print_cls(config, yields):
         test_stat="q",
         return_expected_set=True,
     )
-    print(f"      Observed CLs: {CLs_obs:.6f}")
+    logging.info(f"      Observed CLs: {CLs_obs:.6f}")
     for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
-        print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.6f}")
+        logging.info(f"Expected CLs({n_sigma:2d} σ): {expected_value:.6f}")
 
 
 def to_python_lists(obj):
@@ -108,6 +95,7 @@ def to_python_lists(obj):
 # this is for conservative NN training tests
 
 
+# https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
 def sigmoid_cross_entropy_with_logits(preds, labels):
     return jnp.mean(
         jnp.maximum(preds, 0) - preds * labels + jnp.log1p(jnp.exp(-jnp.abs(preds)))
@@ -121,16 +109,15 @@ def bce(data, nn, pars):
     # sample names in a dict
     nn_apply = partial(nn, pars)
     preds = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
-    print(preds.keys())
+
     bkg = preds["bkg"]
     sig = preds["NOSYS"]
     # I have no clue why learning only works with opposite labels?
-    labels = jnp.concatenate([jnp.zeros_like(bkg),jnp.ones_like(sig)])
-    preds =  jnp.concatenate((sig, bkg))
+    labels = jnp.concatenate([jnp.zeros_like(bkg), jnp.ones_like(sig)])
+    # labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
+    preds = jnp.concatenate((sig, bkg))
 
     return sigmoid_cross_entropy_with_logits(preds, labels).mean()
-
-
 
 
 # def bce(data, nn, pars):

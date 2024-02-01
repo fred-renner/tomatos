@@ -1,6 +1,5 @@
 import os
 
-import jax.numpy as jnp
 import numpy as np
 
 
@@ -8,10 +7,10 @@ class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            # "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_SM.h5",
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_k2v0.h5",
-            # "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-mc20_ttbar.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/m_hh_all_sys/dump-run2.h5",
+            # "SM": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-mc20_SM.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-mc20_k2v0.h5",
+            # "ttbar": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-mc20_ttbar.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-run2.h5",
         }
         # fmt: on
 
@@ -67,33 +66,33 @@ class Setup:
 
         self.systematics = [
             "NOSYS",
-            "xbb_pt_bin_0__1up",
-            "xbb_pt_bin_0__1down",
-            "xbb_pt_bin_1__1up",
-            "xbb_pt_bin_1__1down",
-            "xbb_pt_bin_2__1up",
-            "xbb_pt_bin_2__1down",
-            "xbb_pt_bin_3__1up",
-            "xbb_pt_bin_3__1down",
-            "JET_MassRes_Top__1up",
-            "JET_MassRes_Hbb__1up",
-            "JET_MassRes_WZ__1up",
-            "JET_Rtrk_Modelling_pT__1up",
-            "JET_Comb_Modelling_mass__1up",
-            "JET_MassRes_Top__1down",
-            "JET_MassRes_Hbb__1down",
-            "JET_MassRes_WZ__1down",
-            "JET_Rtrk_Modelling_pT__1down",
-            "JET_Comb_Modelling_mass__1down",
-            "JET_Flavor_Composition__1up",
-            "JET_Flavor_Composition__1down",
-            "GEN_MUR05_MUF05_PDF260000",
-            "GEN_MUR05_MUF10_PDF260000",
-            "GEN_MUR10_MUF05_PDF260000",
-            "GEN_MUR10_MUF10_PDF260000",
-            "GEN_MUR10_MUF20_PDF260000",
-            "GEN_MUR20_MUF10_PDF260000",
-            "GEN_MUR20_MUF20_PDF260000",
+            # "xbb_pt_bin_0__1up",
+            # "xbb_pt_bin_0__1down",
+            # "xbb_pt_bin_1__1up",
+            # "xbb_pt_bin_1__1down",
+            # "xbb_pt_bin_2__1up",
+            # "xbb_pt_bin_2__1down",
+            # "xbb_pt_bin_3__1up",
+            # "xbb_pt_bin_3__1down",
+            # "JET_MassRes_Top__1up",
+            # "JET_MassRes_Hbb__1up",
+            # "JET_MassRes_WZ__1up",
+            # "JET_Rtrk_Modelling_pT__1up",
+            # "JET_Comb_Modelling_mass__1up",
+            # "JET_MassRes_Top__1down",
+            # "JET_MassRes_Hbb__1down",
+            # "JET_MassRes_WZ__1down",
+            # "JET_Rtrk_Modelling_pT__1down",
+            # "JET_Comb_Modelling_mass__1down",
+            # "JET_Flavor_Composition__1up",
+            # "JET_Flavor_Composition__1down",
+            # "GEN_MUR05_MUF05_PDF260000",
+            # "GEN_MUR05_MUF10_PDF260000",
+            # "GEN_MUR10_MUF05_PDF260000",
+            # "GEN_MUR10_MUF10_PDF260000",
+            # "GEN_MUR10_MUF20_PDF260000",
+            # "GEN_MUR20_MUF10_PDF260000",
+            # "GEN_MUR20_MUF20_PDF260000",
         ]
 
         self.systematics_raw = []
@@ -107,8 +106,6 @@ class Setup:
 
         self.n_features = len(self.vars)
 
-        # if self.include_bins:
-        # keep in [0,1] if using sigmoid activation
         self.bins = np.linspace(0, 1, args.bins + 1)
 
         # some bad bin settings for testing
@@ -116,8 +113,10 @@ class Setup:
         # self.bins = np.array([0, 0.0594, 0.133, 0.975, 0.969, 1])
         # bad_edges = np.linspace(0.9900, 0.9999, args.bins - 1)
         # bad_edges = np.insert(bad_edges, 0, 0)
-        # edges = np.append(bad_edges, 1)
-        # self.bins = jnp.array(edges)
+        # edges = np.append(bad_edges, 0.9)
+        # edges = np.array([0.2, 0.3, 0.35, 0.95])
+
+        # self.bins = np.array(edges)
 
         # bandwidth ~ bin width is a good choice
         self.bandwidth = 0.2
@@ -153,7 +152,9 @@ class Setup:
                 ]
             )  # rel 21 analysis
 
+        self.batch_size = int(1e5)  # int is necessary
         self.lr = 1e-2
+        # one step is one batch, not epoch
         if self.debug:
             self.num_steps = 10
         else:
