@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import pickle
+
 import sys
 from pprint import pprint
 
@@ -16,6 +16,7 @@ import hh_neos.optimization
 import hh_neos.plotting
 import hh_neos.preprocess
 import hh_neos.utils
+import logging
 
 JAX_CHECK_TRACER_LEAKS = True
 import jax.numpy as jnp
@@ -30,18 +31,27 @@ args = parser.parse_args()
 
 def run():
     config = hh_neos.configuration.Setup(args)
-    sys.stdout = hh_neos.utils.Logger(config)
-    pprint(vars(config))
+
+    logging.basicConfig(
+        filename=config.results_path + "log.txt",
+        filemode="w",
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    logging.getLogger().addHandler(logging.StreamHandler())
+    logging.getLogger("pyhf").setLevel(logging.WARNING)
+    logging.info(pprint(vars(config)))
+
     data = hh_neos.preprocess.prepare_data(config)
-    print([x.shape for x in data])
+    logging.info(f"dataset shapes: {[x.shape for x in data]}")
     init_pars, nn, nn_setup = hh_neos.nn_architecture.init(config)
-    print(init_pars)
+    logging.info(init_pars)
     train, test = hh_neos.batching.split_data(data, train_size=config.train_data_ratio)
-    batch_iterator = hh_neos.batching.make_iterator(train)
+    batch_iterator = hh_neos.batching.make_iterator(train, batch_size=config.batch_size)
 
     best_params, metrics = hh_neos.optimization.run(
         config=config,
-        data=data,
         test=test,
         batch_iterator=batch_iterator,
         init_pars=init_pars,
@@ -64,7 +74,7 @@ def run():
     # save metadata
     with open(config.metadata_file_path, "w") as file:
         json.dump(results, file)
-        print(config.metadata_file_path)
+        logging.info(config.metadata_file_path)
 
     plot()
 
@@ -89,4 +99,3 @@ def plot():
 if __name__ == "__main__":
     # run()
     plot()
-
