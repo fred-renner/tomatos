@@ -8,9 +8,8 @@ Array = jnp.ndarray
 rng_state = 0
 
 
-# todo for proper batching
-def split_data(data, train_size):
-    split = train_test_split(*data, train_size=train_size, random_state=rng_state)
+def split_data(data, ratio):
+    split = train_test_split(*data, train_size=ratio, random_state=rng_state)
     train, test = split[::2], split[1::2]
 
     return train, test

@@ -74,7 +74,7 @@ def hist(
 
 
 def hists_from_nn(
-    pars: Array,
+    nn_pars: Array,
     data: dict[str, Array],
     nn: Callable,
     bandwidth: float,
@@ -91,7 +91,7 @@ def hists_from_nn(
 
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
-    nn_apply = partial(nn, pars)
+    nn_apply = partial(nn, nn_pars)
     nn_output = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
 
     hists = {

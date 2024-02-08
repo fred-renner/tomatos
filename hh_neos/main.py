@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
-
-import sys
-from pprint import pprint
+import logging
 
 import equinox as eqx
 import jax
@@ -16,11 +14,13 @@ import hh_neos.optimization
 import hh_neos.plotting
 import hh_neos.preprocess
 import hh_neos.utils
-import logging
 
 JAX_CHECK_TRACER_LEAKS = True
 import jax.numpy as jnp
 import numpy as np
+import relaxed
+import json
+
 
 jax.config.update("jax_enable_x64", True)
 
@@ -41,17 +41,24 @@ def run():
     )
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
-    logging.info(pprint(vars(config)))
+    logging.getLogger("relaxed").setLevel(logging.WARNING)
+    logging.info(json.dumps(hh_neos.utils.to_python_lists(config.__dict__), indent=4))
 
     data = hh_neos.preprocess.prepare_data(config)
-    logging.info(f"dataset shapes: {[x.shape for x in data]}")
+    logging.info(f"datasets: {len(data)}")
     init_pars, nn, nn_setup = hh_neos.nn_architecture.init(config)
-    logging.info(init_pars)
-    train, test = hh_neos.batching.split_data(data, train_size=config.train_data_ratio)
+
+    train, valid_test = hh_neos.batching.split_data(data, ratio=config.train_data_ratio)
+    valid, test = hh_neos.batching.split_data(valid_test, ratio=0.8)
+    logging.info(f"train size: {train[0].shape[0]}")
+    logging.info(f"valid size: {valid[0].shape[0]}")
+    logging.info(f"test size: {test[0].shape[0]}")
+
     batch_iterator = hh_neos.batching.make_iterator(train, batch_size=config.batch_size)
 
     best_params, metrics = hh_neos.optimization.run(
         config=config,
+        valid=valid,
         test=test,
         batch_iterator=batch_iterator,
         init_pars=init_pars,

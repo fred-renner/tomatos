@@ -1,19 +1,20 @@
+import logging
+from functools import partial
+
+import jax
 import jax.numpy as jnp
+import numpy as np
 import pyhf
 import relaxed
 
-import numpy as np
 import hh_neos.histograms
-from functools import partial
-import jax
-import logging
 
 Array = jnp.ndarray
 
 
 def get_hist(config, nn, best_params, data):
     if config.include_bins:
-        bins = jnp.array([0, *best_params["bins"], 1])
+        bins = best_params["bins"]
         logging.info(best_params["bins"])
     else:
         bins = config.bins
@@ -28,18 +29,12 @@ def get_hist(config, nn, best_params, data):
     else:
         # to get correct yields would also need to pass whole data
         yields = hh_neos.histograms.hists_from_nn(
-            pars=best_params["nn_pars"],
+            nn_pars=best_params["nn_pars"],
             data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
             nn=nn,
             bandwidth=1e-8,
-            bins=jnp.array([0, *best_params["bins"], 1])
-            if config.include_bins
-            else config.bins,
+            bins=best_params["bins"] if config.include_bins else config.bins,
         )
-    logging.info(
-        bins[1:-1],
-    )
-    logging.info(yields)
     logging.info(
         (
             "Asimov Significance: ",
@@ -128,3 +123,54 @@ def bce(data, nn, pars):
 #     return sigmoid_cross_entropy_with_logits(
 #         jnp.concatenate(list(preds.values())).ravel(), labels
 #     ).mean()
+
+
+# def bin_correction(bins):
+#     bins = np.concatenate([[0], bins, [1]])
+#     # calculate neighbor distance
+#     diff = bins[1:] - bins[:-1]
+#     # sort check
+#     increasing = diff > 0
+#     # check if they are some distance apart, to not break in next update step
+#     # with config.lr = 1e-2 the bins are pulled around ~ 0.01
+#     neighbor_distance = np.abs(diff) > 0.05
+#     # since neighbor calc add the first one
+#     increasing = np.append(True, increasing)
+#     neighbor_distance = np.append(True, neighbor_distance)
+#     # pop the one left to the one if the last is too close to 1
+#     if neighbor_distance[-1] == False:
+#         neighbor_distance[-2] = False
+#     combined_condition = (bins < 1) & (bins > 0) & increasing & neighbor_distance
+#     corrected_bins = bins[combined_condition]
+
+#     # Ensure at least one bin remains after filtering.
+#     return corrected_bins if corrected_bins.size > 0 else np.array([0.5])
+
+
+# def bin_correction_(bins):
+#     # make sure bins don't overlap and are unique, need to avoid loops and
+#     # whatnot since this is a jitted function --> jnp.where
+
+#     # # take care of out of bound
+#     # bins = jnp.where(bins > 0, bins, 0.01)
+#     # bins = jnp.where(bins < 1, bins, 0.99)
+#     # find duplicates
+#     is_not_duplicate = bins[1:] != bins[:-1]
+#     # comparison does not include last value for condition
+#     is_not_duplicate = jnp.concatenate((is_not_duplicate, jnp.array([True])))
+#     # pad duplicates
+#     unique_increment = jnp.arange(bins.size) * 0.001
+#     # now return former values or pad if duplicate
+#     bins = jnp.where(is_not_duplicate, bins, bins + unique_increment)
+#     # monotonically increase
+
+#     # calculate neighbor distance
+#     diff = bins[1:] - bins[:-1]
+#     # sort check
+#     increasing = diff > 0
+#     # check if they are some distance apart, to not break in next update step
+#     # with config.lr = 1e-2 the bins are pulled around ~ 0.01
+#     neighbor_distance = np.abs(diff) > 0.05
+#     bins = jnp.sort(bins)
+
+#     return bins
