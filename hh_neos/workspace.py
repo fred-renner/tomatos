@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
-import pyhf
 import numpy as np
+import pyhf
 
 Array = jnp.ndarray
 
@@ -37,7 +37,13 @@ def get_generator_weight_envelope(hists):
 
 # assume we give a dict of histograms with keys "sig", "bkg_nominal", "bkg_up",
 # "bkg_down".
-def model_from_hists(do_m_hh, hists: dict[str, Array], config: object) -> pyhf.Model:
+def model_from_hists(
+    do_m_hh,
+    hists: dict[str, Array],
+    config: object,
+    do_systematics: bool,
+    do_stat_error: bool,
+) -> pyhf.Model:
     """How to make your HistFactory model from your histograms."""
 
     if do_m_hh:
@@ -73,41 +79,65 @@ def model_from_hists(do_m_hh, hists: dict[str, Array], config: object) -> pyhf.M
         }
     else:
         signal_modifiers = []
-        for sys in config.systematics_raw:
-            signal_modifiers += (
+        bkg_modifiers = []
+        if do_systematics:
+            for sys in config.systematics_raw:
+                signal_modifiers += (
+                    {
+                        "name": sys,
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists[f"{sys}__1up"],
+                            "lo_data": hists[f"{sys}__1down"],
+                        },
+                    },
+                )
+            if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
+                gen_up, gen_down = get_generator_weight_envelope(hists)
+                signal_modifiers += (
+                    {
+                        "name": "scale_variations",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": gen_up,
+                            "lo_data": gen_down,
+                        },
+                    },
+                )
+
+            bkg_modifiers += (
                 {
-                    "name": sys,
+                    "name": "norm_err_bkg",
                     "type": "histosys",
                     "data": {
-                        "hi_data": hists[f"{sys}__1up"],
-                        "lo_data": hists[f"{sys}__1down"],
+                        "hi_data": hists["bkg"] * (1 + 0.05658641863973597),
+                        "lo_data": hists["bkg"] * (1 - 0.05658641863973597),
                     },
                 },
             )
-        if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
-            gen_up, gen_down = get_generator_weight_envelope(hists)
+        if do_stat_error:
+            stat_err_signal = make_stat_err(hists["NOSYS"])
+            stat_err_bkg = make_stat_err(hists["bkg"])
             signal_modifiers += (
                 {
-                    "name": "scale_variations",
+                    "name": "stat_err_signal",
                     "type": "histosys",
                     "data": {
-                        "hi_data": gen_up,
-                        "lo_data": gen_down,
+                        "hi_data": stat_err_signal["hi"],
+                        "lo_data": stat_err_signal["low"],
                     },
                 },
             )
-        stat_err_signal = make_stat_err(hists["NOSYS"])
-        stat_err_bkg = make_stat_err(hists["bkg"])
-        signal_modifiers += (
-            {
-                "name": "stat_err_signal",
-                "type": "histosys",
-                "data": {
-                    "hi_data": stat_err_signal["hi"],
-                    "lo_data": stat_err_signal["low"],
+            bkg_modifiers += (
+                {
+                    "name": "stat_err_bkg",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": stat_err_bkg["hi"],
+                        "lo_data": stat_err_bkg["low"],
+                    },
                 },
-            },
-        )
+            )
         spec = {
             "channels": [
                 {
@@ -129,14 +159,7 @@ def model_from_hists(do_m_hh, hists: dict[str, Array], config: object) -> pyhf.M
                             "name": "background",
                             "data": hists["bkg"],  # background
                             "modifiers": [
-                                {
-                                    "name": "stat_err_bkg",
-                                    "type": "histosys",
-                                    "data": {
-                                        "hi_data": stat_err_bkg["hi"],
-                                        "lo_data": stat_err_bkg["low"],
-                                    },
-                                },
+                                *bkg_modifiers,
                             ],
                         },
                         # {

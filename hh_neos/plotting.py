@@ -7,6 +7,7 @@ import relaxed
 import hh_neos.histograms
 import hh_neos.utils
 import hh_neos.workspace
+import logging
 
 
 def plot_metrics(metrics, config):
@@ -17,8 +18,9 @@ def plot_metrics(metrics, config):
     # scale train test for visual comparison
     # could also do ratio, maybe better
     # scale = metrics["cls_test"][0] / metrics["cls_train"][0]
-    plt.plot(epoch_grid, metrics["cls_test"], label=r"$CL_s$ test")
     plt.plot(epoch_grid, metrics["cls_train"], label=r"$CL_s$ train")
+    plt.plot(epoch_grid, metrics["cls_valid"], label=r"$CL_s$ valid")
+    plt.plot(epoch_grid, metrics["cls_test"], label=r"$CL_s$ test")
     # plt.plot(epoch_grid, scale * metrics["cls_train"], label=r"$CL_s$ train (scaled)")
     plt.legend()
     plt.xlabel("epoch")
@@ -27,9 +29,30 @@ def plot_metrics(metrics, config):
     # ax.set_yscale('log')
     plt.tight_layout()
     plot_path = config["results_path"] + "cls.pdf"
-    print(plot_path)
+    logging.info(plot_path)
     plt.savefig(plot_path)
     plt.close()
+
+    # bce
+    if len(metrics["bce_train"]) > 0:
+        plt.figure()
+        # scale train test for visual comparison
+        # could also do ratio, maybe better
+        # scale = metrics["cls_test"][0] / metrics["cls_train"][0]
+        plt.plot(epoch_grid, metrics["bce_train"], label=r"bce train")
+        plt.plot(epoch_grid, metrics["bce_valid"], label=r"bce valid")
+        plt.plot(epoch_grid, metrics["bce_test"], label=r"bce test")
+        # plt.plot(epoch_grid, scale * metrics["cls_train"], label=r"$CL_s$ train (scaled)")
+        plt.legend()
+        plt.xlabel("epoch")
+        plt.ylabel("Loss")
+        # ax = plt.gca()
+        # ax.set_yscale('log')
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bce.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
 
     # Z_A
     plt.figure()
@@ -39,28 +62,29 @@ def plot_metrics(metrics, config):
     plt.ylabel(r"$Z_A$")
     plt.tight_layout()
     plot_path = config["results_path"] + "Z_A.pdf"
-    print(plot_path)
+    logging.info(plot_path)
     plt.savefig(plot_path)
     plt.close()
 
     # bins
-    plt.figure()
-    for i, bins in enumerate(metrics["bins"]):
-        if config["do_m_hh"] and config["include_bins"]:
-            bins = (np.array(bins) - config["scaler_min"][0]) / config["scaler_scale"][
-                0
-            ]
-            plt.xlabel("m$_{hh}$ (MeV)")
-        else:
-            plt.xlabel("NN score")
-            # plt.xlim([0, 1])
-        plt.vlines(x=bins, ymin=i, ymax=i + 1)
-        plt.ylabel("epoch")
-    plt.tight_layout()
-    plot_path = config["results_path"] + "bins.pdf"
-    print(plot_path)
-    plt.savefig(plot_path)
-    plt.close()
+    if len(metrics["bce_train"]) > 0:
+        plt.figure()
+        for i, bins in enumerate(metrics["bins"]):
+            if config["do_m_hh"] and config["include_bins"]:
+                bins = (np.array(bins) - config["scaler_min"][0]) / config["scaler_scale"][
+                    0
+                ]
+                plt.xlabel("m$_{hh}$ (MeV)")
+            else:
+                plt.xlabel("NN score")
+                # plt.xlim([0, 1])
+            plt.vlines(x=bins, ymin=i, ymax=i + 1)
+            plt.ylabel("epoch")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bins.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
 
 
 def hist(config, bins, yields):
@@ -105,5 +129,6 @@ def hist(config, bins, yields):
     plt.ylabel("Events")
     plt.legend()  # prop={"size": 6})
     plt.tight_layout()
-    print(config["results_path"] + "hist.pdf")
+    logging.info(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")
+

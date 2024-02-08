@@ -1,21 +1,22 @@
+import gc
+import logging
+import sys
 from functools import partial
 from time import perf_counter
+
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pyhf
 import relaxed
 from jaxopt import OptaxSolver
-import hh_neos.pipeline
-import gc
-import sys
+
 import hh_neos.histograms
-import logging
+import hh_neos.pipeline
 
 Array = jnp.ndarray
-import numpy as np
-
-np.set_printoptions(precision=3)
+np.set_printoptions(precision=2)
 
 
 # clear caches each update otherwise memory explodes
@@ -35,135 +36,136 @@ def clear_caches():
 
 def run(
     config,
+    valid,
     test,
     batch_iterator,
     init_pars,
     nn,
 ) -> tuple[Array, dict[str, list]]:
+    # even though config is passed, need to keep redundant args here as this
+    # function is jitted
     loss = partial(
         hh_neos.pipeline.pipeline,
         nn=nn,
         sample_names=config.data_types,
         include_bins=config.include_bins,
         do_m_hh=config.do_m_hh,
-        loss=config.objective,
+        loss_type=config.objective,
         config=config,
+        bandwidth=config.bandwidth,
+        do_systematics=config.do_systematics,
+        do_stat_error=config.do_stat_error,
     )
-
     # sometimes adagrad can also work
-    solver = OptaxSolver(loss, opt=optax.adam(config.lr), jit=True)
+    solver = OptaxSolver(loss, opt=optax.adam(config.lr), has_aux=True, jit=True)
 
     pyhf.set_backend("jax", default=True, precision="64b")
 
     params = init_pars
     best_params = init_pars
     best_sig = 999
-    # metrics = {k: [] for k in ["cls", "discovery", "poi_uncert"]}
-    metrics = {k: [] for k in ["cls"]}
-    train_loss = []
-    test_loss = []
-    z_a = []
-    bins_per_step = []
 
-    # one step is one batch, not epoch
+    metrics = {
+        k: []
+        for k in [
+            "cls_train",
+            "cls_valid",
+            "cls_test",
+            "discovery_train",
+            "discovery_valid",
+            "discovery_test",
+            "bce_train",
+            "bce_valid",
+            "bce_test",
+            "Z_A",
+            "bins",
+            "hist_sig",
+            "hist_bkg",
+        ]
+    }
+
+    # one step is one batch (not necessarily epoch)
     for i in range(config.num_steps):
         logging.info(f"step {i}: loss={config.objective}")
-        data, batch_num, num_batches = next(batch_iterator)
-
+        train, batch_num, num_batches = next(batch_iterator)
+        # initialize with or without binning
         if i == 0:
             if config.include_bins:
-                init_pars["bins"] = config.bins[1:-1]
-                logging.info(init_pars)
-                state = solver.init_state(
-                    init_pars,
-                    data=data,
-                    bandwidth=config.bandwidth,
-                )
-                prev_bins = config.bins[1:-1]
+                init_pars["bins"] = config.bins
             else:
-                if "bins" in init_pars:
-                    del init_pars["bins"]
-                state = solver.init_state(
-                    init_pars,
-                    bins=config.bins,
-                    data=data,
-                    bandwidth=config.bandwidth,
-                )
-                prev_bins = config.bins
+                init_pars.pop("bins", None)
 
-        if "bins" in init_pars and i > 0:
-            prev_bins = np.array(params["bins"])
+            logging.info(init_pars)
+            state = solver.init_state(
+                init_pars,
+                data=train,
+            )
 
         start = perf_counter()
         params, state = solver.update(
             params,
             state,
-            bins=config.bins,
-            data=data,
-            bandwidth=config.bandwidth,
+            data=train,
         )
+        hists = state.aux
+        end = perf_counter()
+        logging.info(f"update took {end-start:.4f}s")
+
+        bins = np.array(params["bins"]) if "bins" in params else config.bins
+        # save current bins
+        if config.include_bins:
+            logging.info((f"next bin edges: {bins}"))
+            metrics["bins"].append(bins)
+
+        logging.info((f"hist sig: {hists['NOSYS']}"))
+        logging.info((f"hist bkg: {hists['bkg']}"))
+        metrics["hist_sig"].append(hists["NOSYS"])
+        metrics["hist_bkg"].append(hists["bkg"])
+
+        # Evaluate losses.
+        start = perf_counter()
+        for loss_type in ["cls"]: #, "bce"]:  # , "discovery", "bce"]:
+            metrics[f"{loss_type}_valid"].append(
+                evaluate_loss(loss, params, valid, loss_type)
+            )
+            metrics[f"{loss_type}_test"].append(
+                evaluate_loss(loss, params, test, loss_type)
+            )
+            metrics[f"{loss_type}_train"].append(
+                evaluate_loss(loss, params, train, loss_type)
+            )
+            logging.info(f"{loss_type}: {metrics[f'{loss_type}_train'][-1]:.8f}")
+
+        objective = config.objective + "_valid"
+        # pick best training from valid.
+        # if metrics[objective][-1] < best_sig:
+        best_params = params
+        best_sig = metrics[objective][-1]
+
+        # Z_A
+        z_a = get_significance(config, nn, params, train)
+        logging.info(f"Z_A: {z_a:.8f}")
+        metrics["Z_A"].append(z_a)
 
         end = perf_counter()
-        logging.info(f"update took {end-start:.4g}s")
-        if "bins" in params:
-            bin_edges = np.array([0, *params["bins"], 1])
-            logging.info((f"bin edges: {bin_edges}"))
-            bins_per_step.append(params["bins"])
-        for metric in metrics:
-            # evaluate loss on test set
-            test_metric = loss(
-                params, bins=config.bins, data=test, loss=metric, bandwidth=1e-8
-            )  # small bandwidth to have "spikes"
+        logging.info(f"metric evaluation took {end-start:.4g}s")
 
-            logging.info(f"{metric}: {test_metric:.4g}")
-            metrics[metric].append(test_metric)
-            test_loss.append(test_metric)
-
-            # evaluate loss on train set
-            train_metric = loss(
-                params, bins=config.bins, data=data, loss=metric, bandwidth=1e-8
-            )
-            train_loss.append(train_metric)
-
-        # find best training...
-        if metrics[config.objective][-1] < best_sig:
-            best_params = params
-            best_sig = metrics[config.objective][-1]
-
-        # for Z_A
-        # becomes issue for proper batching
-        z_a.append(get_significance(config, nn, params, data))
-
-        # find best binning
-        bins = np.array(params["bins"])
-        corrected_bins = bin_correction(bins)
-        if len(corrected_bins) != len(bins):
-            params["bins"] = corrected_bins
-            state = solver.init_state(
-                params,
-                data=data,
-                bandwidth=config.bandwidth,
+        # once some bin value is nan, everything breaks unrecoverable, also
+        # re-init does not work
+        if any(np.isnan(bins)):
+            sys.exit(
+                "\n\033[0;31m" + f"ERROR: I tried bad bins: {metrics['bins'][i-1]}"
             )
 
         logging.info("\n")
         clear_caches()
 
-    metrics["Z_A"] = z_a
-    metrics["bins"] = bins_per_step
-    metrics["cls_train"] = train_loss
-    metrics["cls_test"] = test_loss
     return best_params, metrics
 
 
-def bin_correction(bins):
-    left_neighbor_larger = bins[:-1] < bins[1:]
-    left_neighbor_larger = np.append(True, left_neighbor_larger)
-
-    combined_condition = (bins < 1) & (bins > 0) & left_neighbor_larger
-    corrected_bins = bins[combined_condition]
-
-    # Ensure at least one bin remains after filtering.
-    return corrected_bins if corrected_bins.size > 0 else np.array([0.5])
+# Function to evaluate loss for a given data set and loss type.
+def evaluate_loss(loss, params, data, loss_type):
+    return loss(params, data=data, loss_type=loss_type, bandwidth=1e-8)[0]
 
 
 def get_significance(config, nn, params, data):
@@ -176,7 +178,7 @@ def get_significance(config, nn, params, data):
         )
     else:
         yields = hh_neos.histograms.hists_from_nn(
-            pars=params["nn_pars"],
+            nn_pars=params["nn_pars"],
             nn=nn,
             data=data_dct,
             bandwidth=config.bandwidth,  # for the bKDEs
@@ -184,6 +186,4 @@ def get_significance(config, nn, params, data):
             if config.include_bins
             else config.bins,
         )
-    this_z_a = relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
-    logging.info(("Z_A: ", this_z_a))
-    return this_z_a
+    return relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])

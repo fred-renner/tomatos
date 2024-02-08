@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
-w_CR = 0.007691879267891989
-err_w_CR = 0.0007230248761909538
+# xbb 70
+w_CR = 0.011839196732981155
 
 
 def stack_inputs(
@@ -165,11 +165,9 @@ def prepare_data(config):
 
     # if config.include_bins:
     data, scaler = min_max_norm(data)
-    # print([data[key].shape[0] for key in data.keys()])
 
     # replicate to have same size sample input
     data["bkg"] = np.asarray(np.resize(data["bkg"][:], data["NOSYS"].shape))
-    # print([data[key].shape for key in data.keys()])
     config.data_types = []
     jnp_data = []
     for k in data.keys():
