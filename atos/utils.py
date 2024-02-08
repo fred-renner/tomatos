@@ -7,7 +7,7 @@ import numpy as np
 import pyhf
 import relaxed
 
-import hh_neos.histograms
+import atos.histograms
 
 Array = jnp.ndarray
 
@@ -20,7 +20,7 @@ def get_hist(config, nn, best_params, data):
         bins = config.bins
     if config.do_m_hh:
         # use whole data set to get correct norm
-        yields = hh_neos.histograms.hists_from_mhh(
+        yields = atos.histograms.hists_from_mhh(
             data={k: v for k, v in zip(config.data_types, data)},
             bandwidth=1e-8,
             bins=bins,
@@ -28,7 +28,7 @@ def get_hist(config, nn, best_params, data):
 
     else:
         # to get correct yields would also need to pass whole data
-        yields = hh_neos.histograms.hists_from_nn(
+        yields = atos.histograms.hists_from_nn(
             nn_pars=best_params["nn_pars"],
             data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
             nn=nn,
@@ -46,7 +46,7 @@ def get_hist(config, nn, best_params, data):
 
 
 def print_cls(config, yields):
-    model = hh_neos.workspace.model_from_hists(config, yields)
+    model = atos.workspace.model_from_hists(config, yields)
 
     CLs_obs, CLs_exp = pyhf.infer.hypotest(
         1.0,  # null hypothesis
