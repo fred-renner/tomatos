@@ -9,7 +9,7 @@ import pyhf
 
 import atos.batching
 import atos.configuration
-import atos.nn_architecture
+import atos.nn_setup
 import atos.optimization
 import atos.plotting
 import atos.preprocess
@@ -46,7 +46,7 @@ def run():
 
     data = atos.preprocess.prepare_data(config)
     logging.info(f"datasets: {len(data)}")
-    init_pars, nn, nn_setup = atos.nn_architecture.init(config)
+    init_pars, nn, nn_setup = atos.nn_setup.init(config)
 
     train, valid_test = atos.batching.split_data(data, ratio=config.train_data_ratio)
     valid, test = atos.batching.split_data(valid_test, ratio=0.8)
