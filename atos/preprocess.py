@@ -54,7 +54,7 @@ def stack_inputs(
     ----------
     filepath : str
         path to file
-    config : hh_neos.configuration.Setup
+    config : atos.configuration.Setup
         config object
     filepath : sys
         systematic

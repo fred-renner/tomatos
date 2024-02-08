@@ -13,7 +13,7 @@ class Setup:
         # fmt: on
 
         self.do_m_hh = False
-        self.include_bins = True
+        self.include_bins = False
         self.debug = True
 
         # # rel 21

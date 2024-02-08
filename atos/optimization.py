@@ -12,8 +12,8 @@ import pyhf
 import relaxed
 from jaxopt import OptaxSolver
 
-import hh_neos.histograms
-import hh_neos.pipeline
+import atos.histograms
+import atos.pipeline
 
 Array = jnp.ndarray
 np.set_printoptions(precision=2)
@@ -45,7 +45,7 @@ def run(
     # even though config is passed, need to keep redundant args here as this
     # function is jitted
     loss = partial(
-        hh_neos.pipeline.pipeline,
+        atos.pipeline.pipeline,
         nn=nn,
         sample_names=config.data_types,
         include_bins=config.include_bins,
@@ -171,13 +171,13 @@ def evaluate_loss(loss, params, data, loss_type):
 def get_significance(config, nn, params, data):
     data_dct = {k: v for k, v in zip(config.data_types, data)}
     if config.do_m_hh:
-        yields = hh_neos.histograms.hists_from_mhh(
+        yields = atos.histograms.hists_from_mhh(
             data=data_dct,
             bandwidth=1e-8,
             bins=params["bins"] if config.include_bins else config.bins,
         )
     else:
-        yields = hh_neos.histograms.hists_from_nn(
+        yields = atos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
             nn=nn,
             data=data_dct,

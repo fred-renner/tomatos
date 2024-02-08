@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hh_neos"
+name = "atos"
 version = "0.1"
 requires-python = ">=3.9"
 dependencies = [
@@ -26,5 +26,5 @@ dependencies = [
 find = {} # Scan the project directory with the default parameters
 
 [project.scripts]
-hh_neos = "hh_neos.main:run"
-hh_neos_plot = "hh_neos.main:plot"
+atos = "atos.main:run"
+atos-plot = "atos.main:plot"

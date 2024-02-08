@@ -7,13 +7,13 @@ import equinox as eqx
 import jax
 import pyhf
 
-import hh_neos.batching
-import hh_neos.configuration
-import hh_neos.nn_architecture
-import hh_neos.optimization
-import hh_neos.plotting
-import hh_neos.preprocess
-import hh_neos.utils
+import atos.batching
+import atos.configuration
+import atos.nn_architecture
+import atos.optimization
+import atos.plotting
+import atos.preprocess
+import atos.utils
 
 JAX_CHECK_TRACER_LEAKS = True
 import jax.numpy as jnp
@@ -25,12 +25,12 @@ import json
 jax.config.update("jax_enable_x64", True)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--bins", type=int)
+parser.add_argument("--bins", type=int, required=True)
 args = parser.parse_args()
 
 
 def run():
-    config = hh_neos.configuration.Setup(args)
+    config = atos.configuration.Setup(args)
 
     logging.basicConfig(
         filename=config.results_path + "log.txt",
@@ -42,21 +42,21 @@ def run():
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
-    logging.info(json.dumps(hh_neos.utils.to_python_lists(config.__dict__), indent=4))
+    logging.info(json.dumps(atos.utils.to_python_lists(config.__dict__), indent=4))
 
-    data = hh_neos.preprocess.prepare_data(config)
+    data = atos.preprocess.prepare_data(config)
     logging.info(f"datasets: {len(data)}")
-    init_pars, nn, nn_setup = hh_neos.nn_architecture.init(config)
+    init_pars, nn, nn_setup = atos.nn_architecture.init(config)
 
-    train, valid_test = hh_neos.batching.split_data(data, ratio=config.train_data_ratio)
-    valid, test = hh_neos.batching.split_data(valid_test, ratio=0.8)
+    train, valid_test = atos.batching.split_data(data, ratio=config.train_data_ratio)
+    valid, test = atos.batching.split_data(valid_test, ratio=0.8)
     logging.info(f"train size: {train[0].shape[0]}")
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
 
-    batch_iterator = hh_neos.batching.make_iterator(train, batch_size=config.batch_size)
+    batch_iterator = atos.batching.make_iterator(train, batch_size=config.batch_size)
 
-    best_params, metrics = hh_neos.optimization.run(
+    best_params, metrics = atos.optimization.run(
         config=config,
         valid=valid,
         test=test,
@@ -65,13 +65,13 @@ def run():
         nn=nn,
     )
 
-    bins, yields = hh_neos.utils.get_hist(config, nn, best_params, data)
+    bins, yields = atos.utils.get_hist(config, nn, best_params, data)
 
     results = {
-        "config": hh_neos.utils.to_python_lists(config.__dict__),
-        "metrics": hh_neos.utils.to_python_lists(metrics),
-        "bins": hh_neos.utils.to_python_lists(bins),
-        "yields": hh_neos.utils.to_python_lists(yields),
+        "config": atos.utils.to_python_lists(config.__dict__),
+        "metrics": atos.utils.to_python_lists(metrics),
+        "bins": atos.utils.to_python_lists(bins),
+        "yields": atos.utils.to_python_lists(yields),
     }
 
     # save model to file
@@ -87,16 +87,16 @@ def run():
 
 
 def plot():
-    config = hh_neos.configuration.Setup(args)
+    config = atos.configuration.Setup(args)
     results = {}
     with open(config.metadata_file_path, "r") as file:
         results = json.load(file)
 
-    hh_neos.plotting.plot_metrics(
+    atos.plotting.plot_metrics(
         results["metrics"],
         results["config"],
     )
-    hh_neos.plotting.hist(
+    atos.plotting.hist(
         results["config"],
         results["bins"],
         results["yields"],

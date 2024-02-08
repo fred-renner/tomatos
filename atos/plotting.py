@@ -4,9 +4,9 @@ import numpy as np
 import pyhf
 import relaxed
 
-import hh_neos.histograms
-import hh_neos.utils
-import hh_neos.workspace
+import atos.histograms
+import atos.utils
+import atos.workspace
 import logging
 
 

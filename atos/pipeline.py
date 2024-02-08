@@ -8,9 +8,9 @@ import neos
 import numpy as np
 import pyhf
 
-import hh_neos.histograms
-import hh_neos.utils
-import hh_neos.workspace
+import atos.histograms
+import atos.utils
+import atos.workspace
 
 # jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
@@ -43,14 +43,14 @@ def pipeline(
         pars["bins"] = bins
 
     if do_m_hh:
-        hists = hh_neos.histograms.hists_from_mhh(
+        hists = atos.histograms.hists_from_mhh(
             data=data_dct,
             bins=bins,
             bandwidth=bandwidth,
             include_bins=include_bins,
         )
     else:
-        hists = hh_neos.histograms.hists_from_nn(
+        hists = atos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,
             data=data_dct,
@@ -60,10 +60,10 @@ def pipeline(
 
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type.lower() in ["bce", "binary cross-entropy"]:
-        return hh_neos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
+        return atos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
 
     # build our statistical model, and calculate the loss!
-    model = hh_neos.workspace.model_from_hists(
+    model = atos.workspace.model_from_hists(
         do_m_hh, hists, config, do_systematics, do_stat_error
     )
 
