@@ -15,16 +15,25 @@ def plot_metrics(metrics, config):
 
     # cls
     plt.figure()
-    # scale train test for visual comparison
-    # could also do ratio, maybe better
-    # scale = metrics["cls_test"][0] / metrics["cls_train"][0]
-    plt.plot(epoch_grid, metrics["cls_train"], label=r"$CL_s$ train")
-    plt.plot(epoch_grid, metrics["cls_valid"], label=r"$CL_s$ valid")
-    plt.plot(epoch_grid, metrics["cls_test"], label=r"$CL_s$ test")
-    # plt.plot(epoch_grid, scale * metrics["cls_train"], label=r"$CL_s$ train (scaled)")
+    plt.plot(
+        epoch_grid,
+        metrics["cls_train"] / np.max(metrics["cls_train"]),
+        label=r"$CL_s$ train",
+    )
+    plt.plot(
+        epoch_grid,
+        metrics["cls_valid"] / np.max(metrics["cls_valid"]),
+        label=r"$CL_s$ valid",
+    )
+    plt.plot(
+        epoch_grid,
+        metrics["cls_test"] / np.max(metrics["cls_test"]),
+        label=r"$CL_s$ test",
+    )
+
     plt.legend()
     plt.xlabel("epoch")
-    plt.ylabel("Loss")
+    plt.ylabel("normalized loss")
     # ax = plt.gca()
     # ax.set_yscale('log')
     plt.tight_layout()
@@ -71,9 +80,9 @@ def plot_metrics(metrics, config):
         plt.figure()
         for i, bins in enumerate(metrics["bins"]):
             if config["do_m_hh"] and config["include_bins"]:
-                bins = (np.array(bins) - config["scaler_min"][0]) / config["scaler_scale"][
-                    0
-                ]
+                bins = (np.array(bins) - config["scaler_min"][0]) / config[
+                    "scaler_scale"
+                ][0]
                 plt.xlabel("m$_{hh}$ (MeV)")
             else:
                 plt.xlabel("NN score")
@@ -131,4 +140,3 @@ def hist(config, bins, yields):
     plt.tight_layout()
     logging.info(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")
-

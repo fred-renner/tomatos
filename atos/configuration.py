@@ -14,7 +14,7 @@ class Setup:
 
         self.do_m_hh = False
         self.include_bins = False
-        self.debug = True
+        self.debug = False
 
         # # rel 21
         # self.vars = [
@@ -126,9 +126,9 @@ class Setup:
             )  # rel 21 analysis
 
         self.batch_size = int(1e5)  # int is necessary
-        # larger than 1e-2 messes up binning optimization
-        # this is also ~ the value by which the bins are pulled around
-        self.lr = 0.005
+
+        # with all systs + stats 0.001 seems too small
+        self.lr = 0.01
         # one step is one batch, not epoch
         if self.debug:
             self.num_steps = 3
@@ -141,14 +141,14 @@ class Setup:
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
 
-        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/neos/"
+        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/atos/"
 
         if self.do_m_hh:
-            results_folder = "neos_m_hh/"
+            results_folder = "atos_m_hh/"
         else:
-            results_folder = f"neos_{self.objective}_{args.bins}_bins/"
+            results_folder = f"atos_{self.objective}_{args.bins}_blank/"
         if self.debug:
-            results_folder = "neos_debug/"
+            results_folder = "atos_debug/"
         self.results_path += results_folder
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)

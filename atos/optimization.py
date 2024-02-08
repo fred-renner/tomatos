@@ -56,7 +56,7 @@ def run(
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
     )
-    # sometimes adagrad can also work
+
     solver = OptaxSolver(loss, opt=optax.adam(config.lr), has_aux=True, jit=True)
 
     pyhf.set_backend("jax", default=True, precision="64b")
