@@ -54,7 +54,7 @@ def stack_inputs(
     ----------
     filepath : str
         path to file
-    config : atos.configuration.Setup
+    config : tomatos.configuration.Setup
         config object
     filepath : sys
         systematic

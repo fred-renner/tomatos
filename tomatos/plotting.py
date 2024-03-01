@@ -4,9 +4,9 @@ import numpy as np
 import pyhf
 import relaxed
 
-import atos.histograms
-import atos.utils
-import atos.workspace
+import tomatos.histograms
+import tomatos.utils
+import tomatos.workspace
 import logging
 
 

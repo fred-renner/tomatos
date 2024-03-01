@@ -64,33 +64,33 @@ class Setup:
 
         self.systematics = [
             "NOSYS",
-            "xbb_pt_bin_0__1up",
-            "xbb_pt_bin_0__1down",
-            "xbb_pt_bin_1__1up",
-            "xbb_pt_bin_1__1down",
-            "xbb_pt_bin_2__1up",
-            "xbb_pt_bin_2__1down",
-            "xbb_pt_bin_3__1up",
-            "xbb_pt_bin_3__1down",
-            "JET_MassRes_Top__1up",
-            "JET_MassRes_Hbb__1up",
-            "JET_MassRes_WZ__1up",
-            "JET_Rtrk_Modelling_pT__1up",
-            "JET_Comb_Modelling_mass__1up",
-            "JET_MassRes_Top__1down",
-            "JET_MassRes_Hbb__1down",
-            "JET_MassRes_WZ__1down",
-            "JET_Rtrk_Modelling_pT__1down",
-            "JET_Comb_Modelling_mass__1down",
-            "JET_Flavor_Composition__1up",
-            "JET_Flavor_Composition__1down",
-            "GEN_MUR05_MUF05_PDF260000",
-            "GEN_MUR05_MUF10_PDF260000",
-            "GEN_MUR10_MUF05_PDF260000",
-            "GEN_MUR10_MUF10_PDF260000",
-            "GEN_MUR10_MUF20_PDF260000",
-            "GEN_MUR20_MUF10_PDF260000",
-            "GEN_MUR20_MUF20_PDF260000",
+            # "xbb_pt_bin_0__1up",
+            # "xbb_pt_bin_0__1down",
+            # "xbb_pt_bin_1__1up",
+            # "xbb_pt_bin_1__1down",
+            # "xbb_pt_bin_2__1up",
+            # "xbb_pt_bin_2__1down",
+            # "xbb_pt_bin_3__1up",
+            # "xbb_pt_bin_3__1down",
+            # "JET_MassRes_Top__1up",
+            # "JET_MassRes_Hbb__1up",
+            # "JET_MassRes_WZ__1up",
+            # "JET_Rtrk_Modelling_pT__1up",
+            # "JET_Comb_Modelling_mass__1up",
+            # "JET_MassRes_Top__1down",
+            # "JET_MassRes_Hbb__1down",
+            # "JET_MassRes_WZ__1down",
+            # "JET_Rtrk_Modelling_pT__1down",
+            # "JET_Comb_Modelling_mass__1down",
+            # "JET_Flavor_Composition__1up",
+            # "JET_Flavor_Composition__1down",
+            # "GEN_MUR05_MUF05_PDF260000",
+            # "GEN_MUR05_MUF10_PDF260000",
+            # "GEN_MUR10_MUF05_PDF260000",
+            # "GEN_MUR10_MUF10_PDF260000",
+            # "GEN_MUR10_MUF20_PDF260000",
+            # "GEN_MUR20_MUF10_PDF260000",
+            # "GEN_MUR20_MUF20_PDF260000",
         ]
 
         self.systematics_raw = []
@@ -139,16 +139,16 @@ class Setup:
         self.train_data_ratio = 0.9
 
         # can choose from "cls", "discovery", "bce"
-        self.objective = "cls"
+        self.objective = "bce"
 
-        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/atos/"
+        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
 
         if self.do_m_hh:
-            results_folder = "atos_m_hh/"
+            results_folder = "tomatos_m_hh/"
         else:
-            results_folder = f"atos_{self.objective}_{args.bins}_blank/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}/"
         if self.debug:
-            results_folder = "atos_debug/"
+            results_folder = "tomatos_debug/"
         self.results_path += results_folder
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
