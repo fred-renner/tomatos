@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import logging
 
 import equinox as eqx
 import jax
 import pyhf
 
-import atos.batching
-import atos.configuration
-import atos.nn_setup
-import atos.optimization
-import atos.plotting
-import atos.preprocess
-import atos.utils
+import tomatos.batching
+import tomatos.configuration
+import tomatos.nn_setup
+import tomatos.optimization
+import tomatos.plotting
+import tomatos.preprocess
+import tomatos.utils
 
 JAX_CHECK_TRACER_LEAKS = True
 import jax.numpy as jnp
@@ -30,7 +29,7 @@ args = parser.parse_args()
 
 
 def run():
-    config = atos.configuration.Setup(args)
+    config = tomatos.configuration.Setup(args)
 
     logging.basicConfig(
         filename=config.results_path + "log.txt",
@@ -42,21 +41,21 @@ def run():
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
-    logging.info(json.dumps(atos.utils.to_python_lists(config.__dict__), indent=4))
+    logging.info(json.dumps(tomatos.utils.to_python_lists(config.__dict__), indent=4))
 
-    data = atos.preprocess.prepare_data(config)
+    data = tomatos.preprocess.prepare_data(config)
     logging.info(f"datasets: {len(data)}")
-    init_pars, nn, nn_setup = atos.nn_setup.init(config)
+    init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
 
-    train, valid_test = atos.batching.split_data(data, ratio=config.train_data_ratio)
-    valid, test = atos.batching.split_data(valid_test, ratio=0.8)
+    train, valid_test = tomatos.batching.split_data(data, ratio=config.train_data_ratio)
+    valid, test = tomatos.batching.split_data(valid_test, ratio=0.8)
     logging.info(f"train size: {train[0].shape[0]}")
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
 
-    batch_iterator = atos.batching.make_iterator(train, batch_size=config.batch_size)
+    batch_iterator = tomatos.batching.make_iterator(train, batch_size=config.batch_size)
 
-    best_params, metrics = atos.optimization.run(
+    best_params, metrics = tomatos.optimization.run(
         config=config,
         valid=valid,
         test=test,
@@ -65,13 +64,13 @@ def run():
         nn=nn,
     )
 
-    bins, yields = atos.utils.get_hist(config, nn, best_params, data)
+    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data)
 
     results = {
-        "config": atos.utils.to_python_lists(config.__dict__),
-        "metrics": atos.utils.to_python_lists(metrics),
-        "bins": atos.utils.to_python_lists(bins),
-        "yields": atos.utils.to_python_lists(yields),
+        "config": tomatos.utils.to_python_lists(config.__dict__),
+        "metrics": tomatos.utils.to_python_lists(metrics),
+        "bins": tomatos.utils.to_python_lists(bins),
+        "yields": tomatos.utils.to_python_lists(yields),
     }
 
     # save model to file
@@ -87,16 +86,16 @@ def run():
 
 
 def plot():
-    config = atos.configuration.Setup(args)
+    config = tomatos.configuration.Setup(args)
     results = {}
     with open(config.metadata_file_path, "r") as file:
         results = json.load(file)
 
-    atos.plotting.plot_metrics(
+    tomatos.plotting.plot_metrics(
         results["metrics"],
         results["config"],
     )
-    atos.plotting.hist(
+    tomatos.plotting.hist(
         results["config"],
         results["bins"],
         results["yields"],

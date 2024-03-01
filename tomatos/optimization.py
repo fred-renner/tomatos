@@ -12,8 +12,8 @@ import pyhf
 import relaxed
 from jaxopt import OptaxSolver
 
-import atos.histograms
-import atos.pipeline
+import tomatos.histograms
+import tomatos.pipeline
 
 Array = jnp.ndarray
 np.set_printoptions(precision=2)
@@ -45,7 +45,7 @@ def run(
     # even though config is passed, need to keep redundant args here as this
     # function is jitted
     loss = partial(
-        atos.pipeline.pipeline,
+        tomatos.pipeline.pipeline,
         nn=nn,
         sample_names=config.data_types,
         include_bins=config.include_bins,
@@ -124,7 +124,7 @@ def run(
 
         # Evaluate losses.
         start = perf_counter()
-        for loss_type in ["cls"]: #, "bce"]:  # , "discovery", "bce"]:
+        for loss_type in ["cls", "bce"]:  # , "bce"]:  # , "discovery", "bce"]:
             metrics[f"{loss_type}_valid"].append(
                 evaluate_loss(loss, params, valid, loss_type)
             )
@@ -138,9 +138,9 @@ def run(
 
         objective = config.objective + "_valid"
         # pick best training from valid.
-        # if metrics[objective][-1] < best_sig:
-        best_params = params
-        best_sig = metrics[objective][-1]
+        if metrics[objective][-1] < best_sig:
+            best_params = params
+            best_sig = metrics[objective][-1]
 
         # Z_A
         z_a = get_significance(config, nn, params, train)
@@ -171,13 +171,13 @@ def evaluate_loss(loss, params, data, loss_type):
 def get_significance(config, nn, params, data):
     data_dct = {k: v for k, v in zip(config.data_types, data)}
     if config.do_m_hh:
-        yields = atos.histograms.hists_from_mhh(
+        yields = tomatos.histograms.hists_from_mhh(
             data=data_dct,
             bandwidth=1e-8,
             bins=params["bins"] if config.include_bins else config.bins,
         )
     else:
-        yields = atos.histograms.hists_from_nn(
+        yields = tomatos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
             nn=nn,
             data=data_dct,
