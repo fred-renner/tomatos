@@ -30,6 +30,8 @@ def hist(
     ----------
     data : Array
         1D array of data to histogram.
+    weights : Array
+        weights to data
     bins : Array
         1D array of bin edges.
     bandwidth : float
@@ -53,9 +55,16 @@ def hist(
     # 7.2.3 nathan thesis
     # get cumulative counts (area under kde) for each set of bin edges
 
+    # bins=np.array([0,1,2,3])
+    # bins.reshape(-1, 1)
+    # array([[0],
+    #        [1],
+    #        [2],
+    #        [3]])
     cdf = jsp.stats.norm.cdf(bins.reshape(-1, 1), loc=data, scale=bandwidth)
     # multiply with weight
     cdf = cdf * weights
+
     # sum kde contributions in each bin
     counts = (cdf[1:, :] - cdf[:-1, :]).sum(axis=1)
 
@@ -73,6 +82,51 @@ def hist(
     return counts
 
 
+# much easier to get w2sum from a dedicated jitted function
+@jax.jit
+def get_w2sum(
+    data: Array,
+    weights: Array,
+    bins: Array,
+    bandwidth: float,
+) -> Array:
+    """get w2 sum from Differentiable histogram, defined via a binned kernel density estimate (bKDE).
+
+    Parameters
+    ----------
+    data : Array
+        1D array of data to histogram.
+    weights : Array
+        weights to data
+    bins : Array
+        1D array of bin edges.
+    bandwidth : float
+        The bandwidth of the kernel. Bigger == lower gradient variance, but more bias.
+    Returns
+    -------
+    Array
+        1D array of bKDE counts.
+    """
+
+    # 7.2.3 nathan thesis
+    # get cumulative counts (area under kde) for each set of bin edges
+
+    # bins=np.array([0,1,2,3])
+    # bins.reshape(-1, 1)
+    # array([[0],
+    #        [1],
+    #        [2],
+    #        [3]])
+
+    cdf = jsp.stats.norm.cdf(bins.reshape(-1, 1), loc=data, scale=bandwidth)
+    cdf = cdf * (weights**2)
+
+    # sum kde contributions in each bin
+    counts = (cdf[1:, :] - cdf[:-1, :]).sum(axis=1)
+
+    return counts
+
+
 def hists_from_nn(
     nn_pars: Array,
     data: dict[str, Array],
@@ -82,6 +136,7 @@ def hists_from_nn(
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs yields."""
 
+    # k index is sample index
     values = {k: data[k][:, 0, :] for k in data}
     #
     weights = {k: data[k][:, 1, 0] for k in data}
@@ -98,6 +153,18 @@ def hists_from_nn(
         k: make_hist(data=nn_output[k], weights=weights[k])
         for k, v in nn_output.items()
     }
+    hists["NOSYS_w2sum"] = get_w2sum(
+        data=nn_output["NOSYS"],
+        weights=weights["NOSYS"],
+        bandwidth=bandwidth,
+        bins=bins,
+    )
+    hists["bkg_w2sum"] = get_w2sum(
+        data=nn_output["bkg"],
+        weights=weights["bkg"],
+        bandwidth=bandwidth,
+        bins=bins,
+    )
 
     return hists
 

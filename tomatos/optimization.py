@@ -64,7 +64,7 @@ def run(
     params = init_pars
     best_params = init_pars
     best_sig = 999
-
+    print(config.data_types)
     metrics = {
         k: []
         for k in [
@@ -79,8 +79,7 @@ def run(
             "bce_test",
             "Z_A",
             "bins",
-            "hist_sig",
-            "hist_bkg",
+            *config.data_types, # add the hists
         ]
     }
 
@@ -107,7 +106,7 @@ def run(
             state,
             data=train,
         )
-        hists = state.aux
+        histograms = state.aux
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
 
@@ -117,14 +116,14 @@ def run(
             logging.info((f"next bin edges: {bins}"))
             metrics["bins"].append(bins)
 
-        logging.info((f"hist sig: {hists['NOSYS']}"))
-        logging.info((f"hist bkg: {hists['bkg']}"))
-        metrics["hist_sig"].append(hists["NOSYS"])
-        metrics["hist_bkg"].append(hists["bkg"])
+        logging.info((f"hist sig: {histograms['NOSYS']}"))
+        logging.info((f"hist bkg: {histograms['bkg']}"))
+        for hist in config.data_types:
+            metrics[hist].append(histograms[hist])
 
         # Evaluate losses.
         start = perf_counter()
-        for loss_type in ["cls", "bce"]:  # , "bce"]:  # , "discovery", "bce"]:
+        for loss_type in ["cls"]:  # , "bce"]:  # , "discovery", "bce"]:
             metrics[f"{loss_type}_valid"].append(
                 evaluate_loss(loss, params, valid, loss_type)
             )
