@@ -6,10 +6,9 @@ import pyhf
 Array = jnp.ndarray
 
 
-def make_stat_err(hist):
-    stat_err_signal = jnp.sqrt(hist)
-    hi = hist + stat_err_signal
-    low = hist - stat_err_signal
+def make_stat_err(hist, stat_err):
+    hi = hist + stat_err
+    low = hist - stat_err
     # make 0 if negative
     low = jnp.where(low > 0, low, 0)
     return {"hi": hi, "low": low}
@@ -116,8 +115,14 @@ def model_from_hists(
                 },
             )
         if do_stat_error:
-            stat_err_signal = make_stat_err(hists["NOSYS"])
-            stat_err_bkg = make_stat_err(hists["bkg"])
+            stat_err_signal = make_stat_err(
+                hists["NOSYS"],
+                jnp.sqrt(hists["NOSYS_w2sum"]),
+            )
+            stat_err_bkg = make_stat_err(
+                hists["bkg"],
+                jnp.sqrt(hists["bkg_w2sum"]),
+            )
             signal_modifiers += (
                 {
                     "name": "stat_err_signal",

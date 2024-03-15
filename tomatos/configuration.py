@@ -14,31 +14,8 @@ class Setup:
 
         self.do_m_hh = False
         self.include_bins = False
-        self.debug = False
+        self.debug = True
 
-        # # rel 21
-        # self.vars = [
-        #     "pt_h1",
-        #     "eta_h1",
-        #     # "phi_h1",
-        #     # "m_h1",
-        #     "pt_h2",
-        #     "eta_h2",
-        #     # "phi_h2",
-        #     # "m_h2",
-        #     "pt_hh",
-        #     "eta_hh",
-        #     # "phi_hh",
-        #     "m_hh",
-        #     "pt_j1",
-        #     "eta_j1",
-        #     # "phi_j1",
-        #     "E_j1",
-        #     "pt_j2",
-        #     "eta_j2",
-        #     # "phi_j2",
-        #     "E_j2",
-        # ]
         self.vars = [
             "m_hh",
             "pt_h1",
@@ -64,38 +41,38 @@ class Setup:
 
         self.systematics = [
             "NOSYS",
-            # "xbb_pt_bin_0__1up",
-            # "xbb_pt_bin_0__1down",
-            # "xbb_pt_bin_1__1up",
-            # "xbb_pt_bin_1__1down",
-            # "xbb_pt_bin_2__1up",
-            # "xbb_pt_bin_2__1down",
-            # "xbb_pt_bin_3__1up",
-            # "xbb_pt_bin_3__1down",
-            # "JET_MassRes_Top__1up",
-            # "JET_MassRes_Hbb__1up",
-            # "JET_MassRes_WZ__1up",
-            # "JET_Rtrk_Modelling_pT__1up",
-            # "JET_Comb_Modelling_mass__1up",
-            # "JET_MassRes_Top__1down",
-            # "JET_MassRes_Hbb__1down",
-            # "JET_MassRes_WZ__1down",
-            # "JET_Rtrk_Modelling_pT__1down",
-            # "JET_Comb_Modelling_mass__1down",
-            # "JET_Flavor_Composition__1up",
-            # "JET_Flavor_Composition__1down",
-            # "GEN_MUR05_MUF05_PDF260000",
-            # "GEN_MUR05_MUF10_PDF260000",
-            # "GEN_MUR10_MUF05_PDF260000",
-            # "GEN_MUR10_MUF10_PDF260000",
-            # "GEN_MUR10_MUF20_PDF260000",
-            # "GEN_MUR20_MUF10_PDF260000",
-            # "GEN_MUR20_MUF20_PDF260000",
+            "xbb_pt_bin_0__1up",
+            "xbb_pt_bin_0__1down",
+            "xbb_pt_bin_1__1up",
+            "xbb_pt_bin_1__1down",
+            "xbb_pt_bin_2__1up",
+            "xbb_pt_bin_2__1down",
+            "xbb_pt_bin_3__1up",
+            "xbb_pt_bin_3__1down",
+            "JET_MassRes_Top__1up",
+            "JET_MassRes_Hbb__1up",
+            "JET_MassRes_WZ__1up",
+            "JET_Rtrk_Modelling_pT__1up",
+            "JET_Comb_Modelling_mass__1up",
+            "JET_MassRes_Top__1down",
+            "JET_MassRes_Hbb__1down",
+            "JET_MassRes_WZ__1down",
+            "JET_Rtrk_Modelling_pT__1down",
+            "JET_Comb_Modelling_mass__1down",
+            "JET_Flavor_Composition__1up",
+            "JET_Flavor_Composition__1down",
+            "GEN_MUR05_MUF05_PDF260000",
+            "GEN_MUR05_MUF10_PDF260000",
+            "GEN_MUR10_MUF05_PDF260000",
+            "GEN_MUR10_MUF10_PDF260000",
+            "GEN_MUR10_MUF20_PDF260000",
+            "GEN_MUR20_MUF10_PDF260000",
+            "GEN_MUR20_MUF20_PDF260000",
         ]
 
         self.systematics_raw = []
         self.do_stat_error = False
-        self.do_systematics = False
+        self.do_systematics = True
         for sys in self.systematics:
             if "1up" in sys:
                 self.systematics_raw += [sys.split("__")[0]]
@@ -139,14 +116,14 @@ class Setup:
         self.train_data_ratio = 0.9
 
         # can choose from "cls", "discovery", "bce"
-        self.objective = "bce"
+        self.objective = "cls"
 
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
 
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_sys/"
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
