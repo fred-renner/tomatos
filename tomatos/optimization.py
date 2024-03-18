@@ -79,7 +79,11 @@ def run(
             "bce_test",
             "Z_A",
             "bins",
-            *config.data_types, # add the hists
+            *config.data_types,  # add the hists
+            "NOSYS_stat_up",
+            "NOSYS_stat_down",
+            "bkg_stat_up",
+            "bkg_stat_down",
         ]
     }
 
@@ -118,7 +122,8 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
-        for hist in config.data_types:
+
+        for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
 
         # Evaluate losses.

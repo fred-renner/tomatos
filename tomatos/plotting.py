@@ -97,8 +97,11 @@ def plot_metrics(metrics, config):
 
 
 def hist(config, bins, yields):
-    plt.figure()
+    fig=plt.figure()
     for l, a in zip(yields, jnp.array(list(yields.values()))):
+        
+        if "JET" in l or "GEN" in l:
+            break
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
@@ -133,10 +136,12 @@ def hist(config, bins, yields):
                 # align="edge",
             )
             plt.xlabel("NN score")
-        if l == "NOSYS":
-            break
+        # this makes sig and bkg only 
+        # if l == "NOSYS":
+        #     break
+    fig.legend(loc="upper right")
     plt.ylabel("Events")
-    plt.legend()  # prop={"size": 6})
+    # plt.legend()  # prop={"size": 6})
     plt.tight_layout()
     logging.info(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")
