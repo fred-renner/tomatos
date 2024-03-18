@@ -6,14 +6,6 @@ import pyhf
 Array = jnp.ndarray
 
 
-def make_stat_err(hist, stat_err):
-    hi = hist + stat_err
-    low = hist - stat_err
-    # make 0 if negative
-    low = jnp.where(low > 0, low, 0)
-    return {"hi": hi, "low": low}
-
-
 def get_generator_weight_envelope(hists):
     nominal = hists["NOSYS"]
     gens = [
@@ -115,21 +107,13 @@ def model_from_hists(
                 },
             )
         if do_stat_error:
-            stat_err_signal = make_stat_err(
-                hists["NOSYS"],
-                jnp.sqrt(hists["NOSYS_w2sum"]),
-            )
-            stat_err_bkg = make_stat_err(
-                hists["bkg"],
-                jnp.sqrt(hists["bkg_w2sum"]),
-            )
             signal_modifiers += (
                 {
                     "name": "stat_err_signal",
                     "type": "histosys",
                     "data": {
-                        "hi_data": stat_err_signal["hi"],
-                        "lo_data": stat_err_signal["low"],
+                        "hi_data": hists["NOSYS_stat_up"],
+                        "lo_data": hists["NOSYS_stat_down"],
                     },
                 },
             )
@@ -138,8 +122,8 @@ def model_from_hists(
                     "name": "stat_err_bkg",
                     "type": "histosys",
                     "data": {
-                        "hi_data": stat_err_bkg["hi"],
-                        "lo_data": stat_err_bkg["low"],
+                        "hi_data": hists["bkg_stat_up"],
+                        "lo_data": hists["bkg_stat_down"],
                     },
                 },
             )

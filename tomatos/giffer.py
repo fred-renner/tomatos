@@ -18,19 +18,7 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 
 if __name__ == "__main__":
     models = [
-        # "m_hh",
-        "atos_bce_3",
-        "atos_bce_4",
-        "atos_bce_5",
-        # "atos_cls_3_blank",
-        # "atos_cls_3_sys",
-        # "atos_cls_3_stat_sys",
-        # "atos_cls_4_blank",
-        # "atos_cls_4_sys",
-        # "atos_cls_4_stat_sys",
-        # "atos_cls_5_blank",
-        # "atos_cls_5_sys",
-        # "atos_cls_5_stat_sys",
+        "tomatos_cls_6_sys",
     ]
     ymax = 0
     for m in models:
@@ -40,41 +28,42 @@ if __name__ == "__main__":
         image_path = model_path + "/images"
         if not os.path.isdir(image_path):
             os.makedirs(image_path)
-        for i in range(len(meta_data["metrics"]["hist_sig"])):
+        # loop over epochs
+        for i in range(len(meta_data["metrics"]["NOSYS"])):
+            # if i==1:
+            #     break
+            print(i)
+            # loop over hists
             plt.figure()
-            plt.stairs(
-                edges=meta_data["config"]["bins"],
-                values=meta_data["metrics"]["hist_sig"][i],
-                label="Sig",
-                alpha=0.8,
-                fill=None,
-                linewidth=2,
-                # align="edge",
-            )
-            plt.stairs(
-                edges=meta_data["config"]["bins"],
-                values=meta_data["metrics"]["hist_bkg"][i],
-                label="Bkg",
-                alpha=0.8,
-                fill=None,
-                linewidth=2,
-                # align="edge",
-            )
+            for hist_name in meta_data["config"]["data_types"]:
+                # if "JET" in hist_name or "GEN" in hist_name:
+                #     break
+                plt.stairs(
+                    edges=meta_data["config"]["bins"],
+                    values=meta_data["metrics"][hist_name][i],
+                    label=hist_name,
+                    alpha=0.8,
+                    fill=None,
+                    linewidth=2,
+                    # align="edge",
+                )
+
+                ax = plt.gca()
+                ylim = ax.get_ylim()
+                if ylim[1] > ymax:
+                    ymax = ylim[1]
+                ax.set_ylim([0, ymax])
+
             if meta_data["config"]["do_m_hh"]:
                 plt.xlabel("m$_{hh}$ (MeV)")
             else:
                 plt.xlabel("NN score")
 
             plt.ylabel("Events")
-            plt.legend()  # prop={"size": 6})
+            plt.legend(prop={"size": 5})  # prop={"size": 6})
             plt.tight_layout()
-            ax = plt.gca()
-            ylim = ax.get_ylim()
-            if ylim[1] > ymax[1]:
-                ymax = ylim
-            ax.set_ylim(ymax)
-            plt.savefig(image_path + "/" + f"{i:004d}" + ".png")
-            print(i)
+            plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=100)
             plt.close()
 
-        create_gif_from_folder(image_path, model_path + m + ".gif", duration=0.005)
+        create_gif_from_folder(image_path, model_path + m + ".gif", duration=0.002)
+        print(model_path + m + ".gif")

@@ -153,18 +153,28 @@ def hists_from_nn(
         k: make_hist(data=nn_output[k], weights=weights[k])
         for k, v in nn_output.items()
     }
-    hists["NOSYS_w2sum"] = get_w2sum(
-        data=nn_output["NOSYS"],
-        weights=weights["NOSYS"],
-        bandwidth=bandwidth,
-        bins=bins,
+
+    # calculate stat error
+    NOSYS_stat_err = jnp.sqrt(
+        get_w2sum(
+            data=nn_output["NOSYS"],
+            weights=weights["NOSYS"],
+            bandwidth=bandwidth,
+            bins=bins,
+        )
     )
-    hists["bkg_w2sum"] = get_w2sum(
-        data=nn_output["bkg"],
-        weights=weights["bkg"],
-        bandwidth=bandwidth,
-        bins=bins,
+    bkg_stat_err = jnp.sqrt(
+        get_w2sum(
+            data=nn_output["bkg"],
+            weights=weights["bkg"],
+            bandwidth=bandwidth,
+            bins=bins,
+        )
     )
+    hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
+    hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
+    hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
+    hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
 
     return hists
 
