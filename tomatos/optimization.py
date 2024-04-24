@@ -84,6 +84,8 @@ def run(
             "NOSYS_stat_down",
             "bkg_stat_up",
             "bkg_stat_down",
+            "vbf cut",
+            "eta_cut",
         ]
     }
 
@@ -93,6 +95,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
+            init_pars["vbf_cut"] = 0.25
+            init_pars["eta_cut"] = 0.25
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -110,6 +114,7 @@ def run(
             state,
             data=train,
         )
+
         histograms = state.aux
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
@@ -122,13 +127,17 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
+        logging.info(f"vbf cut: {params['vbf_cut']}")
+        logging.info(f"eta cut: {params['eta_cut']}")
+        metrics["vbf cut"].append(params["vbf_cut"])
+        metrics["eta_cut"].append(params["eta_cut"])
 
         for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
 
         # Evaluate losses.
         start = perf_counter()
-        for loss_type in ["cls"]:  # , "bce"]:  # , "discovery", "bce"]:
+        for loss_type in [config.objective]:  # , "bce"]:  # , "discovery", "bce"]:
             metrics[f"{loss_type}_valid"].append(
                 evaluate_loss(loss, params, valid, loss_type)
             )
@@ -183,6 +192,9 @@ def get_significance(config, nn, params, data):
     else:
         yields = tomatos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
+            config=config,
+            vbf_cut=params["vbf_cut"],
+            eta_cut=params["eta_cut"],
             nn=nn,
             data=data_dct,
             bandwidth=config.bandwidth,  # for the bKDEs

@@ -10,37 +10,63 @@ import tomatos.workspace
 import logging
 
 
+def interpolate_gaps(values, limit=None):
+    """
+    Fill gaps using linear interpolation, optionally only fill gaps up to a
+    size of `limit`.
+    """
+    values = np.asarray(values)
+    i = np.arange(values.size)
+    valid = np.isfinite(values)
+    filled = np.interp(i, i[valid], values[valid])
+
+    if limit is not None:
+        invalid = ~valid
+        for n in range(1, limit + 1):
+            invalid[:-n] &= invalid[n:]
+        filled[invalid] = np.nan
+
+    return filled
+
+
 def plot_metrics(metrics, config):
     epoch_grid = range(1, config["num_steps"] + 1)
 
-    # cls
-    plt.figure()
-    plt.plot(
-        epoch_grid,
-        metrics["cls_train"] / np.max(metrics["cls_train"]),
-        label=r"$CL_s$ train",
-    )
-    plt.plot(
-        epoch_grid,
-        metrics["cls_valid"] / np.max(metrics["cls_valid"]),
-        label=r"$CL_s$ valid",
-    )
-    plt.plot(
-        epoch_grid,
-        metrics["cls_test"] / np.max(metrics["cls_test"]),
-        label=r"$CL_s$ test",
-    )
+    # lets account for possible nan's
 
-    plt.legend()
-    plt.xlabel("epoch")
-    plt.ylabel("normalized loss")
-    # ax = plt.gca()
-    # ax.set_yscale('log')
-    plt.tight_layout()
-    plot_path = config["results_path"] + "cls.pdf"
-    logging.info(plot_path)
-    plt.savefig(plot_path)
-    plt.close()
+    for k, v in metrics.items():
+        if "cls" in k and len(v) != 0:
+            metrics[k] = interpolate_gaps(np.array(v))
+
+            plt.figure()
+            plt.plot(
+                epoch_grid,
+                metrics["cls_train"] / np.max(metrics["cls_train"]),
+                label=r"$CL_s$ train",
+            )
+            plt.plot(
+                epoch_grid,
+                metrics["cls_valid"] / np.max(metrics["cls_valid"]),
+                label=r"$CL_s$ valid",
+            )
+            plt.plot(
+                epoch_grid,
+                metrics["cls_test"] / np.max(metrics["cls_test"]),
+                label=r"$CL_s$ test",
+            )
+
+            plt.legend()
+            plt.xlabel("epoch")
+            plt.ylabel("normalized loss")
+            # ax = plt.gca()
+            # ax.set_yscale('log')
+            plt.tight_layout()
+            plot_path = config["results_path"] + "cls.pdf"
+
+            logging.info(plot_path)
+            plt.savefig(plot_path)
+            plt.close()
+            break
 
     # bce
     if len(metrics["bce_train"]) > 0:
@@ -76,7 +102,7 @@ def plot_metrics(metrics, config):
     plt.close()
 
     # bins
-    if len(metrics["bce_train"]) > 0:
+    if len(metrics["bins"]) > 0:
         plt.figure()
         for i, bins in enumerate(metrics["bins"]):
             if config["do_m_hh"] and config["include_bins"]:
@@ -97,9 +123,8 @@ def plot_metrics(metrics, config):
 
 
 def hist(config, bins, yields):
-    fig=plt.figure()
+    fig = plt.figure()
     for l, a in zip(yields, jnp.array(list(yields.values()))):
-        
         if "JET" in l or "GEN" in l:
             break
         if config["do_m_hh"]:
@@ -136,7 +161,7 @@ def hist(config, bins, yields):
                 # align="edge",
             )
             plt.xlabel("NN score")
-        # this makes sig and bkg only 
+        # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
     fig.legend(loc="upper right")

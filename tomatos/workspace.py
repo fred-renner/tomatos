@@ -59,11 +59,6 @@ def model_from_hists(
                             "data": hists["bkg"],  # background
                             "modifiers": [],
                         },
-                        # {
-                        #     "name": "ttbar",
-                        #     "data": hists["ttbar"],  # background
-                        #     "modifiers": [],
-                        # },
                     ],
                 },
             ],
@@ -95,14 +90,33 @@ def model_from_hists(
                         },
                     },
                 )
-
-            bkg_modifiers += (
+            signal_modifiers += (
                 {
-                    "name": "norm_err_bkg",
+                    "name": "branching_ratio_bb",
                     "type": "histosys",
                     "data": {
-                        "hi_data": hists["bkg"] * (1 + 0.05658641863973597),
-                        "lo_data": hists["bkg"] * (1 - 0.05658641863973597),
+                        "hi_data": hists["bkg"] * (1 + 0.034230167215544956),
+                        "lo_data": hists["bkg"] * (1 - 0.03479541236132045),
+                    },
+                },
+            )
+            # bkg_modifiers += (
+            #     {
+            #         "name": "bkg_estimate_norm",
+            #         "type": "histosys",
+            #         "data": {
+            #             "hi_data": hists["bkg"] * (1 + 0.22400495831770745),
+            #             "lo_data": hists["bkg"] * (1 - 0.22400495831770745),
+            #         },
+            #     },
+            # )
+            bkg_modifiers += (
+                {
+                    "name": "bkg_estimate_norm",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["bkg"] * (1 + 0.03973059408763616),
+                        "lo_data": hists["bkg"] * (1 - 0.03973059408763616),
                     },
                 },
             )
@@ -151,11 +165,6 @@ def model_from_hists(
                                 *bkg_modifiers,
                             ],
                         },
-                        # {
-                        #     "name": "ttbar",
-                        #     "data": hists["ttbar"],  # background
-                        #     "modifiers": [],
-                        # },
                     ],
                 },
             ],

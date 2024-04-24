@@ -32,6 +32,9 @@ def get_hist(config, nn, best_params, data):
             nn_pars=best_params["nn_pars"],
             data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
             nn=nn,
+            config=config,
+            vbf_cut=best_params["vbf_cut"],
+            eta_cut=best_params["eta_cut"],
             bandwidth=1e-8,
             bins=best_params["bins"] if config.include_bins else config.bins,
         )

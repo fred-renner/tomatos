@@ -7,8 +7,13 @@ class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-mc20_k2v0_70.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/important_sys/dump-run2_70.h5",
+            # with nominal vbf cut
+            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars/dump-l1cvv0cv1.h5",
+            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars/dump-run2.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
+            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-l1cvv0cv1.h5",
+            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-run2.h5",
         }
         # fmt: on
 
@@ -17,7 +22,14 @@ class Setup:
         self.debug = False
 
         self.vars = [
-            "m_hh",
+            "pt_j1",
+            "eta_j1",
+            "phi_j1",
+            "E_j1",
+            "pt_j2",
+            "eta_j2",
+            "phi_j2",
+            "E_j2",
             "pt_h1",
             "eta_h1",
             "phi_h1",
@@ -29,50 +41,38 @@ class Setup:
             "pt_hh",
             "eta_hh",
             "phi_hh",
-            "pt_j1",
-            "eta_j1",
-            "phi_j1",
-            "E_j1",
-            "pt_j2",
-            "eta_j2",
-            "phi_j2",
-            "E_j2",
+            "m_hh",
+            "lead_xbb_score",
+            # "m_jj",
+            # "eta_jj",
         ]
 
         self.systematics = [
-            "NOSYS", # signal no systematic... 
-        #     "xbb_pt_bin_0__1up",
-        #     "xbb_pt_bin_0__1down",
-        #     "xbb_pt_bin_1__1up",
-        #     "xbb_pt_bin_1__1down",
-        #     "xbb_pt_bin_2__1up",
-        #     "xbb_pt_bin_2__1down",
-        #     "xbb_pt_bin_3__1up",
-        #     "xbb_pt_bin_3__1down",
-        #     "JET_MassRes_Top__1up",
-        #     "JET_MassRes_Hbb__1up",
-        #     "JET_MassRes_WZ__1up",
-        #     "JET_Rtrk_Modelling_pT__1up",
-        #     "JET_Comb_Modelling_mass__1up",
-        #     "JET_MassRes_Top__1down",
-        #     "JET_MassRes_Hbb__1down",
-        #     "JET_MassRes_WZ__1down",
-        #     "JET_Rtrk_Modelling_pT__1down",
-        #     "JET_Comb_Modelling_mass__1down",
-        #     "JET_Flavor_Composition__1up",
-        #     "JET_Flavor_Composition__1down",
-        #     "GEN_MUR05_MUF05_PDF260000",
-        #     "GEN_MUR05_MUF10_PDF260000",
-        #     "GEN_MUR10_MUF05_PDF260000",
-        #     "GEN_MUR10_MUF10_PDF260000",
-        #     "GEN_MUR10_MUF20_PDF260000",
-        #     "GEN_MUR20_MUF10_PDF260000",
-        #     "GEN_MUR20_MUF20_PDF260000",
+            "NOSYS",
+            "xbb_pt_bin_0__1up",
+            "xbb_pt_bin_0__1down",
+            "xbb_pt_bin_1__1up",
+            "xbb_pt_bin_1__1down",
+            "xbb_pt_bin_2__1up",
+            "xbb_pt_bin_2__1down",
+            "xbb_pt_bin_3__1up",
+            "xbb_pt_bin_3__1down",
+            "JET_EtaIntercalibration_NonClosure_PreRec__1up",
+            "JET_EtaIntercalibration_Modelling__1up",
+            "JET_EtaIntercalibration_NonClosure_PreRec__1down",
+            "JET_EtaIntercalibration_Modelling__1down",
+            "GEN_MUR05_MUF05_PDF260000",
+            "GEN_MUR05_MUF10_PDF260000",
+            "GEN_MUR10_MUF05_PDF260000",
+            "GEN_MUR10_MUF10_PDF260000",
+            "GEN_MUR10_MUF20_PDF260000",
+            "GEN_MUR20_MUF10_PDF260000",
+            "GEN_MUR20_MUF20_PDF260000",
         ]
 
         self.systematics_raw = []
         self.do_stat_error = True
-        self.do_systematics = False
+        self.do_systematics = True
         for sys in self.systematics:
             if "1up" in sys:
                 self.systematics_raw += [sys.split("__")[0]]
@@ -108,22 +108,22 @@ class Setup:
         self.lr = 0.01
         # one step is one batch, not epoch
         if self.debug:
-            self.num_steps = 3
+            self.num_steps = 2
         else:
-            self.num_steps = 400
+            self.num_steps = 200
 
         # share of data used for training vs testing
         self.train_data_ratio = 0.9
 
         # can choose from "cls", "discovery", "bce"
-        self.objective = "cls"
+        self.objective = "bce"
 
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
 
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}_only_stats/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}/"
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
