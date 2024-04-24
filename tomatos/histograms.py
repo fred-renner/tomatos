@@ -7,12 +7,15 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import pyhf
+import vector
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 JAX_CHECK_TRACER_LEAKS = True
-
+jnp.set_printoptions(precision=5)
 
 Array = jnp.ndarray
+import relaxed
 
 
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
@@ -128,11 +131,14 @@ def get_w2sum(
 
 
 def hists_from_nn(
+    config,
     nn_pars: Array,
     data: dict[str, Array],
     nn: Callable,
     bandwidth: float,
     bins: Array,
+    vbf_cut: Array,
+    eta_cut: Array,
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs yields."""
 
@@ -140,6 +146,56 @@ def hists_from_nn(
     values = {k: data[k][:, 0, :] for k in data}
     #
     weights = {k: data[k][:, 1, 0] for k in data}
+    # it prints 0. but they are not
+
+    # get signal
+    og_values = jnp.copy(values["NOSYS"])
+
+    # taken from sklearn inverse_transform
+    og_values -= config.scaler_min
+    og_values /= config.scaler_scale
+
+    # # this indexing is horrible, but for now
+    # Calculate the components for both jets
+    # Convert pt, eta, phi, energy to px, py, pz, E for vector operations
+    # https://root.cern.ch/doc/master/GenVector_2PtEtaPhiE4D_8h_source.html
+    def pt_eta_phi_E_to_px_py_pz(pt, eta, phi, energy):
+        px = pt * jnp.cos(phi)
+        py = pt * jnp.sin(phi)
+        pz = pt * jnp.sinh(eta)
+        return px, py, pz, energy
+
+    px1, py1, pz1, E1 = pt_eta_phi_E_to_px_py_pz(
+        og_values[:, 0], og_values[:, 1], og_values[:, 2], og_values[:, 3]
+    )
+    px2, py2, pz2, E2 = pt_eta_phi_E_to_px_py_pz(
+        og_values[:, 4], og_values[:, 5], og_values[:, 6], og_values[:, 7]
+    )
+
+    # Compute invariant mass and eta difference for the jet pairs
+    m_jj_squared = (
+        (E1 + E2) ** 2 - (px1 + px2) ** 2 - (py1 + py2) ** 2 - (pz1 + pz2) ** 2
+    )
+    m_jj = jnp.sqrt(
+        jnp.maximum(0.0, m_jj_squared)
+    )  # Ensure the argument of sqrt is non-negative, adjust units if necessary
+    eta_difference = jnp.abs(og_values[:, 1] - og_values[:, 5])
+
+    # Apply cuts
+    # need to scale otherwise optimization not working
+    def min_max_scale(x):
+        return (x - jnp.min(x)) / (jnp.max(x) - jnp.min(x))
+
+    m_jj_cut_w = relaxed.cut(min_max_scale(m_jj), vbf_cut, slope=1000, keep="above")
+    eta_cut_w = relaxed.cut(
+        min_max_scale(eta_difference), eta_cut, slope=100, keep="above"
+    )
+
+    def invert_min_max_scale(y, min_x, max_x):
+        return y * (max_x - min_x) + min_x
+
+    print("unscaled vbf: ", invert_min_max_scale(vbf_cut, jnp.min(m_jj), jnp.max(m_jj)))
+    # weights = {k: w * m_jj_cut_w * eta_cut_w for k, w in weights.items()}
 
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)

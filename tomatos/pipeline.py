@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import neos
 import numpy as np
 import pyhf
+from jax import grad, jit, vmap
 
 import tomatos.histograms
 import tomatos.utils
@@ -52,7 +53,10 @@ def pipeline(
     else:
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
-            nn=nn,
+            nn=nn,  
+            config=config,
+            vbf_cut=pars["vbf_cut"],
+            eta_cut=pars["eta_cut"],
             data=data_dct,
             bandwidth=bandwidth,  # for the bKDEs
             bins=bins,
@@ -68,7 +72,10 @@ def pipeline(
     )
 
     # this particular fit_lr quite influences the minimization
-    return neos.loss_from_model(model, loss=loss_type), hists  # , fit_lr=1e-5)
+    return (
+        neos.loss_from_model(model, loss=loss_type, fit_lr=1e-3),
+        hists,
+    )  # , fit_lr=1e-5)
 
 
 # could actually think of something with sin or cos...

@@ -3,8 +3,9 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
-# xbb 70
-w_CR = 0.011839196732981155
+# mistag 0.46
+# w_CR = 0.003564427018356799
+w_CR = 0.003938787769940113
 
 
 def stack_inputs(
@@ -93,7 +94,6 @@ def stack_inputs(
                 arr[:, 1, i] = np.resize(f[w_name][:], (n_events))
             else:
                 arr[:, 1, i] = np.full(n_events, custom_weights)
-
         return arr
 
 
