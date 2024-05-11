@@ -84,8 +84,14 @@ def run(
             "NOSYS_stat_down",
             "bkg_stat_up",
             "bkg_stat_down",
-            "vbf cut",
+            "vbf_cut",
             "eta_cut",
+            "bkg_shape_sys_up",
+            "bkg_shape_sys_down",
+            "bkg_CR_xbb_1",
+            "bkg_CR_xbb_2",
+            "bkg_VR_xbb_1",
+            "bkg_VR_xbb_2",
         ]
     }
 
@@ -129,7 +135,7 @@ def run(
         logging.info((f"hist bkg: {histograms['bkg']}"))
         logging.info(f"vbf cut: {params['vbf_cut']}")
         logging.info(f"eta cut: {params['eta_cut']}")
-        metrics["vbf cut"].append(params["vbf_cut"])
+        metrics["vbf_cut"].append(params["vbf_cut"])
         metrics["eta_cut"].append(params["eta_cut"])
 
         for hist in histograms.keys():

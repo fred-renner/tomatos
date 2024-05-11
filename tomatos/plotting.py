@@ -8,6 +8,7 @@ import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 import logging
+w_CR = 0.0036312547281962607
 
 
 def interpolate_gaps(values, limit=None):
@@ -32,10 +33,10 @@ def interpolate_gaps(values, limit=None):
 def plot_metrics(metrics, config):
     epoch_grid = range(1, config["num_steps"] + 1)
 
-    # lets account for possible nan's
 
     for k, v in metrics.items():
         if "cls" in k and len(v) != 0:
+            # lets account for possible nan's
             metrics[k] = interpolate_gaps(np.array(v))
 
             plt.figure()
@@ -127,6 +128,8 @@ def hist(config, bins, yields):
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         if "JET" in l or "GEN" in l:
             break
+        if "bkg"==l:
+            a*=w_CR
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[

@@ -10,6 +10,8 @@ import jax.scipy as jsp
 import vector
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
+import tomatos.preprocess
+import h5py
 
 JAX_CHECK_TRACER_LEAKS = True
 jnp.set_printoptions(precision=5)
@@ -130,26 +132,9 @@ def get_w2sum(
     return counts
 
 
-def hists_from_nn(
-    config,
-    nn_pars: Array,
-    data: dict[str, Array],
-    nn: Callable,
-    bandwidth: float,
-    bins: Array,
-    vbf_cut: Array,
-    eta_cut: Array,
-) -> dict[str, Array]:
-    """Function that takes in data + analysis config parameters, and constructs yields."""
-
-    # k index is sample index
-    values = {k: data[k][:, 0, :] for k in data}
-    #
-    weights = {k: data[k][:, 1, 0] for k in data}
-    # it prints 0. but they are not
-
+def get_vbf_cut_weights(config, values, vbf_cut, eta_cut):
     # get signal
-    og_values = jnp.copy(values["NOSYS"])
+    og_values = jnp.copy(values)
 
     # taken from sklearn inverse_transform
     og_values -= config.scaler_min
@@ -157,6 +142,8 @@ def hists_from_nn(
 
     # # this indexing is horrible, but for now
     # Calculate the components for both jets
+    # the issue is, if we give it at the beginning it becomes an input
+    # variable... would this be bad?
     # Convert pt, eta, phi, energy to px, py, pz, E for vector operations
     # https://root.cern.ch/doc/master/GenVector_2PtEtaPhiE4D_8h_source.html
     def pt_eta_phi_E_to_px_py_pz(pt, eta, phi, energy):
@@ -166,19 +153,24 @@ def hists_from_nn(
         return px, py, pz, energy
 
     px1, py1, pz1, E1 = pt_eta_phi_E_to_px_py_pz(
-        og_values[:, 0], og_values[:, 1], og_values[:, 2], og_values[:, 3]
+        og_values[:, 0],
+        og_values[:, 1],
+        og_values[:, 2],
+        og_values[:, 3],
     )
     px2, py2, pz2, E2 = pt_eta_phi_E_to_px_py_pz(
-        og_values[:, 4], og_values[:, 5], og_values[:, 6], og_values[:, 7]
+        og_values[:, 4],
+        og_values[:, 5],
+        og_values[:, 6],
+        og_values[:, 7],
     )
 
     # Compute invariant mass and eta difference for the jet pairs
     m_jj_squared = (
         (E1 + E2) ** 2 - (px1 + px2) ** 2 - (py1 + py2) ** 2 - (pz1 + pz2) ** 2
     )
-    m_jj = jnp.sqrt(
-        jnp.maximum(0.0, m_jj_squared)
-    )  # Ensure the argument of sqrt is non-negative, adjust units if necessary
+    m_jj = jnp.sqrt(m_jj_squared)
+
     eta_difference = jnp.abs(og_values[:, 1] - og_values[:, 5])
 
     # Apply cuts
@@ -194,8 +186,46 @@ def hists_from_nn(
     def invert_min_max_scale(y, min_x, max_x):
         return y * (max_x - min_x) + min_x
 
-    print("unscaled vbf: ", invert_min_max_scale(vbf_cut, jnp.min(m_jj), jnp.max(m_jj)))
-    # weights = {k: w * m_jj_cut_w * eta_cut_w for k, w in weights.items()}
+    optimized_m_jj = invert_min_max_scale(vbf_cut, jnp.min(m_jj), jnp.max(m_jj))
+    optimized_delta_eta_jj = invert_min_max_scale(
+        eta_cut, jnp.min(eta_difference), jnp.max(eta_difference)
+    )
+    print("optimized m_jj: ", optimized_m_jj)
+    print("optimized delta_eta_jj: ", optimized_delta_eta_jj)
+    weight = m_jj_cut_w * eta_cut_w
+
+    return weight, optimized_m_jj, optimized_delta_eta_jj
+
+
+def get_vbf_cut_weights_unscaled(m_jj, delta_eta_jj, vbf_cut, eta_cut):
+    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=1e-5, keep="above")
+    eta_cut_w = relaxed.cut(delta_eta_jj, eta_cut, slope=1e-5, keep="above")
+    weight = m_jj_cut_w * eta_cut_w
+    return weight
+
+
+def hists_from_nn(
+    config,
+    nn_pars: Array,
+    data: dict[str, Array],
+    nn: Callable,
+    bandwidth: float,
+    bins: Array,
+    vbf_cut: Array,
+    eta_cut: Array,
+) -> dict[str, Array]:
+    """Function that takes in data + analysis config parameters, and constructs yields."""
+
+    # k index is sample index
+    values = {k: data[k][:, 0, :] for k in data}
+    # it prints 0. but they are not
+    weights = {k: data[k][:, 1, 0] for k in data}
+
+    cutted_weight, optimized_m_jj, optimized_delta_eta_jj = get_vbf_cut_weights(
+        config, values["NOSYS"], vbf_cut, eta_cut
+    )
+
+    weights = {k: w * cutted_weight for k, w in weights.items()}
 
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
@@ -227,6 +257,33 @@ def hists_from_nn(
             bins=bins,
         )
     )
+
+    # add VR and CR from data für bkg estimate
+    estimate_regions = [
+        "CR_xbb_1",
+        "CR_xbb_2",
+        "VR_xbb_1",
+        "VR_xbb_2",
+    ]
+
+    
+    # need another bandwidth hist since we want sharp hists
+    make_hist = partial(hist, bandwidth=1e-8, bins=bins)
+    nn_apply = partial(nn, nn_pars)
+    # apply optimized m_jj and eta_jj cut on the estimate_regions
+    for reg in estimate_regions:
+        cutted_weight_estimate = get_vbf_cut_weights_unscaled(
+            getattr(config, f"bkg_estimate_data_m_jj_{reg}"),
+            getattr(config, f"bkg_estimate_data_eta_jj_{reg}"),
+            vbf_cut=optimized_m_jj,
+            eta_cut=optimized_delta_eta_jj,
+        )
+        bkg_estimate_data = getattr(config, f"bkg_estimate_data_{reg}")
+        hists[f"bkg_{reg}"] = make_hist(
+            data=jax.vmap(nn_apply)(bkg_estimate_data[:, 0, :]).ravel(),
+            weights=cutted_weight_estimate,
+        )
+
     hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
     hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
     hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err

@@ -13,7 +13,8 @@ class Setup:
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
             # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-l1cvv0cv1.h5",
-            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-run2.h5",
+            # "run2":
+            # "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-run2.h5",
         }
         # fmt: on
 
@@ -108,7 +109,7 @@ class Setup:
         self.lr = 0.01
         # one step is one batch, not epoch
         if self.debug:
-            self.num_steps = 2
+            self.num_steps = 3
         else:
             self.num_steps = 200
 

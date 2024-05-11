@@ -65,6 +65,8 @@ def run():
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data)
+    
+    config = tomatos.utils.delete_aux_data(config)
 
     results = {
         "config": tomatos.utils.to_python_lists(config.__dict__),
