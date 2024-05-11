@@ -3,14 +3,13 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
-# mistag 0.46
-# w_CR = 0.003564427018356799
-w_CR = 0.003938787769940113
+w_CR = 0.0036312547281962607
 
 
 def stack_inputs(
     filepath,
     config,
+    region,
     n_events=0,
     sys="NOSYS",
     use_NOSYS_weights=True,
@@ -70,10 +69,8 @@ def stack_inputs(
     """
 
     if "run2" in filepath:
-        region = "SR_xbb_1"
         is_mc = False
     else:
-        region = "SR_xbb_2"
         is_mc = True
 
     with h5py.File(filepath, "r") as f:
@@ -146,8 +143,9 @@ def prepare_data(config):
     data["bkg"] = stack_inputs(
         config.files["run2"],
         config,
+        region="SR_xbb_1",
         n_events=max_events,
-        custom_weights=replicate_weight * w_CR,
+        custom_weights=replicate_weight,
     )
 
     for sys in config.systematics:
@@ -158,6 +156,7 @@ def prepare_data(config):
         data[sys] = stack_inputs(
             config.files["k2v0"],
             config,
+            region="SR_xbb_2",
             n_events=max_events,
             use_NOSYS_weights=use_NOSYS_weights,
             sys=sys,
@@ -176,6 +175,37 @@ def prepare_data(config):
 
     config.scaler_scale = scaler.scale_
     config.scaler_min = scaler.min_
+
+    # add VR and CR from data für bkg estimate
+    estimate_regions = [
+        "CR_xbb_1",
+        "CR_xbb_2",
+        "VR_xbb_1",
+        "VR_xbb_2",
+    ]
+
+    for reg in estimate_regions:
+        # load
+        setattr(
+            config,
+            f"bkg_estimate_data_{reg}",
+            stack_inputs(
+                config.files["run2"],
+                config,
+                region=reg,
+                n_events=get_n_events(
+                    filepath=config.files["run2"], var=f"m_hh_NOSYS.{reg}"
+                ),
+                sys="NOSYS",
+                custom_weights=1.0,
+            ),
+        )
+
+        with h5py.File(config.files["run2"], "r") as f:
+            setattr(config, f"bkg_estimate_data_m_jj_{reg}", f[f"m_jj_NOSYS.{reg}"][:])
+            setattr(
+                config, f"bkg_estimate_data_eta_jj_{reg}", f[f"eta_jj_NOSYS.{reg}"][:]
+            )
 
     # samples, events, features
     return jnp_data
