@@ -53,7 +53,7 @@ def pipeline(
     else:
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
-            nn=nn,  
+            nn=nn,
             config=config,
             vbf_cut=pars["vbf_cut"],
             eta_cut=pars["eta_cut"],
@@ -71,7 +71,7 @@ def pipeline(
         do_m_hh, hists, config, do_systematics, do_stat_error
     )
 
-    # this particular fit_lr quite influences the minimization
+    # # this particular fit_lr quite influences the minimization
     return (
         neos.loss_from_model(model, loss=loss_type, fit_lr=1e-3),
         hists,

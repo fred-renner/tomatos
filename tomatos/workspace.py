@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyhf
+import logging
 
 Array = jnp.ndarray
 
@@ -32,7 +33,9 @@ def get_bkg_weight(hists):
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
     w_CR = CR_4b_Data / CR_2b_Data
-    err_w_CR = w_CR * jnp.sqrt(jnp.square(errCR1 / CR_4b_Data) + jnp.square(errCR2 / CR_2b_Data))
+    err_w_CR = w_CR * jnp.sqrt(
+        jnp.square(errCR1 / CR_4b_Data) + jnp.square(errCR2 / CR_2b_Data)
+    )
 
     return w_CR, err_w_CR
 
@@ -47,37 +50,37 @@ def model_from_hists(
     """How to make your HistFactory model from your histograms."""
     w_CR, err_w_CR = get_bkg_weight(hists)
     rel_err_w_CR = err_w_CR / w_CR
+
     hists["bkg"] *= w_CR
-    # it really does not like literally empty bins 
-    hists["bkg_VR_xbb_1"]+=1e-9 
-    hists["bkg_VR_xbb_2"]+=1e-9
-    bkg_estimate_validation = hists["bkg_VR_xbb_1"] * w_CR
+    hists["bkg_stat_up"] *= w_CR
+    hists["bkg_stat_down"] *= w_CR
+
+    bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
+    # it really does not like literally empty bins
+    hists["bkg_VR_xbb_2"] += 1e-15
+    bkg_estimate_in_VR += 1e-15
+
     relative_bkg_validation = jnp.abs(
-        (bkg_estimate_validation - hists["bkg_VR_xbb_2"]) / bkg_estimate_validation
+        (bkg_estimate_in_VR - hists["bkg_VR_xbb_2"]) / bkg_estimate_in_VR
     )
-    relative_bkg_validation = jnp.where(
-        jnp.isnan(relative_bkg_validation), 0, relative_bkg_validation
-    )
+
     bkg_shapesys_up = 1 + relative_bkg_validation
     bkg_shapesys_down = 1 - relative_bkg_validation
     bkg_shapesys_down = jnp.where(bkg_shapesys_down < 0, 0, bkg_shapesys_down)
 
+    logging.info(f'{hists["bkg"]} hists["bkg"]')
+    logging.info(f"{bkg_estimate_in_VR} bkg_estimate_in_VR")
+    logging.info(f'{hists["bkg_VR_xbb_2"]} hists["bkg_VR_xbb_2"]')
+    logging.info(f"{relative_bkg_validation} relative_bkg_validation")
 
-    print(hists["bkg_CR_xbb_2"])
-    print(hists["bkg_CR_xbb_1"])
-    print(hists["bkg_VR_xbb_2"])
-    print(hists["bkg_VR_xbb_1"])
-    print(w_CR)
-    print(hists["bkg"])
+    hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
+    hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
 
-    print(bkg_estimate_validation)
-    print(hists["bkg_VR_xbb_2"])
-    print(bkg_estimate_validation * bkg_shapesys_up)
-    print(bkg_estimate_validation * bkg_shapesys_down)
-    hists["bkg_shape_sys_up"]=bkg_estimate_validation * bkg_shapesys_up
-    hists["bkg_shape_sys_down"]=bkg_estimate_validation * bkg_shapesys_down
-    
-    
+    # hists["bkg_shape_sys_up"] = hists["bkg"] * config.bkg_shapesys_up
+    # hists["bkg_shape_sys_down"] = hists["bkg"] * config.bkg_shapesys_down
+    logging.info(f'{hists["bkg_shape_sys_up"]} bkg_shape_sys_up')
+    logging.info(f'{hists["bkg_shape_sys_down"]} bkg_shape_sys_down')
+
     if do_m_hh:
         spec = {
             "channels": [

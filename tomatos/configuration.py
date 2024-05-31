@@ -7,21 +7,14 @@ class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            # with nominal vbf cut
-            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars/dump-l1cvv0cv1.h5",
-            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars/dump-run2.h5",
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
-            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-l1cvv0cv1.h5",
-            # "run2":
-            # "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_vbf_cut/dump-run2.h5",
         }
         # fmt: on
 
         self.do_m_hh = False
         self.include_bins = False
-        self.debug = False
-
+        self.debug = args.debug
         self.vars = [
             "pt_j1",
             "eta_j1",
@@ -85,6 +78,7 @@ class Setup:
 
         self.bins = np.linspace(0, 1, args.bins + 1)
 
+        # 0.05 is too small, 0.2 seems optimal
         self.bandwidth = 0.2
 
         if self.do_m_hh and not self.include_bins:
@@ -105,19 +99,20 @@ class Setup:
 
         self.batch_size = int(1e5)  # int is necessary
 
-        # with all systs + stats 0.001 seems too small
+        # with all systs 0.001 seems too small
         self.lr = 0.01
         # one step is one batch, not epoch
         if self.debug:
             self.num_steps = 3
         else:
-            self.num_steps = 200
+            self.num_steps = 500
 
         # share of data used for training vs testing
-        self.train_data_ratio = 0.9
+        self.train_valid_ratio = 0.9
+        self.valid_test_ratio = 0.8
 
         # can choose from "cls", "discovery", "bce"
-        self.objective = "bce"
+        self.objective = "cls"
 
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
 

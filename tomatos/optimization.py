@@ -16,7 +16,9 @@ import tomatos.histograms
 import tomatos.pipeline
 
 Array = jnp.ndarray
-np.set_printoptions(precision=2)
+
+
+w_CR = 0.0036312547281962607
 
 
 # clear caches each update otherwise memory explodes
@@ -101,8 +103,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = 0.25
-            init_pars["eta_cut"] = 0.25
+            init_pars["vbf_cut"] = 0.2
+            init_pars["eta_cut"] = 0.2
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -122,6 +124,7 @@ def run(
         )
 
         histograms = state.aux
+
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
 
@@ -143,7 +146,12 @@ def run(
 
         # Evaluate losses.
         start = perf_counter()
-        for loss_type in [config.objective]:  # , "bce"]:  # , "discovery", "bce"]:
+        if config.objective == "bce":
+            evaluation_losses = ["bce", "cls"]
+        else:
+            evaluation_losses = ["cls"]
+
+        for loss_type in evaluation_losses:
             metrics[f"{loss_type}_valid"].append(
                 evaluate_loss(loss, params, valid, loss_type)
             )
@@ -160,6 +168,7 @@ def run(
         if metrics[objective][-1] < best_sig:
             best_params = params
             best_sig = metrics[objective][-1]
+            logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
 
         # Z_A
         z_a = get_significance(config, nn, params, train)
@@ -208,4 +217,8 @@ def get_significance(config, nn, params, data):
             if config.include_bins
             else config.bins,
         )
-    return relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
+    if config.objective == "cls":
+        yields["bkg"] *= w_CR
+    return relaxed.metrics.asimov_sig(
+        s=jnp.sum(yields["NOSYS"]), b=jnp.sum(yields["bkg"])
+    )

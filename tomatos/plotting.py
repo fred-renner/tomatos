@@ -8,7 +8,10 @@ import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 import logging
+
 w_CR = 0.0036312547281962607
+
+fig_size = (5, 4)
 
 
 def interpolate_gaps(values, limit=None):
@@ -33,45 +36,45 @@ def interpolate_gaps(values, limit=None):
 def plot_metrics(metrics, config):
     epoch_grid = range(1, config["num_steps"] + 1)
 
+    # cls
+    if len(metrics["cls_train"]) > 0:
+        # lets account for possible nan's
+        metrics["cls_train"] = interpolate_gaps(np.array(metrics["cls_train"]))
+        metrics["cls_valid"] = interpolate_gaps(np.array(metrics["cls_valid"]))
+        metrics["cls_test"] = interpolate_gaps(np.array(metrics["cls_test"]))
+        plt.figure(figsize=fig_size)
+        plt.plot(
+            epoch_grid,
+            metrics["cls_train"],  # / np.max(metrics["cls_train"]),
+            label=r"$CL_s$ train",
+        )
+        plt.plot(
+            epoch_grid,
+            metrics["cls_valid"],  # / np.max(metrics["cls_valid"]),
+            label=r"$CL_s$ valid",
+        )
+        plt.plot(
+            epoch_grid,
+            metrics["cls_test"],  # / np.max(metrics["cls_test"]),
+            label=r"$CL_s$ test",
+        )
 
-    for k, v in metrics.items():
-        if "cls" in k and len(v) != 0:
-            # lets account for possible nan's
-            metrics[k] = interpolate_gaps(np.array(v))
-
-            plt.figure()
-            plt.plot(
-                epoch_grid,
-                metrics["cls_train"] / np.max(metrics["cls_train"]),
-                label=r"$CL_s$ train",
-            )
-            plt.plot(
-                epoch_grid,
-                metrics["cls_valid"] / np.max(metrics["cls_valid"]),
-                label=r"$CL_s$ valid",
-            )
-            plt.plot(
-                epoch_grid,
-                metrics["cls_test"] / np.max(metrics["cls_test"]),
-                label=r"$CL_s$ test",
-            )
-
-            plt.legend()
-            plt.xlabel("epoch")
-            plt.ylabel("normalized loss")
-            # ax = plt.gca()
-            # ax.set_yscale('log')
-            plt.tight_layout()
-            plot_path = config["results_path"] + "cls.pdf"
-
-            logging.info(plot_path)
-            plt.savefig(plot_path)
-            plt.close()
-            break
+        plt.legend()
+        plt.xlabel("epoch")
+        plt.ylabel("Loss")
+        # ax = plt.gca()
+        # ax.set_yscale('log')
+        plt.tight_layout()
+        plot_path = config["results_path"] + "cls.pdf"
+        ax = plt.gca()
+        ax.set_yscale("log")
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
 
     # bce
     if len(metrics["bce_train"]) > 0:
-        plt.figure()
+        plt.figure(figsize=fig_size)
         # scale train test for visual comparison
         # could also do ratio, maybe better
         # scale = metrics["cls_test"][0] / metrics["cls_train"][0]
@@ -82,8 +85,8 @@ def plot_metrics(metrics, config):
         plt.legend()
         plt.xlabel("epoch")
         plt.ylabel("Loss")
-        # ax = plt.gca()
-        # ax.set_yscale('log')
+        ax = plt.gca()
+        ax.set_yscale("log")
         plt.tight_layout()
         plot_path = config["results_path"] + "bce.pdf"
         logging.info(plot_path)
@@ -91,7 +94,7 @@ def plot_metrics(metrics, config):
         plt.close()
 
     # Z_A
-    plt.figure()
+    plt.figure(figsize=fig_size)
     plt.plot(epoch_grid, metrics["Z_A"], label=r"$Z_A$")
     plt.legend()
     plt.xlabel("epoch")
@@ -104,7 +107,7 @@ def plot_metrics(metrics, config):
 
     # bins
     if len(metrics["bins"]) > 0:
-        plt.figure()
+        plt.figure(figsize=fig_size)
         for i, bins in enumerate(metrics["bins"]):
             if config["do_m_hh"] and config["include_bins"]:
                 bins = (np.array(bins) - config["scaler_min"][0]) / config[
@@ -122,14 +125,53 @@ def plot_metrics(metrics, config):
         plt.savefig(plot_path)
         plt.close()
 
+    # cuts
+    plt.plot(np.array(metrics["vbf_cut"]))
+    plt.plot(np.array(metrics["eta_cut"]))
+
+    # times 4 because we start at 0.25
+    # plt.plot(np.array(metrics["vbf_cut"]) * 4 * 1711148.3917125356)
+    # plt.plot(np.array(metrics["eta_cut"]) * 4 * 2.240490436553956)
+    plt.xlabel("epoch")
+    plt.ylabel("Rescaled Cut")
+    plt.legend([r"$m_{jj}$", r"$|\Delta\eta(j,j)|$"])
+
+    plt.tight_layout()
+    plot_path = config["results_path"] + "cuts.pdf"
+    logging.info(plot_path)
+    plt.savefig(plot_path)
+    plt.close()
+
 
 def hist(config, bins, yields):
-    fig = plt.figure()
+    fig = plt.figure(figsize=fig_size)
+    print(yields)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
-        if "JET" in l or "GEN" in l:
-            break
-        if "bkg"==l:
-            a*=w_CR
+        # if "JET" in l or "GEN" in l:
+        #     break
+
+        if "bkg" == l:
+            l = "Background Estimate"
+            if config["objective"] != "bce":
+                a *= w_CR
+        if "NOSYS" == l:
+            l = r"$\kappa_{2V=0}$ signal"
+
+        bkg_regions = [
+            "bkg_CR_xbb_1",
+            "bkg_CR_xbb_2",
+            "bkg_VR_xbb_1",
+            "bkg_VR_xbb_2",
+            "bkg_stat_up",
+            "bkg_stat_down",
+            "bkg_stat_up",
+            "bkg_stat_down",
+            "NOSYS_stat_up",
+            "NOSYS_stat_down",
+        ]
+        if any([l == reg for reg in bkg_regions]):
+            continue
+
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
@@ -158,18 +200,18 @@ def hist(config, bins, yields):
                 edges=bins,
                 values=a,
                 label=l,
-                alpha=0.4,
+                # alpha=0.4,
                 fill=None,
-                linewidth=2,
+                # linewidth=2,
                 # align="edge",
             )
             plt.xlabel("NN score")
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
-    fig.legend(loc="upper right")
+    plt.legend(fontsize=5)
     plt.ylabel("Events")
     # plt.legend()  # prop={"size": 6})
     plt.tight_layout()
-    logging.info(config["results_path"] + "hist.pdf")
+    print(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")

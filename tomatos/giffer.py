@@ -18,7 +18,8 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 
 if __name__ == "__main__":
     models = [
-        "tomatos_cls_6_sys",
+        "tomatos_bce_5",
+        "tomatos_cls_5",
     ]
     ymax = 0
     for m in models:
@@ -35,6 +36,7 @@ if __name__ == "__main__":
             print(i)
             # loop over hists
             plt.figure()
+
             for hist_name in meta_data["config"]["data_types"]:
                 # if "JET" in hist_name or "GEN" in hist_name:
                 #     break
@@ -42,9 +44,8 @@ if __name__ == "__main__":
                     edges=meta_data["config"]["bins"],
                     values=meta_data["metrics"][hist_name][i],
                     label=hist_name,
-                    alpha=0.8,
                     fill=None,
-                    linewidth=2,
+                    linewidth=1,
                     # align="edge",
                 )
 
@@ -59,11 +60,15 @@ if __name__ == "__main__":
             else:
                 plt.xlabel("NN score")
 
+            plt.text(0.5, 0.8, f"Epoch {i}",
+                horizontalalignment='center',
+                verticalalignment='center',
+                transform = ax.transAxes)
             plt.ylabel("Events")
-            plt.legend(prop={"size": 5})  # prop={"size": 6})
+            plt.legend(prop={"size": 5},loc="upper right")  # prop={"size": 6})
             plt.tight_layout()
             plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=100)
             plt.close()
 
-        create_gif_from_folder(image_path, model_path + m + ".gif", duration=0.002)
+        create_gif_from_folder(image_path, model_path + m + ".gif", duration=0.001)
         print(model_path + m + ".gif")

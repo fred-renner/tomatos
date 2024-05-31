@@ -93,39 +93,27 @@ def to_python_lists(obj):
 # this is for conservative NN training tests
 
 
-# https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
-def sigmoid_cross_entropy_with_logits(preds, labels):
-    return jnp.mean(
-        jnp.maximum(preds, 0) - preds * labels + jnp.log1p(jnp.exp(-jnp.abs(preds)))
-    )
+def binary_cross_entropy(preds, labels):
+    epsilon = 1e-15  # To avoid log(0)
+    preds = jnp.clip(preds, epsilon, 1 - epsilon)
+    return -jnp.mean(labels * jnp.log(preds) + (1 - labels) * jnp.log(1 - preds))
 
 
 def bce(data, nn, pars):
-    values = {k: data[k][:, 0, :] for k in data}
+    # only need sig and bkg
+    values = {k: data[k][:, 0, :] for k in ["NOSYS", "bkg"]}
 
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
     nn_apply = partial(nn, pars)
     preds = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
 
-    bkg = preds["bkg"]
     sig = preds["NOSYS"]
-    # I have no clue why learning only works with opposite labels?
-    labels = jnp.concatenate([jnp.zeros_like(bkg), jnp.ones_like(sig)])
-    # labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
+    bkg = preds["bkg"]
+    labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
     preds = jnp.concatenate((sig, bkg))
 
-    return sigmoid_cross_entropy_with_logits(preds, labels).mean()
-
-
-# def bce(data, nn, pars):
-#     preds = {k: nn(pars, data[k]).ravel() for k in data}
-#     bkg = jnp.concatenate([preds[k] for k in preds if "sig" not in k])
-#     sig = preds["sig"]
-#     labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
-#     return sigmoid_cross_entropy_with_logits(
-#         jnp.concatenate(list(preds.values())).ravel(), labels
-#     ).mean()
+    return binary_cross_entropy(preds, labels)
 
 
 # def bin_correction(bins):

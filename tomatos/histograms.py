@@ -12,12 +12,15 @@ from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 import tomatos.preprocess
 import h5py
+import logging
 
 JAX_CHECK_TRACER_LEAKS = True
 jnp.set_printoptions(precision=5)
 
 Array = jnp.ndarray
 import relaxed
+
+w_CR = 0.0036312547281962607
 
 
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
@@ -190,16 +193,16 @@ def get_vbf_cut_weights(config, values, vbf_cut, eta_cut):
     optimized_delta_eta_jj = invert_min_max_scale(
         eta_cut, jnp.min(eta_difference), jnp.max(eta_difference)
     )
-    print("optimized m_jj: ", optimized_m_jj)
-    print("optimized delta_eta_jj: ", optimized_delta_eta_jj)
+    logging.info(f"optimized m_jj: { optimized_m_jj}")
+    logging.info(f"optimized delta_eta_jj: { optimized_delta_eta_jj}")
     weight = m_jj_cut_w * eta_cut_w
 
     return weight, optimized_m_jj, optimized_delta_eta_jj
 
 
 def get_vbf_cut_weights_unscaled(m_jj, delta_eta_jj, vbf_cut, eta_cut):
-    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=1e-5, keep="above")
-    eta_cut_w = relaxed.cut(delta_eta_jj, eta_cut, slope=1e-5, keep="above")
+    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=1e-4, keep="above")
+    eta_cut_w = relaxed.cut(delta_eta_jj, eta_cut, slope=1, keep="above")
     weight = m_jj_cut_w * eta_cut_w
     return weight
 
@@ -224,8 +227,8 @@ def hists_from_nn(
     cutted_weight, optimized_m_jj, optimized_delta_eta_jj = get_vbf_cut_weights(
         config, values["NOSYS"], vbf_cut, eta_cut
     )
-
-    weights = {k: w * cutted_weight for k, w in weights.items()}
+    if config.objective == "cls":
+        weights = {k: w * cutted_weight for k, w in weights.items()}
 
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
@@ -266,28 +269,31 @@ def hists_from_nn(
         "VR_xbb_2",
     ]
 
-    
     # need another bandwidth hist since we want sharp hists
-    make_hist = partial(hist, bandwidth=1e-8, bins=bins)
-    nn_apply = partial(nn, nn_pars)
+    sharp_hist = partial(hist, bandwidth=1e-8, bins=bins)
+
     # apply optimized m_jj and eta_jj cut on the estimate_regions
     for reg in estimate_regions:
         cutted_weight_estimate = get_vbf_cut_weights_unscaled(
-            getattr(config, f"bkg_estimate_data_m_jj_{reg}"),
-            getattr(config, f"bkg_estimate_data_eta_jj_{reg}"),
+            config.bkg_estimate[f"m_jj_{reg}"],
+            config.bkg_estimate[f"eta_jj_{reg}"],
             vbf_cut=optimized_m_jj,
             eta_cut=optimized_delta_eta_jj,
         )
-        bkg_estimate_data = getattr(config, f"bkg_estimate_data_{reg}")
-        hists[f"bkg_{reg}"] = make_hist(
+        bkg_estimate_data = config.bkg_estimate[reg]
+        hists[f"bkg_{reg}"] = sharp_hist(
             data=jax.vmap(nn_apply)(bkg_estimate_data[:, 0, :]).ravel(),
-            weights=cutted_weight_estimate,
+            weights=cutted_weight_estimate,  # nominal weights are 1.0 since data
         )
+        # print(hists[f"bkg_{reg}"])
 
     hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
     hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
     hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
     hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
+
+    if config.objective == "bce":
+        hists["bkg"] *= w_CR
 
     return hists
 
