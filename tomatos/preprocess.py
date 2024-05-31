@@ -2,6 +2,7 @@ import h5py
 import jax.numpy as jnp
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import copy
 
 w_CR = 0.0036312547281962607
 
@@ -12,7 +13,6 @@ def stack_inputs(
     region,
     n_events=0,
     sys="NOSYS",
-    use_NOSYS_weights=True,
     custom_weights=1.0,
 ):
     """make array of input variables and attach desired weights to bookkeep the
@@ -58,8 +58,6 @@ def stack_inputs(
         config object
     filepath : sys
         systematic
-    use_NOSYS_weights : bool
-        attach NOSYS weights, but load given sys vars
 
     Returns
     -------
@@ -76,17 +74,16 @@ def stack_inputs(
     with h5py.File(filepath, "r") as f:
         arr = np.zeros((n_events, 2, config.n_features))
 
-        if use_NOSYS_weights:
-            w_sys = "NOSYS"
-        else:
-            w_sys = sys
-
         for i, var in enumerate(config.vars):
             # fill
             var_name = var + "_" + sys + "." + region
-            w_name = "weights_" + w_sys + "." + region
+            w_name = "weights_" + sys + "." + region
+
             # auto up and down scale
+            # values
             arr[:, 0, i] = np.resize(f[var_name][:], (n_events))
+
+            # weights
             if is_mc:
                 arr[:, 1, i] = np.resize(f[w_name][:], (n_events))
             else:
@@ -149,16 +146,11 @@ def prepare_data(config):
     )
 
     for sys in config.systematics:
-        use_NOSYS_weights = True
-        if "xbb" in sys:
-            use_NOSYS_weights = False
-
         data[sys] = stack_inputs(
             config.files["k2v0"],
             config,
             region="SR_xbb_2",
             n_events=max_events,
-            use_NOSYS_weights=use_NOSYS_weights,
             sys=sys,
         )
 
@@ -176,36 +168,40 @@ def prepare_data(config):
     config.scaler_scale = scaler.scale_
     config.scaler_min = scaler.min_
 
-    # add VR and CR from data für bkg estimate
+    # add VR and CR from data for bkg estimate
+    # and also m_jj and eta_jj for them for the cut optimization
     estimate_regions = [
         "CR_xbb_1",
         "CR_xbb_2",
         "VR_xbb_1",
         "VR_xbb_2",
     ]
-
+    # scale with clipping, mh1, mh2 will be max/min values of SR... Wonder if
+    # thats better than not giving the info at all, what happens to the bkg
+    # estimate?
+    bkg_estimate_scaler = MinMaxScaler(clip=True)
+    bkg_estimate_scaler.scale_ = scaler.scale_
+    bkg_estimate_scaler.min_ = scaler.min_
+    config.bkg_estimate = {}
     for reg in estimate_regions:
         # load
-        setattr(
+        config.bkg_estimate[reg] = stack_inputs(
+            config.files["run2"],
             config,
-            f"bkg_estimate_data_{reg}",
-            stack_inputs(
-                config.files["run2"],
-                config,
-                region=reg,
-                n_events=get_n_events(
-                    filepath=config.files["run2"], var=f"m_hh_NOSYS.{reg}"
-                ),
-                sys="NOSYS",
-                custom_weights=1.0,
+            region=reg,
+            n_events=get_n_events(
+                filepath=config.files["run2"], var=f"m_hh_NOSYS.{reg}"
             ),
+            sys="NOSYS",
+            custom_weights=1.0,
+        )
+        config.bkg_estimate[reg][:, 0, :] = bkg_estimate_scaler.transform(
+            config.bkg_estimate[reg][:, 0, :]
         )
 
         with h5py.File(config.files["run2"], "r") as f:
-            setattr(config, f"bkg_estimate_data_m_jj_{reg}", f[f"m_jj_NOSYS.{reg}"][:])
-            setattr(
-                config, f"bkg_estimate_data_eta_jj_{reg}", f[f"eta_jj_NOSYS.{reg}"][:]
-            )
+            config.bkg_estimate[f"m_jj_{reg}"] = f[f"m_jj_NOSYS.{reg}"][:]
+            config.bkg_estimate[f"eta_jj_{reg}"] = f[f"eta_jj_NOSYS.{reg}"][:]
 
     # samples, events, features
     return jnp_data

@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import logging
-
 import equinox as eqx
 import jax
-import pyhf
-
 import tomatos.batching
 import tomatos.configuration
 import tomatos.nn_setup
@@ -13,18 +10,18 @@ import tomatos.optimization
 import tomatos.plotting
 import tomatos.preprocess
 import tomatos.utils
-
-JAX_CHECK_TRACER_LEAKS = True
-import jax.numpy as jnp
-import numpy as np
-import relaxed
 import json
 
+jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
+JAX_CHECK_TRACER_LEAKS = True
+JAX_DEBUG_NANS=True 
 
 jax.config.update("jax_enable_x64", True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, required=True)
+parser.add_argument("--debug", action="store_true", default=False)
+
 args = parser.parse_args()
 
 
@@ -47,8 +44,14 @@ def run():
     logging.info(f"datasets: {len(data)}")
     init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
 
-    train, valid_test = tomatos.batching.split_data(data, ratio=config.train_data_ratio)
-    valid, test = tomatos.batching.split_data(valid_test, ratio=0.8)
+    train, valid_test = tomatos.batching.split_data(
+        data, ratio=config.train_valid_ratio
+    )
+    valid, test = tomatos.batching.split_data(valid_test, ratio=config.valid_test_ratio)
+    # account for splitting with weights, so histograms have the same height,
+    # even with less data
+    train, valid, test = tomatos.batching.adjust_weights(config, train, valid, test)
+
     logging.info(f"train size: {train[0].shape[0]}")
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
@@ -65,7 +68,6 @@ def run():
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data)
-    
     config = tomatos.utils.delete_aux_data(config)
 
     results = {
