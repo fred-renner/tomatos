@@ -135,10 +135,23 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
-        logging.info(f"vbf cut: {params['vbf_cut']}")
-        logging.info(f"eta cut: {params['eta_cut']}")
-        metrics["vbf_cut"].append(params["vbf_cut"])
-        metrics["eta_cut"].append(params["eta_cut"])
+        logging.info((f"hist bkg shape up: {histograms['bkg_shape_sys_up']}"))
+        logging.info((f"hist bkg shape down: {histograms['bkg_shape_sys_down']}"))
+        logging.info(f"vbf scaled cut: {params['vbf_cut']}")
+        logging.info(f"eta scaled cut: {params['eta_cut']}")
+
+        def unscale_value(value, idx):
+            value -= config.scaler_min[idx]
+            value /= config.scaler_scale[idx]
+            return value
+
+        optimized_m_jj = unscale_value(params["vbf_cut"], -2)
+        optimized_eta_jj = unscale_value(params["eta_cut"], -1)
+
+        logging.info(f"vbf cut: {optimized_m_jj}")
+        logging.info(f"eta cut: {optimized_eta_jj}")
+        metrics["vbf_cut"].append(optimized_m_jj)
+        metrics["eta_cut"].append(optimized_eta_jj)
 
         for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
