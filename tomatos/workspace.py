@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pyhf
@@ -75,9 +74,6 @@ def model_from_hists(
 
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
-
-    # hists["bkg_shape_sys_up"] = hists["bkg"] * config.bkg_shapesys_up
-    # hists["bkg_shape_sys_down"] = hists["bkg"] * config.bkg_shapesys_down
     logging.info(f'{hists["bkg_shape_sys_up"]} bkg_shape_sys_up')
     logging.info(f'{hists["bkg_shape_sys_down"]} bkg_shape_sys_down')
 

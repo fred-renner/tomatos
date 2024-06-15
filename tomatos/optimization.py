@@ -4,7 +4,6 @@ import sys
 from functools import partial
 from time import perf_counter
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -103,8 +102,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = 0.2
-            init_pars["eta_cut"] = 0.2
+            init_pars["vbf_cut"] = 0.02
+            init_pars["eta_cut"] = 0.02
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -219,6 +218,4 @@ def get_significance(config, nn, params, data):
         )
     if config.objective == "cls":
         yields["bkg"] *= w_CR
-    return relaxed.metrics.asimov_sig(
-        s=jnp.sum(yields["NOSYS"]), b=jnp.sum(yields["bkg"])
-    )
+    return relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"])

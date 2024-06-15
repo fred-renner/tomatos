@@ -7,15 +7,11 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import vector
-from sklearn.preprocessing import MinMaxScaler
-import numpy as np
-import tomatos.preprocess
-import h5py
+
 import logging
 
 JAX_CHECK_TRACER_LEAKS = True
-jnp.set_printoptions(precision=5)
+
 
 Array = jnp.ndarray
 import relaxed

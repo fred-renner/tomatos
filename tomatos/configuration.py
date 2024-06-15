@@ -105,7 +105,7 @@ class Setup:
         if self.debug:
             self.num_steps = 3
         else:
-            self.num_steps = 500
+            self.num_steps = 5000
 
         # share of data used for training vs testing
         self.train_valid_ratio = 0.9
@@ -119,11 +119,16 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_5000_bounded/"
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
+
+        # if initialize parameters of a trained model
+        self.preload_model = True
+        # self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_fixed_cuts_m5/neos_model.eqx"
+        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_1000_bounded/neos_model.eqx"
 
         self.metadata_file_path = self.results_path + "metadata.json"
