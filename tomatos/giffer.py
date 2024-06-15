@@ -22,12 +22,12 @@ if __name__ == "__main__":
         # "tomatos_cls_5",
         # "tomatos_cls_5_1000",
         # "tomatos_cls_5_1000_unbound_shapesys",
-        # "tomatos_cls_5_400_unbound_shapesys",
+        "tomatos_cls_5_400",
         # "tomatos_bce_5_1000",
         # "tomatos_cls_5_fixed_cuts_m5",
         # "tomatos_cls_5_fixed_cuts_0p07",
         # "tomatos_cls_5_preload_fixed_cuts_m5"
-        "tomatos_cls_5_preload_fixed_cuts_m5_bandwidth_0p1"
+        # "tomatos_cls_5_preload_fixed_cuts_m5_bandwidth_0p1"
     ]
     ymax = 0
     for m in models:

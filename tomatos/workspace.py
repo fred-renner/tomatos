@@ -67,15 +67,15 @@ def model_from_hists(
     bkg_shapesys_down = 1 - relative_bkg_validation
     bkg_shapesys_down = jnp.where(bkg_shapesys_down < 0, 0, bkg_shapesys_down)
 
-    logging.info(f'{hists["bkg"]} hists["bkg"]')
-    logging.info(f"{bkg_estimate_in_VR} bkg_estimate_in_VR")
-    logging.info(f'{hists["bkg_VR_xbb_2"]} hists["bkg_VR_xbb_2"]')
-    logging.info(f"{relative_bkg_validation} relative_bkg_validation")
-
+    # logging.info(f'{hists["bkg"]} hists["bkg"]')
+    # logging.info(f"{bkg_estimate_in_VR} bkg_estimate_in_VR")
+    # logging.info(f'{hists["bkg_VR_xbb_2"]} hists["bkg_VR_xbb_2"]')
+    # logging.info(f"{relative_bkg_validation} relative_bkg_validation")
+    # logging.info(f"{w_CR}")
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
-    logging.info(f'{hists["bkg_shape_sys_up"]} bkg_shape_sys_up')
-    logging.info(f'{hists["bkg_shape_sys_down"]} bkg_shape_sys_down')
+    # logging.info(f'{hists["bkg_shape_sys_up"]} bkg_shape_sys_up')
+    # logging.info(f'{hists["bkg_shape_sys_down"]} bkg_shape_sys_down')
 
     if do_m_hh:
         spec = {

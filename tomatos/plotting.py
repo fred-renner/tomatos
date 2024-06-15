@@ -127,41 +127,12 @@ def plot_metrics(metrics, config):
 
     # cuts
 
-    # plt.plot(np.array(metrics["vbf_cut"]))
-    # plt.plot(np.array(metrics["eta_cut"]))
-
-    # # ), 'vbf_cut': 0.2, 'eta_cut': 0.2}
-    # # optimized m_jj:  1371080.1142079446
-    # # optimized delta_eta_jj:  1.7923978805542002
-
-    # plt.xlabel("Epoch")
-    # plt.ylabel("Min-Max Scaled Cut")
-    # plt.legend([r"$m_{jj}$", r"$|\Delta\eta(j,j)|$"])
-
-    # plt.tight_layout()
-    # plot_path = config["results_path"] + "cuts.pdf"
-    # logging.info(plot_path)
-    # plt.savefig(plot_path)
-    # plt.close()
-
-    # Function to inverse transform the min-max scaled data
-    def inverse_transform(scaled_data, initial_value):
-        return scaled_data * (1 / scaled_data[0]) * initial_value
-
-    # Assuming the first values of the original data are known
-    initial_vbf_cut = 1371080.1142079446
-    initial_eta_cut = 1.7923978805542002
-
-    # Inverse transform the data
-    vbf_cut_original = inverse_transform(np.array(metrics["vbf_cut"]), initial_vbf_cut)
-    eta_cut_original = inverse_transform(np.array(metrics["eta_cut"]), initial_eta_cut)
-
     # Plotting the data
     fig, ax1 = plt.subplots(figsize=(6, 4))
     color = "tab:red"
     ax1.set_xlabel("Epoch")
     ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
-    ax1.plot(vbf_cut_original * 1e-6, color=color)
+    ax1.plot(metrics["vbf_cut"] * 1e-6, color=color)
     ax1.tick_params(axis="y", labelcolor=color)
 
     ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
@@ -170,7 +141,7 @@ def plot_metrics(metrics, config):
     ax2.set_ylabel(
         r"$|\Delta\eta(j,j)|$", color=color
     )  # we already handled the x-label with ax1
-    ax2.plot(eta_cut_original, color=color)
+    ax2.plot(metrics["eta_cut"], color=color)
     ax2.tick_params(axis="y", labelcolor=color)
 
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
