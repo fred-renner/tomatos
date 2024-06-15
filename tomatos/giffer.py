@@ -18,8 +18,16 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 
 if __name__ == "__main__":
     models = [
-        "tomatos_bce_5",
-        "tomatos_cls_5",
+        # "tomatos_bce_5",
+        # "tomatos_cls_5",
+        # "tomatos_cls_5_1000",
+        # "tomatos_cls_5_1000_unbound_shapesys",
+        # "tomatos_cls_5_400_unbound_shapesys",
+        # "tomatos_bce_5_1000",
+        # "tomatos_cls_5_fixed_cuts_m5",
+        # "tomatos_cls_5_fixed_cuts_0p07",
+        # "tomatos_cls_5_preload_fixed_cuts_m5"
+        "tomatos_cls_5_preload_fixed_cuts_m5_bandwidth_0p1"
     ]
     ymax = 0
     for m in models:
@@ -30,13 +38,15 @@ if __name__ == "__main__":
         if not os.path.isdir(image_path):
             os.makedirs(image_path)
         # loop over epochs
+
+        meta_data["config"]["data_types"] += ["bkg_shape_sys_up", "bkg_shape_sys_down"]
+
         for i in range(len(meta_data["metrics"]["NOSYS"])):
-            # if i==1:
+            # if i == 5:
             #     break
             print(i)
             # loop over hists
             plt.figure()
-
             for hist_name in meta_data["config"]["data_types"]:
                 # if "JET" in hist_name or "GEN" in hist_name:
                 #     break
@@ -60,14 +70,18 @@ if __name__ == "__main__":
             else:
                 plt.xlabel("NN score")
 
-            plt.text(0.5, 0.8, f"Epoch {i}",
-                horizontalalignment='center',
-                verticalalignment='center',
-                transform = ax.transAxes)
+            plt.text(
+                0.5,
+                0.8,
+                f"Epoch {i}",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+            )
             plt.ylabel("Events")
-            plt.legend(prop={"size": 5},loc="upper right")  # prop={"size": 6})
+            plt.legend(prop={"size": 5}, loc="upper right")  # prop={"size": 6})
             plt.tight_layout()
-            plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=100)
+            plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=200)
             plt.close()
 
         create_gif_from_folder(image_path, model_path + m + ".gif", duration=0.001)

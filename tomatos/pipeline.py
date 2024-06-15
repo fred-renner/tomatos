@@ -1,19 +1,14 @@
-from functools import partial
 from typing import Callable, Iterable
 
-import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import neos
-import numpy as np
 import pyhf
-from jax import grad, jit, vmap
 
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
+import logging
 
-# jax.config.update("jax_enable_x64", True)
 pyhf.set_backend("jax")
 
 
@@ -51,6 +46,9 @@ def pipeline(
             include_bins=include_bins,
         )
     else:
+        # logging.info("Cuts are fixed in pipeline.py")
+        # pars["vbf_cut"] = 0.0768125547167431
+        # pars["eta_cut"] = 0.16166851655920972
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,

@@ -26,8 +26,12 @@ class NeuralNetwork(eqx.Module):
 
 
 # https://docs.kidger.site/equinox/examples/init_apply/
-def make_nn(in_size):
-    model = NeuralNetwork(in_size)
+def make_nn(config):
+    model = NeuralNetwork(config.n_features)
+
+    if config.preload_model:
+        model = eqx.tree_deserialise_leaves(config.preload_model_path, model)
+
     params, static = eqx.partition(model, eqx.is_inexact_array)
 
     def init_fn():
@@ -41,7 +45,7 @@ def make_nn(in_size):
 
 
 def init(config):
-    init_random_params, nn, nn_setup = make_nn(in_size=config.n_features)
+    init_random_params, nn, nn_setup = make_nn(config)
     init_pars = dict(nn_pars=init_random_params())
 
     return init_pars, nn, nn_setup
