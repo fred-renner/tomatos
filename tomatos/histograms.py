@@ -132,11 +132,20 @@ def get_w2sum(
 
 
 def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut):
-    # check a sigmoid plot for values between 0,1 a slope smaller than 1000 is
-    # not a good cut
-    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=1000, keep="above")
-    eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=1000, keep="above")
+    # check a sigmoid plot for values between 0,1
+    # slope of 1000 runs but seems to tight
+    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=100, keep="above")
+    eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=100, keep="above")
     return m_jj_cut_w * eta_cut_w
+
+
+# def cut(data, cut_val, slope, keep: str = "above"):
+#     if keep == "above":
+#         return 1 / (1 + np.exp(-slope * (data - cut_val)))
+#     if keep == "below":
+#         return 1 / (1 + np.exp(slope * (data - cut_val)))
+#     msg = f"keep must be one of 'above' or 'below', not {keep}"
+#     raise ValueError(msg)
 
 
 def hists_from_nn(
@@ -155,20 +164,21 @@ def hists_from_nn(
     values = {k: data[k][:, 0, :] for k in data}
     # it prints 0. but they are not
     weights = {k: data[k][:, 1, 0] for k in data}
+
     # apply cuts to weights
-    # indexing is horrible I know
-    # actually would need to cut on all samples...
-    cutted_weight_signal = get_cut_weights(
-        values["NOSYS"][:, -2], values["NOSYS"][:, -1], vbf_cut, eta_cut
-    )
-    cutted_weight_bkg = get_cut_weights(
-        values["bkg"][:, -2], values["bkg"][:, -1], vbf_cut, eta_cut
-    )
     if config.objective == "cls":
-        weights = {
-            k: w * cutted_weight_bkg if k is "bkg" else w * cutted_weight_signal
-            for k, w in weights.items()
-        }
+        # indexing is horrible I know
+        for k in values.keys():
+            # optimization only on signal and bkg
+            if k == "NOSYS" or k == "bkg":
+                cutted_weight = get_cut_weights(
+                    values[k][:, -2], values[k][:, -1], vbf_cut, eta_cut
+                )
+            else:
+                cutted_weight = (values[k][:, -2] > vbf_cut) * (
+                    values[k][:, -1] > eta_cut
+                )
+            weights[k] *= cutted_weight
 
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)

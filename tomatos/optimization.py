@@ -89,6 +89,8 @@ def run(
             "eta_cut",
             "bkg_shape_sys_up",
             "bkg_shape_sys_down",
+            "ps_up",
+            "ps_down",
             "bkg_CR_xbb_1",
             "bkg_CR_xbb_2",
             "bkg_VR_xbb_1",
@@ -102,8 +104,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = 0.02
-            init_pars["eta_cut"] = 0.02
+            init_pars["vbf_cut"] = -0.2
+            init_pars["eta_cut"] = -0.2
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -114,7 +116,12 @@ def run(
                 init_pars,
                 data=train,
             )
-
+        # doesn't seem to work
+        # if i % 20 == 0:
+        #     state = solver.init_state(
+        #         params,
+        #         data=train,
+        #     )
         start = perf_counter()
         params, state = solver.update(
             params,
@@ -135,8 +142,13 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
-        logging.info((f"hist bkg shape up: {histograms['bkg_shape_sys_up']}"))
-        logging.info((f"hist bkg shape down: {histograms['bkg_shape_sys_down']}"))
+        if config.objective == "cls":
+            logging.info(
+                (f"hist bkg unc: {1-histograms['bkg']/histograms['bkg_shape_sys_up']}")
+            )
+            logging.info(
+                (f"hist ps unc: {1-histograms['NOSYS']/histograms['ps_up']}")
+            )
         logging.info(f"vbf scaled cut: {params['vbf_cut']}")
         logging.info(f"eta scaled cut: {params['eta_cut']}")
 
@@ -159,7 +171,8 @@ def run(
         # Evaluate losses.
         start = perf_counter()
         if config.objective == "bce":
-            evaluation_losses = ["bce", "cls"]
+            evaluation_losses = ["bce"]
+            # evaluation_losses = ["bce", "cls"]
         else:
             evaluation_losses = ["cls"]
 

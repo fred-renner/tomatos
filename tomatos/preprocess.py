@@ -1,10 +1,6 @@
 import h5py
-import jax.numpy as jnp
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-import copy
-
-w_CR = 0.0036312547281962607
 
 
 def stack_inputs(
@@ -103,13 +99,12 @@ def min_max_norm(data, estimate_regions_data):
     # find the min max by going over all samples
     for key in data.keys():
         scaler.partial_fit(data[key][:, 0, :])
-
     for key in estimate_regions_data.keys():
         scaler.partial_fit(estimate_regions_data[key][:, 0, :])
 
+    # apply scaling
     for key in data.keys():
         data[key][:, 0, :] = scaler.transform(data[key][:, 0, :])
-
     # scale the estimate regions
     for key in estimate_regions_data.keys():
         estimate_regions_data[key][:, 0, :] = scaler.transform(
@@ -154,6 +149,15 @@ def prepare_data(config):
             sys=sys,
             rescale_weights=True,
         )
+
+    data["ps"] = stack_inputs(
+        config.files["ps"],
+        config,
+        region="SR_xbb_2",
+        n_events=max_events,
+        sys="NOSYS",
+        rescale_weights=True,
+    )
 
     estimate_regions = [
         "CR_xbb_1",

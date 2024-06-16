@@ -126,13 +126,11 @@ def plot_metrics(metrics, config):
         plt.close()
 
     # cuts
-
-    # Plotting the data
-    fig, ax1 = plt.subplots(figsize=(6, 4))
+    fig, ax1 = plt.subplots(figsize=fig_size)
     color = "tab:red"
     ax1.set_xlabel("Epoch")
     ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
-    ax1.plot(metrics["vbf_cut"] * 1e-6, color=color)
+    ax1.plot(np.array(metrics["vbf_cut"]) * 1e-6, color=color)
     ax1.tick_params(axis="y", labelcolor=color)
 
     ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
@@ -152,6 +150,35 @@ def plot_metrics(metrics, config):
     logging.info(plot_path)
     plt.savefig(plot_path)
     plt.close()
+
+    # bkg shapesys
+    plt.figure(figsize=(22, 8))
+    up = np.array(metrics["bkg_shape_sys_up"])
+    down = np.array(metrics["bkg_shape_sys_down"])
+    bkg = np.array(metrics["bkg"])
+    rel_up = up / bkg
+    # rel_down=down/bkg
+    # only up because symmetrized
+    for i, bins in enumerate(metrics["bins"]):
+        plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+    # plt.axvline(x=185,color="black",label="Epoch 185")
+    plt.xlabel("Epoch")
+    plt.ylabel("Relative Error")
+    plt.legend()
+
+    plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
+    logging.info(plot_path)
+    plt.savefig(plot_path)
+    plt.figure(figsize=(22, 8))
+    plt.plot(np.sum(rel_up, axis=1))
+    plt.xlabel("Epoch")
+    plt.ylabel("Cumulative Relative Error")
+    plt.legend()
+
+    plot_path = config["results_path"] + "bkg_shape_sys_rel_error_cumulative.pdf"
+    logging.info(plot_path)
+    plt.savefig(plot_path)
 
 
 def hist(config, bins, yields):
