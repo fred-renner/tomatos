@@ -47,8 +47,8 @@ def pipeline(
         )
     else:
         # logging.info("Cuts are fixed in pipeline.py")
-        # pars["vbf_cut"] = 0.0768125547167431
-        # pars["eta_cut"] = 0.16166851655920972
+        # pars["vbf_cut"] = -10.0
+        # pars["eta_cut"] = -10.0
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,

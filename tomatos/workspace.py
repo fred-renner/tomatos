@@ -39,6 +39,17 @@ def get_bkg_weight(hists):
     return w_CR, err_w_CR
 
 
+def get_symmetric_up_down(nom, sys):
+    # it really does not like literally empty bins
+    nom += 1e-15
+    sys += 1e-15
+    relative = jnp.abs((nom - sys) / nom)
+    up = 1 + relative
+    down = 1 - relative
+    down = jnp.where(down < 0, 0, down)
+    return up, down
+
+
 def model_from_hists(
     do_m_hh,
     hists: dict[str, Array],
@@ -55,27 +66,16 @@ def model_from_hists(
     hists["bkg_stat_down"] *= w_CR
 
     bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
-    # it really does not like literally empty bins
-    hists["bkg_VR_xbb_2"] += 1e-15
-    bkg_estimate_in_VR += 1e-15
 
-    relative_bkg_validation = jnp.abs(
-        (bkg_estimate_in_VR - hists["bkg_VR_xbb_2"]) / bkg_estimate_in_VR
+    bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
+        bkg_estimate_in_VR, hists["bkg_VR_xbb_2"]
     )
-
-    bkg_shapesys_up = 1 + relative_bkg_validation
-    bkg_shapesys_down = 1 - relative_bkg_validation
-    bkg_shapesys_down = jnp.where(bkg_shapesys_down < 0, 0, bkg_shapesys_down)
-
-    # logging.info(f'{hists["bkg"]} hists["bkg"]')
-    # logging.info(f"{bkg_estimate_in_VR} bkg_estimate_in_VR")
-    # logging.info(f'{hists["bkg_VR_xbb_2"]} hists["bkg_VR_xbb_2"]')
-    # logging.info(f"{relative_bkg_validation} relative_bkg_validation")
-    # logging.info(f"{w_CR}")
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
-    # logging.info(f'{hists["bkg_shape_sys_up"]} bkg_shape_sys_up')
-    # logging.info(f'{hists["bkg_shape_sys_down"]} bkg_shape_sys_down')
+
+    ps_up, ps_down = get_symmetric_up_down(hists["NOSYS"], hists["ps"])
+    hists["ps_up"] = hists["NOSYS"] * ps_up
+    hists["ps_down"] = hists["NOSYS"] * ps_down
 
     if do_m_hh:
         spec = {
@@ -138,6 +138,14 @@ def model_from_hists(
                     "data": {
                         "hi_data": hists["NOSYS"] * (1 + 0.034230167215544956),
                         "lo_data": hists["NOSYS"] * (1 - 0.03479541236132045),
+                    },
+                },
+                {
+                    "name": "ps",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["ps_up"],
+                        "lo_data": hists["ps_down"],
                     },
                 },
             )

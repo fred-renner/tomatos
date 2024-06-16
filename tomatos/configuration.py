@@ -9,6 +9,7 @@ class Setup:
         self.files = {
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
+            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-ps.h5",
         }
         # fmt: on
 
@@ -78,7 +79,7 @@ class Setup:
 
         self.bins = np.linspace(0, 1, args.bins + 1)
 
-        # 0.05 is too small, 0.2 seems optimal
+        # 0.2 seems optimal, smaller results in nan's at some point
         self.bandwidth = 0.2
 
         if self.do_m_hh and not self.include_bins:
@@ -103,9 +104,9 @@ class Setup:
         self.lr = 0.01
         # one step is one batch, not epoch
         if self.debug:
-            self.num_steps = 3
+            self.num_steps = 10
         else:
-            self.num_steps = 500
+            self.num_steps = 1000
 
         # share of data used for training vs testing
         self.train_valid_ratio = 0.9
@@ -114,20 +115,21 @@ class Setup:
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
 
-        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
+        # if initialize parameters of a trained model
+        self.preload_model = False
+        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500/neos_model.eqx"
 
+        # paths
+        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}/"
+            results_folder = (
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}/"
+            )
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
-
-        # if initialize parameters of a trained model
-        self.preload_model = False
-        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_1000_bounded/neos_model.eqx"
-
         self.metadata_file_path = self.results_path + "metadata.json"
