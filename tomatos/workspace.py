@@ -77,6 +77,8 @@ def model_from_hists(
     hists["ps_up"] = hists["NOSYS"] * ps_up
     hists["ps_down"] = hists["NOSYS"] * ps_down
 
+    # for key, h in hists.items():
+    #     print(key, h)
     if do_m_hh:
         spec = {
             "channels": [

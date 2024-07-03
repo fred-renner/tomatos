@@ -126,59 +126,90 @@ def plot_metrics(metrics, config):
         plt.close()
 
     # cuts
-    fig, ax1 = plt.subplots(figsize=fig_size)
-    color = "tab:red"
-    ax1.set_xlabel("Epoch")
-    ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
-    ax1.plot(np.array(metrics["vbf_cut"]) * 1e-6, color=color)
-    ax1.tick_params(axis="y", labelcolor=color)
+    if len(np.array(metrics["vbf_cut"])) > 0:
+        fig, ax1 = plt.subplots(figsize=fig_size)
+        color = "tab:red"
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
+        ax1.plot(np.array(metrics["vbf_cut"]) * 1e-6, color=color)
+        ax1.tick_params(axis="y", labelcolor=color)
 
-    ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
 
-    color = "tab:blue"
-    ax2.set_ylabel(
-        r"$|\Delta\eta(j,j)|$", color=color
-    )  # we already handled the x-label with ax1
-    ax2.plot(metrics["eta_cut"], color=color)
-    ax2.tick_params(axis="y", labelcolor=color)
+        color = "tab:blue"
+        ax2.set_ylabel(
+            r"$|\Delta\eta(j,j)|$", color=color
+        )  # we already handled the x-label with ax1
+        ax2.plot(metrics["eta_cut"], color=color)
+        ax2.tick_params(axis="y", labelcolor=color)
 
-    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
 
-    plt.xlabel("Epoch")
-    plt.tight_layout()
-    plot_path = config["results_path"] + "cuts.pdf"
-    logging.info(plot_path)
-    plt.savefig(plot_path)
-    plt.close()
+        plt.xlabel("Epoch")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "cuts.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
 
     # bkg shapesys
-    plt.figure(figsize=(22, 8))
-    up = np.array(metrics["bkg_shape_sys_up"])
-    down = np.array(metrics["bkg_shape_sys_down"])
-    bkg = np.array(metrics["bkg"])
-    rel_up = up / bkg
-    # rel_down=down/bkg
-    # only up because symmetrized
-    for i, bins in enumerate(metrics["bins"]):
-        plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+    if len(metrics["bkg_shape_sys_up"]) > 0:
+        plt.figure(figsize=(40,20))
+        up = np.array(metrics["bkg_shape_sys_up"])
+        down = np.array(metrics["bkg_shape_sys_down"])
+        bkg = np.array(metrics["bkg"])
+        rel_up = up / bkg
+        # rel_down=down/bkg
+        # only up because symmetrized
+        for i in range(len(metrics["bkg_shape_sys_up"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
 
-    # plt.axvline(x=185,color="black",label="Epoch 185")
-    plt.xlabel("Epoch")
-    plt.ylabel("Relative Error")
-    plt.legend()
+        # plt.axvline(x=185,color="black",label="Epoch 185")
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error")
+        plt.legend()
 
-    plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
-    logging.info(plot_path)
-    plt.savefig(plot_path)
-    plt.figure(figsize=(22, 8))
-    plt.plot(np.sum(rel_up, axis=1))
-    plt.xlabel("Epoch")
-    plt.ylabel("Cumulative Relative Error")
-    plt.legend()
+        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.figure(figsize=(22, 8))
+        plt.plot(np.sum(rel_up, axis=1))
+        plt.xlabel("Epoch")
+        plt.ylabel("Cumulative Relative Error")
+        plt.legend()
+        
+        plot_path = config["results_path"] + "bkg_shape_sys_rel_error_cumulative.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
 
-    plot_path = config["results_path"] + "bkg_shape_sys_rel_error_cumulative.pdf"
-    logging.info(plot_path)
-    plt.savefig(plot_path)
+    if len(metrics["ps_up"]) > 0:
+        plt.figure(figsize=(22, 8))
+        up = np.array(metrics["ps_up"])
+        down = np.array(metrics["ps_down"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+        # rel_down=down/bkg
+        # only up because symmetrized
+        for i in range(len(metrics["ps_up"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        # plt.axvline(x=185,color="black",label="Epoch 185")
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error")
+        plt.legend()
+
+        plot_path = config["results_path"] + "ps_rel_error.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
+        plt.figure(figsize=(22, 8))
+        plt.plot(np.sum(rel_up, axis=1))
+        plt.xlabel("Epoch")
+        plt.ylabel("Cumulative Relative Error")
+        plt.legend()
+
+        plot_path = config["results_path"] + "ps_rel_error_cumulative.pdf"
+        logging.info(plot_path)
+        plt.savefig(plot_path)
 
 
 def hist(config, bins, yields):
@@ -209,6 +240,8 @@ def hist(config, bins, yields):
         if any([l == reg for reg in bkg_regions]):
             continue
 
+        if "JET" in l:
+            continue
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[

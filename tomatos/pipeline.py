@@ -76,7 +76,6 @@ def pipeline(
     )  # , fit_lr=1e-5)
 
 
-# could actually think of something with sin or cos...
 # would be better to tell optimization gradient to vanish if bins gets out of bound
 def bin_correction(bins):
     # make sure bins don't overlap and are unique, need to avoid loops and
