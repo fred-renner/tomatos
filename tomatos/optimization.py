@@ -104,8 +104,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = -0.2
-            init_pars["eta_cut"] = -0.2
+            init_pars["vbf_cut"] = 0.0
+            init_pars["eta_cut"] = 0.0
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -116,7 +116,7 @@ def run(
                 init_pars,
                 data=train,
             )
-        # doesn't seem to work
+        # warm reset doesn't seem to work
         # if i % 20 == 0:
         #     state = solver.init_state(
         #         params,

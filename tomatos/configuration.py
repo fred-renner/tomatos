@@ -52,10 +52,10 @@ class Setup:
             "xbb_pt_bin_2__1down",
             "xbb_pt_bin_3__1up",
             "xbb_pt_bin_3__1down",
-            "JET_EtaIntercalibration_NonClosure_PreRec__1up",
-            "JET_EtaIntercalibration_Modelling__1up",
-            "JET_EtaIntercalibration_NonClosure_PreRec__1down",
-            "JET_EtaIntercalibration_Modelling__1down",
+            # "JET_EtaIntercalibration_NonClosure_PreRec__1up",
+            # "JET_EtaIntercalibration_Modelling__1up",
+            # "JET_EtaIntercalibration_NonClosure_PreRec__1down",
+            # "JET_EtaIntercalibration_Modelling__1down",
             "GEN_MUR05_MUF05_PDF260000",
             "GEN_MUR05_MUF10_PDF260000",
             "GEN_MUR10_MUF05_PDF260000",
@@ -106,7 +106,7 @@ class Setup:
         if self.debug:
             self.num_steps = 10
         else:
-            self.num_steps = 1000
+            self.num_steps = 2500
 
         # share of data used for training vs testing
         self.train_valid_ratio = 0.9
@@ -125,7 +125,7 @@ class Setup:
             results_folder = "tomatos_m_hh/"
         else:
             results_folder = (
-                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}/"
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_50/"
             )
         if self.debug:
             results_folder = "tomatos_debug/"
