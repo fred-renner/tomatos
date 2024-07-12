@@ -176,12 +176,13 @@ def model_from_hists(
             )
         if do_stat_error:
             for i in range(len(config.bins) - 1):
-                h_signal_stat_up = jnp.copy(hists["NOSYS"])
-                h_signal_stat_up.at[i].set(hists["NOSYS_stat_up"][i])
-                hists[f"NOSYS_stat_up_bin_{i}"] = h_signal_stat_up
-                h_signal_stat_down = jnp.copy(hists["NOSYS"])
-                h_signal_stat_down.at[i].set(hists["NOSYS_stat_down"][i])
-                hists[f"NOSYS_stat_down_bin_{i}"] = h_signal_stat_down
+                # this .at.set makes a copy without altering the original!
+                hists[f"NOSYS_stat_up_bin_{i}"] = (
+                    hists["NOSYS"].at[i].set(hists["NOSYS_stat_up"][i])
+                )
+                hists[f"NOSYS_stat_down_bin_{i}"] = (
+                    hists["NOSYS"].at[i].set(hists["NOSYS_stat_down"][i])
+                )
                 signal_modifiers += (
                     {
                         "name": "stat_err_signal",
@@ -193,13 +194,12 @@ def model_from_hists(
                     },
                 )
 
-                h_bkg_stat_up = jnp.copy(hists["bkg"])
-                h_bkg_stat_up.at[i].set(hists["bkg_stat_up"][i])
-                hists[f"bkg_stat_up_bin_{i}"] = h_bkg_stat_up
-                h_signal_stat_down = jnp.copy(hists["bkg"])
-                h_signal_stat_down.at[i].set(hists["bkg_stat_down"][i])
-                hists[f"bkg_stat_down_bin_{i}"] = h_signal_stat_down
-
+                hists[f"bkg_stat_up_bin_{i}"] = (
+                    hists["bkg"].at[i].set(hists["bkg_stat_up"][i])
+                )
+                hists[f"bkg_stat_down_bin_{i}"] = (
+                    hists["bkg"].at[i].set(hists["bkg_stat_down"][i])
+                )
                 bkg_modifiers += (
                     {
                         "name": "stat_err_bkg",
@@ -210,6 +210,7 @@ def model_from_hists(
                         },
                     },
                 )
+
         spec = {
             "channels": [
                 {

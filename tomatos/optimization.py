@@ -131,6 +131,10 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
+        
+        logging.info((f"hist stat sig bin 0: {histograms['NOSYS_stat_up_bin_0']}"))
+        logging.info((f"hist stat bkg bin 0: {histograms['bkg_stat_up_bin_0']}"))
+        
         if config.objective == "cls":
             logging.info(
                 (f"hist bkg unc: {1-histograms['bkg']/histograms['bkg_shape_sys_up']}")
