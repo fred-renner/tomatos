@@ -80,21 +80,8 @@ def run(
             "bce_test",
             "Z_A",
             "bins",
-            *config.data_types,  # add the hists
-            "NOSYS_stat_up",
-            "NOSYS_stat_down",
-            "bkg_stat_up",
-            "bkg_stat_down",
             "vbf_cut",
             "eta_cut",
-            "bkg_shape_sys_up",
-            "bkg_shape_sys_down",
-            "ps_up",
-            "ps_down",
-            "bkg_CR_xbb_1",
-            "bkg_CR_xbb_2",
-            "bkg_VR_xbb_1",
-            "bkg_VR_xbb_2",
         ]
     }
 
@@ -130,7 +117,9 @@ def run(
         )
 
         histograms = state.aux
-
+        if i == 0:
+            for k in histograms.keys():
+                metrics[k] = []
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
 
@@ -146,9 +135,7 @@ def run(
             logging.info(
                 (f"hist bkg unc: {1-histograms['bkg']/histograms['bkg_shape_sys_up']}")
             )
-            logging.info(
-                (f"hist ps unc: {1-histograms['NOSYS']/histograms['ps_up']}")
-            )
+            logging.info((f"hist ps unc: {1-histograms['NOSYS']/histograms['ps_up']}"))
         logging.info(f"vbf scaled cut: {params['vbf_cut']}")
         logging.info(f"eta scaled cut: {params['eta_cut']}")
 
