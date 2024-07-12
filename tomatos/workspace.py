@@ -27,8 +27,12 @@ def get_generator_weight_envelope(hists):
 
 
 def get_bkg_weight(hists):
-    CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
-    CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
+    # simple transferfactor
+    # CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
+    # CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
+    # binned transferfactor
+    CR_4b_Data = hists["bkg_CR_xbb_2"]
+    CR_2b_Data = hists["bkg_CR_xbb_1"]
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
     w_CR = CR_4b_Data / CR_2b_Data
@@ -171,26 +175,41 @@ def model_from_hists(
                 },
             )
         if do_stat_error:
-            signal_modifiers += (
-                {
-                    "name": "stat_err_signal",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": hists["NOSYS_stat_up"],
-                        "lo_data": hists["NOSYS_stat_down"],
+            for i in range(len(config.bins) - 1):
+                h_signal_stat_up = jnp.copy(hists["NOSYS"])
+                h_signal_stat_up.at[i].set(hists["NOSYS_stat_up"][i])
+                hists[f"NOSYS_stat_up_bin_{i}"] = h_signal_stat_up
+                h_signal_stat_down = jnp.copy(hists["NOSYS"])
+                h_signal_stat_down.at[i].set(hists["NOSYS_stat_down"][i])
+                hists[f"NOSYS_stat_down_bin_{i}"] = h_signal_stat_down
+                signal_modifiers += (
+                    {
+                        "name": "stat_err_signal",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists[f"NOSYS_stat_up_bin_{i}"],
+                            "lo_data": hists[f"NOSYS_stat_down_bin_{i}"],
+                        },
                     },
-                },
-            )
-            bkg_modifiers += (
-                {
-                    "name": "stat_err_bkg",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": hists["bkg_stat_up"],
-                        "lo_data": hists["bkg_stat_down"],
+                )
+
+                h_bkg_stat_up = jnp.copy(hists["bkg"])
+                h_bkg_stat_up.at[i].set(hists["bkg_stat_up"][i])
+                hists[f"bkg_stat_up_bin_{i}"] = h_bkg_stat_up
+                h_signal_stat_down = jnp.copy(hists["bkg"])
+                h_signal_stat_down.at[i].set(hists["bkg_stat_down"][i])
+                hists[f"bkg_stat_down_bin_{i}"] = h_signal_stat_down
+
+                bkg_modifiers += (
+                    {
+                        "name": "stat_err_bkg",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists[f"bkg_stat_up_bin_{i}"],
+                            "lo_data": hists[f"bkg_stat_down_bin_{i}"],
+                        },
                     },
-                },
-            )
+                )
         spec = {
             "channels": [
                 {

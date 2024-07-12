@@ -34,6 +34,8 @@ def interpolate_gaps(values, limit=None):
 
 
 def plot_metrics(metrics, config):
+    plt.rcParams.update({"font.size": 12})
+    plt.rcParams["lines.linewidth"] = 0.5
     epoch_grid = range(1, config["num_steps"] + 1)
 
     # cls
@@ -68,7 +70,7 @@ def plot_metrics(metrics, config):
         plot_path = config["results_path"] + "cls.pdf"
         ax = plt.gca()
         ax.set_yscale("log")
-        logging.info(plot_path)
+        print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
@@ -89,19 +91,19 @@ def plot_metrics(metrics, config):
         ax.set_yscale("log")
         plt.tight_layout()
         plot_path = config["results_path"] + "bce.pdf"
-        logging.info(plot_path)
+        print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
     # Z_A
     plt.figure(figsize=fig_size)
-    plt.plot(epoch_grid, metrics["Z_A"], label=r"$Z_A$")
+    plt.plot(epoch_grid, metrics["Z_A"], label="Asimov Significance")
     plt.legend()
     plt.xlabel("Epoch")
     plt.ylabel(r"$Z_A$")
     plt.tight_layout()
     plot_path = config["results_path"] + "Z_A.pdf"
-    logging.info(plot_path)
+    print(plot_path)
     plt.savefig(plot_path)
     plt.close()
 
@@ -121,9 +123,10 @@ def plot_metrics(metrics, config):
             plt.ylabel("epoch")
         plt.tight_layout()
         plot_path = config["results_path"] + "bins.pdf"
-        logging.info(plot_path)
+        print(plot_path)
         plt.savefig(plot_path)
         plt.close()
+    plt.rcParams["lines.linewidth"] = 1
 
     # cuts
     if len(np.array(metrics["vbf_cut"])) > 0:
@@ -148,13 +151,13 @@ def plot_metrics(metrics, config):
         plt.xlabel("Epoch")
         plt.tight_layout()
         plot_path = config["results_path"] + "cuts.pdf"
-        logging.info(plot_path)
+        print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
     # bkg shapesys
     if len(metrics["bkg_shape_sys_up"]) > 0:
-        plt.figure(figsize=(40,20))
+        plt.figure(figsize=(10, 4))
         up = np.array(metrics["bkg_shape_sys_up"])
         down = np.array(metrics["bkg_shape_sys_down"])
         bkg = np.array(metrics["bkg"])
@@ -162,68 +165,58 @@ def plot_metrics(metrics, config):
         # rel_down=down/bkg
         # only up because symmetrized
         for i in range(len(metrics["bkg_shape_sys_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+            if i == 0 or i == 1:
+                alpha = 0.5
+            else:
+                alpha = 1
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
 
         # plt.axvline(x=185,color="black",label="Epoch 185")
         plt.xlabel("Epoch")
-        plt.ylabel("Relative Error")
-        plt.legend()
-
-        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
-        logging.info(plot_path)
-        plt.savefig(plot_path)
-        plt.figure(figsize=(22, 8))
-        plt.plot(np.sum(rel_up, axis=1))
-        plt.xlabel("Epoch")
-        plt.ylabel("Cumulative Relative Error")
+        plt.ylabel("Relative Error (err/nominal)")
         plt.legend()
         
-        plot_path = config["results_path"] + "bkg_shape_sys_rel_error_cumulative.pdf"
-        logging.info(plot_path)
+        # ax = plt.gca()
+        # ax.set_yscale("log")     
+        plt.ylim(1,3)
+
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
+        print(plot_path)
         plt.savefig(plot_path)
 
     if len(metrics["ps_up"]) > 0:
-        plt.figure(figsize=(22, 8))
-        up = np.array(metrics["ps_up"])
+        plt.figure(figsize=(10, 4))
+        up = np.array(metrics["xbb_pt_bin_3__1up"])
         down = np.array(metrics["ps_down"])
         bkg = np.array(metrics["NOSYS"])
         rel_up = up / bkg
         # rel_down=down/bkg
         # only up because symmetrized
         for i in range(len(metrics["ps_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+            if i == 0 or i == 4:
+                alpha = 0.5
+            else:
+                alpha = 1
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
 
         # plt.axvline(x=185,color="black",label="Epoch 185")
         plt.xlabel("Epoch")
-        plt.ylabel("Relative Error")
+        plt.ylabel("Relative Error (err/nominal)")
         plt.legend()
+        plt.tight_layout()
 
         plot_path = config["results_path"] + "ps_rel_error.pdf"
-        logging.info(plot_path)
+        print(plot_path)
         plt.savefig(plot_path)
-        plt.figure(figsize=(22, 8))
-        plt.plot(np.sum(rel_up, axis=1))
-        plt.xlabel("Epoch")
-        plt.ylabel("Cumulative Relative Error")
-        plt.legend()
-
-        plot_path = config["results_path"] + "ps_rel_error_cumulative.pdf"
-        logging.info(plot_path)
-        plt.savefig(plot_path)
-
+        
+        
 
 def hist(config, bins, yields):
     fig = plt.figure(figsize=fig_size)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         # if "JET" in l or "GEN" in l:
         #     break
-
-        if "bkg" == l:
-            l = "Background Estimate"
-            if config["objective"] != "bce":
-                a *= w_CR
-        if "NOSYS" == l:
-            l = r"$\kappa_{2V=0}$ signal"
 
         bkg_regions = [
             "bkg_CR_xbb_1",
@@ -242,6 +235,17 @@ def hist(config, bins, yields):
 
         if "JET" in l:
             continue
+        l = l.replace("_", " ")
+
+        if "bkg" == l:
+            l = "Background Estimate"
+            if config["objective"] != "bce":
+                a *= w_CR
+        if "NOSYS" == l:
+            l = r"$\kappa_\mathrm{2V}=0$ signal"
+
+        if "ps" == l:
+            l = "Parton Shower 1down"
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
@@ -279,8 +283,32 @@ def hist(config, bins, yields):
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
-    plt.legend(fontsize=5)
+    plt.legend(fontsize=5, ncol=3)
+
+    plt.stairs(
+        edges=bins,
+        values=yields["bkg"] if config["objective"] == "bce" else np.array(yields["bkg"]) * w_CR,
+        label="Background Estimate",
+        fill=None,
+        linewidth=2,
+        # align="edge",
+        color="tab:blue",
+    )
+    plt.stairs(
+        edges=bins,
+        values=yields["NOSYS"],
+        label=r"$\kappa_\mathrm{2V}=0$ signal",
+        fill=None,
+        linewidth=2,
+        # align="edge",
+        color="tab:orange",
+    )
+
     plt.ylabel("Events")
+    ax = plt.gca()
+    newLim = list(ax.get_ylim())
+    newLim[1] = newLim[1] * 1.3
+    ax.set_ylim(newLim)
     # plt.legend()  # prop={"size": 6})
     plt.tight_layout()
     print(config["results_path"] + "hist.pdf")

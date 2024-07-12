@@ -117,7 +117,7 @@ class Setup:
 
         # if initialize parameters of a trained model
         self.preload_model = False
-        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500/neos_model.eqx"
+        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_2500_slope_50/neos_model.eqx"
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
@@ -125,7 +125,7 @@ class Setup:
             results_folder = "tomatos_m_hh/"
         else:
             results_folder = (
-                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_50/"
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_50_binned_stat/"
             )
         if self.debug:
             results_folder = "tomatos_debug/"
