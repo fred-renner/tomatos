@@ -11,10 +11,11 @@ import tomatos.plotting
 import tomatos.preprocess
 import tomatos.utils
 import json
+import numpy as np
 
 jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
 JAX_CHECK_TRACER_LEAKS = True
-JAX_DEBUG_NANS=True 
+JAX_DEBUG_NANS = True
 
 jax.config.update("jax_enable_x64", True)
 
@@ -40,17 +41,17 @@ def run():
     logging.getLogger("relaxed").setLevel(logging.WARNING)
     logging.info(json.dumps(tomatos.utils.to_python_lists(config.__dict__), indent=4))
 
-    data = tomatos.preprocess.prepare_data(config)
-    logging.info(f"datasets: {len(data)}")
+    train, valid, test = tomatos.preprocess.prepare_data(config)
+    logging.info(f"datasets: {len(train)}")
     init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
 
-    train, valid_test = tomatos.batching.split_data(
-        data, ratio=config.train_valid_ratio
-    )
-    valid, test = tomatos.batching.split_data(valid_test, ratio=config.valid_test_ratio)
-    # account for splitting with weights, so histograms have the same height,
-    # even with less data
-    train, valid, test = tomatos.batching.adjust_weights(config, train, valid, test)
+    # train, valid_test = tomatos.batching.split_data(
+    #     data, ratio=config.train_valid_ratio
+    # )
+    # valid, test = tomatos.batching.split_data(valid_test, ratio=config.valid_test_ratio)
+    # # account for splitting with weights, so histograms have the same height,
+    # # even with less data
+    # train, valid, test = tomatos.batching.adjust_weights(config, train, valid, test)
 
     logging.info(f"train size: {train[0].shape[0]}")
     logging.info(f"valid size: {valid[0].shape[0]}")
@@ -67,7 +68,9 @@ def run():
         nn=nn,
     )
 
-    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data)
+    bins, yields = tomatos.utils.get_hist(
+        config, nn, best_params, data=train + valid + test
+    )
     config = tomatos.utils.delete_aux_data(config)
 
     results = {

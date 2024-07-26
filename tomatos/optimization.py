@@ -64,7 +64,7 @@ def run(
 
     params = init_pars
     best_params = init_pars
-    best_sig = 999
+    best_valid_loss = 999
     print(config.data_types)
     metrics = {
         k: []
@@ -131,11 +131,15 @@ def run(
 
         logging.info((f"hist sig: {histograms['NOSYS']}"))
         logging.info((f"hist bkg: {histograms['bkg']}"))
-        
-        logging.info((f"hist stat sig bin 0: {histograms['NOSYS_stat_up_bin_0']}"))
-        logging.info((f"hist stat bkg bin 0: {histograms['bkg_stat_up_bin_0']}"))
-        
+
         if config.objective == "cls":
+            if config.do_stat_error:
+                logging.info(
+                    (f"hist stat sig bin 0: {histograms['NOSYS_stat_up_bin_0']}")
+                )
+                logging.info(
+                    (f"hist stat bkg bin 0: {histograms['bkg_stat_up_bin_0']}")
+                )
             logging.info(
                 (f"hist bkg unc: {1-histograms['bkg']/histograms['bkg_shape_sys_up']}")
             )
@@ -181,9 +185,9 @@ def run(
 
         objective = config.objective + "_valid"
         # pick best training from valid.
-        if metrics[objective][-1] < best_sig:
+        if metrics[objective][-1] < best_valid_loss:
             best_params = params
-            best_sig = metrics[objective][-1]
+            best_valid_loss = metrics[objective][-1]
             logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
 
         # Z_A
