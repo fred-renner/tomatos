@@ -47,29 +47,27 @@ def plot_metrics(metrics, config):
         plt.figure(figsize=fig_size)
         plt.plot(
             epoch_grid,
-            metrics["cls_train"],  # / np.max(metrics["cls_train"]),
+            metrics["cls_train"] / np.max(metrics["cls_train"]),
             label=r"$CL_s$ train",
         )
         plt.plot(
             epoch_grid,
-            metrics["cls_valid"],  # / np.max(metrics["cls_valid"]),
+            metrics["cls_valid"] / np.max(metrics["cls_valid"]),
             label=r"$CL_s$ valid",
         )
         plt.plot(
             epoch_grid,
-            metrics["cls_test"],  # / np.max(metrics["cls_test"]),
+            metrics["cls_test"] / np.max(metrics["cls_test"]),
             label=r"$CL_s$ test",
         )
 
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
-        # ax = plt.gca()
-        # ax.set_yscale('log')
         plt.tight_layout()
         plot_path = config["results_path"] + "cls.pdf"
         ax = plt.gca()
-        ax.set_yscale("log")
+        # ax.set_yscale("log")
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
@@ -88,7 +86,7 @@ def plot_metrics(metrics, config):
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         ax = plt.gca()
-        ax.set_yscale("log")
+        # ax.set_yscale("log")
         plt.tight_layout()
         plot_path = config["results_path"] + "bce.pdf"
         print(plot_path)
@@ -155,8 +153,7 @@ def plot_metrics(metrics, config):
         plt.savefig(plot_path)
         plt.close()
 
-    # bkg shapesys
-    if len(metrics["bkg_shape_sys_up"]) > 0:
+    if "bkg_shape_sys_up" in metrics.keys():
         plt.figure(figsize=(10, 4))
         up = np.array(metrics["bkg_shape_sys_up"])
         down = np.array(metrics["bkg_shape_sys_down"])
@@ -175,19 +172,19 @@ def plot_metrics(metrics, config):
         plt.xlabel("Epoch")
         plt.ylabel("Relative Error (err/nominal)")
         plt.legend()
-        
+
         # ax = plt.gca()
-        # ax.set_yscale("log")     
-        plt.ylim(1,3)
+        # ax.set_yscale("log")
+        plt.ylim(1, 3)
 
         plt.tight_layout()
         plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
         print(plot_path)
         plt.savefig(plot_path)
 
-    if len(metrics["ps_up"]) > 0:
+    if "ps_up" in metrics.keys():
         plt.figure(figsize=(10, 4))
-        up = np.array(metrics["xbb_pt_bin_3__1up"])
+        up = np.array(metrics["ps_up"])
         down = np.array(metrics["ps_down"])
         bkg = np.array(metrics["NOSYS"])
         rel_up = up / bkg
@@ -209,8 +206,32 @@ def plot_metrics(metrics, config):
         plot_path = config["results_path"] + "ps_rel_error.pdf"
         print(plot_path)
         plt.savefig(plot_path)
-        
-        
+
+    if "ps_up" in metrics.keys():
+        plt.figure(figsize=(10, 4))
+        up = np.array(metrics["xbb_pt_bin_3__1up"])
+        down = np.array(metrics["ps_down"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+        # rel_down=down/bkg
+        # only up because symmetrized
+        for i in range(len(metrics["ps_up"][0])):
+            if i == 0 or i == 4:
+                alpha = 0.5
+            else:
+                alpha = 1
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
+
+        # plt.axvline(x=185,color="black",label="Epoch 185")
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error (err/nominal)")
+        plt.legend()
+        plt.tight_layout()
+
+        plot_path = config["results_path"] + "xbb_pt_bin_3_rel_error.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+    
 
 def hist(config, bins, yields):
     fig = plt.figure(figsize=fig_size)
@@ -287,7 +308,9 @@ def hist(config, bins, yields):
 
     plt.stairs(
         edges=bins,
-        values=yields["bkg"] if config["objective"] == "bce" else np.array(yields["bkg"]) * w_CR,
+        values=yields["bkg"]
+        if config["objective"] == "bce"
+        else np.array(yields["bkg"]) * w_CR,
         label="Background Estimate",
         fill=None,
         linewidth=2,

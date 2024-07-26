@@ -131,11 +131,11 @@ def get_w2sum(
     return counts
 
 
-def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut):
+def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut, slope):
     # check a sigmoid plot for values between 0,1
     # slope of 1000 runs but seems to tight
-    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=50, keep="above")
-    eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=50, keep="above")
+    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=slope, keep="above")
+    eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=slope, keep="above")
     return m_jj_cut_w * eta_cut_w
 
 
@@ -162,7 +162,7 @@ def hists_from_nn(
     if config.objective == "cls":
         for k in values.keys():
             cutted_weight = get_cut_weights(
-                values[k][:, -2], values[k][:, -1], vbf_cut, eta_cut
+                values[k][:, -2], values[k][:, -1], vbf_cut, eta_cut, config.slope
             )
 
             weights[k] *= cutted_weight
@@ -188,8 +188,8 @@ def hists_from_nn(
         "VR_xbb_2",
     ]
 
-    # need another bandwidth hist since we want sharp hists
-    # sharp_hist = partial(hist, bandwidth=0.2, bins=bins)
+    # need another bandwidth hist since we want sharp hists, though looses gradient
+    # sharp_hist = partial(hist, bandwidth=1e-4, bins=bins)
 
     # apply m_jj and eta_jj cut on the estimate_regions
     for reg in estimate_regions:
@@ -198,6 +198,7 @@ def hists_from_nn(
             config.bkg_estimate[reg][:, 0, -1],
             vbf_cut,
             eta_cut,
+            config.slope,
         )
         bkg_estimate_data = config.bkg_estimate[reg]
 

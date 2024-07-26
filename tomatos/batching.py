@@ -9,6 +9,7 @@ rng_state = 0
 
 
 def split_data(data, ratio):
+    """Split arrays or matrices into random train and test subsets."""
     split = train_test_split(*data, train_size=ratio, random_state=rng_state)
     train, test = split[::2], split[1::2]
 
@@ -17,6 +18,7 @@ def split_data(data, ratio):
 
 def adjust_weights(config, train, valid, test):
     # Calculate weight adjustments for each split
+    # such that weights match the original hist counts for each data set
     train_weight_adjustment = 1 / config.train_valid_ratio
     valid_weight_adjustment = (1 / (1 - config.train_valid_ratio)) * (
         1 / config.valid_test_ratio

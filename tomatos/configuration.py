@@ -10,6 +10,9 @@ class Setup:
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
             "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-ps.h5",
+            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-l1cvv0cv1.h5",
+            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-run2.h5",
+            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-ps.h5",
         }
         # fmt: on
 
@@ -52,10 +55,6 @@ class Setup:
             "xbb_pt_bin_2__1down",
             "xbb_pt_bin_3__1up",
             "xbb_pt_bin_3__1down",
-            # "JET_EtaIntercalibration_NonClosure_PreRec__1up",
-            # "JET_EtaIntercalibration_Modelling__1up",
-            # "JET_EtaIntercalibration_NonClosure_PreRec__1down",
-            # "JET_EtaIntercalibration_Modelling__1down",
             "GEN_MUR05_MUF05_PDF260000",
             "GEN_MUR05_MUF10_PDF260000",
             "GEN_MUR10_MUF05_PDF260000",
@@ -78,6 +77,8 @@ class Setup:
         self.n_features = len(self.vars)
 
         self.bins = np.linspace(0, 1, args.bins + 1)
+        # dont need this as norm.cdf includes 1.0
+        # self.bins[-1] = 1.001
 
         # 0.2 seems optimal, smaller results in nan's at some point
         self.bandwidth = 0.2
@@ -98,6 +99,7 @@ class Setup:
                 ]
             )  # rel 21 analysis
 
+        # if we would actually batch, would need to account for in weights...
         self.batch_size = int(1e5)  # int is necessary
 
         # with all systs 0.001 seems too small
@@ -109,9 +111,10 @@ class Setup:
             self.num_steps = 2500
 
         # share of data used for training vs testing
-        self.train_valid_ratio = 0.9
-        self.valid_test_ratio = 0.8
-
+        self.train_valid_ratio = 0.8
+        self.valid_test_ratio = 0.5
+        # slope parameter used by the sigmoid for cut optimization
+        self.slope = 50
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
 
@@ -124,9 +127,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         else:
-            results_folder = (
-                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_50_binned_stat/"
-            )
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_ratios_0p8_0p5/"
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder

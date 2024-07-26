@@ -10,6 +10,7 @@ def stack_inputs(
     n_events=0,
     sys="NOSYS",
     rescale_weights=True,
+    event_range=[0.0, 0.8],
 ):
     """make array of input variables and attach desired weights to keep the
     weights during shuffling, so it gets the shape:
@@ -68,7 +69,9 @@ def stack_inputs(
         is_mc = True
 
     with h5py.File(filepath, "r") as f:
-        arr = np.zeros((n_events, 2, config.n_features))
+        # scale max events
+        ranged_n_events = int(np.abs(event_range[1] - event_range[0]) * n_events)
+        arr = np.zeros((ranged_n_events, 2, config.n_features))
 
         for i, var in enumerate(config.vars):
             # fill
@@ -78,40 +81,50 @@ def stack_inputs(
             # auto up and down scale
             # values
             n_var_events = f[var_name].shape[0]
-            arr[:, 0, i] = np.resize(f[var_name][:], (n_events))
+            idx_0 = int(np.floor(event_range[0] * n_var_events))
+            idx_1 = int(np.floor(event_range[1] * n_var_events))
+            indices = np.arange(idx_0, idx_1)
+
+            arr[:, 0, i] = np.resize(f[var_name][indices], (ranged_n_events))
 
             # weights
             if is_mc:
-                arr[:, 1, i] = np.resize(f[w_name][:], (n_events))
+                arr[:, 1, i] = np.resize(f[w_name][indices], (ranged_n_events))
             else:
-                arr[:, 1, i] = np.ones(n_events)
+                arr[:, 1, i] = np.ones(ranged_n_events)
+
+            selected_sf = n_events / ranged_n_events
+            rescale_sf = len(indices) / ranged_n_events
 
             # account for scaling in weights
             if rescale_weights:
-                arr[:, 1, i] *= n_var_events / n_events
+                arr[:, 1, i] *= selected_sf * rescale_sf
 
         return arr
 
 
-def min_max_norm(data, estimate_regions_data):
+def min_max_norm(train, valid, test, estimate_regions_data):
     scaler = MinMaxScaler()
 
     # find the min max by going over all samples
-    for key in data.keys():
-        scaler.partial_fit(data[key][:, 0, :])
+    # train, valid, test
+    for data in [train, valid, test]:
+        for key in data.keys():
+            scaler.partial_fit(data[key][:, 0, :])
+
     for key in estimate_regions_data.keys():
         scaler.partial_fit(estimate_regions_data[key][:, 0, :])
 
-    # apply scaling
-    for key in data.keys():
-        data[key][:, 0, :] = scaler.transform(data[key][:, 0, :])
+    # apply scaling to train, valid, test
+    for data in [train, valid, test]:
+        for key in data.keys():
+            data[key][:, 0, :] = scaler.transform(data[key][:, 0, :])
     # scale the estimate regions
     for key in estimate_regions_data.keys():
         estimate_regions_data[key][:, 0, :] = scaler.transform(
             estimate_regions_data[key][:, 0, :]
         )
-
-    return data, estimate_regions_data, scaler
+    return train, valid, test, estimate_regions_data, scaler
 
 
 def get_n_events(filepath, var):
@@ -119,25 +132,15 @@ def get_n_events(filepath, var):
         return f[var].shape[0]
 
 
-def prepare_data(config):
+def stack_data(config, max_events, event_range):
     data = {}
-    estimate_regions_data = {}
-
-    max_events = 0
-    for var in config.vars:
-        for sys in config.systematics:
-            var_sys = var + "_" + sys + ".SR_xbb_2"
-            n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
-            if n > max_events:
-                max_events = n
-                max_var_sys = var_sys
-
     data["bkg"] = stack_inputs(
         config.files["run2"],
         config,
         region="SR_xbb_1",
         n_events=max_events,
         rescale_weights=True,
+        event_range=event_range,
     )
 
     for sys in config.systematics:
@@ -148,6 +151,7 @@ def prepare_data(config):
             n_events=max_events,
             sys=sys,
             rescale_weights=True,
+            event_range=event_range,
         )
 
     data["ps"] = stack_inputs(
@@ -157,7 +161,25 @@ def prepare_data(config):
         n_events=max_events,
         sys="NOSYS",
         rescale_weights=True,
+        event_range=event_range,
     )
+
+    return data
+
+
+def prepare_data(config):
+    max_events = 0
+    for var in config.vars:
+        for sys in config.systematics:
+            var_sys = var + "_" + sys + ".SR_xbb_2"
+            n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
+            if n > max_events:
+                max_events = n
+                max_var_sys = var_sys
+
+    train = stack_data(config, max_events, event_range=[0.0, 0.8])
+    valid = stack_data(config, max_events, event_range=[0.8, 0.9])
+    test = stack_data(config, max_events, event_range=[0.9, 1.0])
 
     estimate_regions = [
         "CR_xbb_1",
@@ -166,6 +188,7 @@ def prepare_data(config):
         "VR_xbb_2",
     ]
 
+    estimate_regions_data = {}
     for reg in estimate_regions:
         estimate_regions_data[reg] = stack_inputs(
             config.files["run2"],
@@ -176,18 +199,25 @@ def prepare_data(config):
             ),
             sys="NOSYS",
             rescale_weights=False,
+            event_range=[0.0, 1.0],
         )
 
-    data, estimate_regions_data, scaler = min_max_norm(data, estimate_regions_data)
+    train, valid, test, estimate_regions_data, scaler = min_max_norm(
+        train, valid, test, estimate_regions_data
+    )
 
     config.data_types = []
-    jnp_data = []
-    for k in data.keys():
+    train_ = []
+    valid_ = []
+    test_ = []
+    for k in train.keys():
         config.data_types += [k]
-        jnp_data += [np.asarray(data[k])]
+        train_ += [np.asarray(train[k])]
+        valid_ += [np.asarray(valid[k])]
+        test_ += [np.asarray(test[k])]
 
     config.scaler_scale = scaler.scale_
     config.scaler_min = scaler.min_
     config.bkg_estimate = estimate_regions_data
 
-    return jnp_data
+    return train_, valid_, test_
