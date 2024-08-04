@@ -15,12 +15,17 @@ import numpy as np
 
 jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
 JAX_CHECK_TRACER_LEAKS = True
-JAX_DEBUG_NANS = True
-
 jax.config.update("jax_enable_x64", True)
+
+# useful to find the cause of nan's
+jax.config.update("jax_debug_nans", False)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, required=True)
+parser.add_argument("--steps", type=int, default=1000)
+parser.add_argument("--slope", type=int, default=50)
+parser.add_argument("--lr", type=float, default=0.01)
+parser.add_argument("--bw", type=float, default=0.2)
 parser.add_argument("--debug", action="store_true", default=False)
 
 args = parser.parse_args()
@@ -45,14 +50,6 @@ def run():
     logging.info(f"datasets: {len(train)}")
     init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
 
-    # train, valid_test = tomatos.batching.split_data(
-    #     data, ratio=config.train_valid_ratio
-    # )
-    # valid, test = tomatos.batching.split_data(valid_test, ratio=config.valid_test_ratio)
-    # # account for splitting with weights, so histograms have the same height,
-    # # even with less data
-    # train, valid, test = tomatos.batching.adjust_weights(config, train, valid, test)
-
     logging.info(f"train size: {train[0].shape[0]}")
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
@@ -68,9 +65,7 @@ def run():
         nn=nn,
     )
 
-    bins, yields = tomatos.utils.get_hist(
-        config, nn, best_params, data=train + valid + test
-    )
+    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=train)
     config = tomatos.utils.delete_aux_data(config)
 
     results = {
@@ -106,6 +101,7 @@ def plot():
         results["config"],
         results["bins"],
         results["yields"],
+        results["metrics"],
     )
 
 

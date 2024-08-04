@@ -21,6 +21,7 @@ def pipeline(
     nn: Callable,
     loss_type: str,
     bandwidth: float,
+    slope: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
     config: object,
     include_bins=True,
@@ -57,6 +58,7 @@ def pipeline(
             eta_cut=pars["eta_cut"],
             data=data_dct,
             bandwidth=bandwidth,  # for the bKDEs
+            slope=slope,
             bins=bins,
         )
 
@@ -69,11 +71,10 @@ def pipeline(
         do_m_hh, hists, config, do_systematics, do_stat_error
     )
 
-    # # this particular fit_lr quite influences the minimization
     return (
         neos.loss_from_model(model, loss=loss_type, fit_lr=1e-3),
         hists,
-    )  # , fit_lr=1e-5)
+    )
 
 
 # would be better to tell optimization gradient to vanish if bins gets out of bound

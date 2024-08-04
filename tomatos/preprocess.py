@@ -69,34 +69,38 @@ def stack_inputs(
         is_mc = True
 
     with h5py.File(filepath, "r") as f:
-        # scale max events
+        # nr of events desired for n_events
         ranged_n_events = int(np.abs(event_range[1] - event_range[0]) * n_events)
+        # init array
         arr = np.zeros((ranged_n_events, 2, config.n_features))
-
+        # fill per var
         for i, var in enumerate(config.vars):
-            # fill
             var_name = var + "_" + sys + "." + region
             w_name = "weights_" + sys + "." + region
 
-            # auto up and down scale
-            # values
+            # select the range from available events as n_var_events not
+            # necessarily n_events
             n_var_events = f[var_name].shape[0]
             idx_0 = int(np.floor(event_range[0] * n_var_events))
             idx_1 = int(np.floor(event_range[1] * n_var_events))
             indices = np.arange(idx_0, idx_1)
 
+            # up (or down) scale
             arr[:, 0, i] = np.resize(f[var_name][indices], (ranged_n_events))
 
-            # weights
+            # same for weights
             if is_mc:
                 arr[:, 1, i] = np.resize(f[w_name][indices], (ranged_n_events))
             else:
                 arr[:, 1, i] = np.ones(ranged_n_events)
 
+            # scale weights
+            # upscale to total event yield from ranged_n_events
             selected_sf = n_events / ranged_n_events
+            # amount for actual up/down scaling of values
             rescale_sf = len(indices) / ranged_n_events
 
-            # account for scaling in weights
+            # apply to weights
             if rescale_weights:
                 arr[:, 1, i] *= selected_sf * rescale_sf
 
@@ -178,9 +182,12 @@ def prepare_data(config):
                 max_var_sys = var_sys
 
     train = stack_data(config, max_events, event_range=[0.0, 0.8])
+    # last values in arrays are somewhat shuffled as they are filled in the
+    # order from large to small input files
     valid = stack_data(config, max_events, event_range=[0.8, 0.9])
     test = stack_data(config, max_events, event_range=[0.9, 1.0])
-
+    
+    
     estimate_regions = [
         "CR_xbb_1",
         "CR_xbb_2",
