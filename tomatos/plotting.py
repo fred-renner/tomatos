@@ -9,9 +9,9 @@ import tomatos.utils
 import tomatos.workspace
 import logging
 
-w_CR = 0.0036312547281962607
+w_CR = 0.003785385121790652
 
-fig_size = (5, 4)
+fig_size = (6, 5)
 
 
 def interpolate_gaps(values, limit=None):
@@ -34,8 +34,8 @@ def interpolate_gaps(values, limit=None):
 
 
 def plot_metrics(metrics, config):
-    plt.rcParams.update({"font.size": 12})
-    plt.rcParams["lines.linewidth"] = 0.5
+    plt.rcParams.update({"font.size": 16})
+    # plt.rcParams["lines.linewidth"] = 0.9
     epoch_grid = range(1, config["num_steps"] + 1)
 
     # cls
@@ -162,11 +162,7 @@ def plot_metrics(metrics, config):
         # rel_down=down/bkg
         # only up because symmetrized
         for i in range(len(metrics["bkg_shape_sys_up"][0])):
-            if i == 0 or i == 1:
-                alpha = 0.5
-            else:
-                alpha = 1
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
 
         # plt.axvline(x=185,color="black",label="Epoch 185")
         plt.xlabel("Epoch")
@@ -191,11 +187,7 @@ def plot_metrics(metrics, config):
         # rel_down=down/bkg
         # only up because symmetrized
         for i in range(len(metrics["ps_up"][0])):
-            if i == 0 or i == 4:
-                alpha = 0.5
-            else:
-                alpha = 1
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
 
         # plt.axvline(x=185,color="black",label="Epoch 185")
         plt.xlabel("Epoch")
@@ -207,7 +199,7 @@ def plot_metrics(metrics, config):
         print(plot_path)
         plt.savefig(plot_path)
 
-    if "ps_up" in metrics.keys():
+    if "xbb_pt_bin_3" in metrics.keys():
         plt.figure(figsize=(10, 4))
         up = np.array(metrics["xbb_pt_bin_3__1up"])
         down = np.array(metrics["ps_down"])
@@ -216,11 +208,7 @@ def plot_metrics(metrics, config):
         # rel_down=down/bkg
         # only up because symmetrized
         for i in range(len(metrics["ps_up"][0])):
-            if i == 0 or i == 4:
-                alpha = 0.5
-            else:
-                alpha = 1
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}", alpha=alpha)
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
 
         # plt.axvline(x=185,color="black",label="Epoch 185")
         plt.xlabel("Epoch")
@@ -231,9 +219,51 @@ def plot_metrics(metrics, config):
         plot_path = config["results_path"] + "xbb_pt_bin_3_rel_error.pdf"
         print(plot_path)
         plt.savefig(plot_path)
-    
 
-def hist(config, bins, yields):
+    if "signal_approximation_diff" in metrics.keys():
+        plt.figure(figsize=(10, 4))
+        up = np.array(metrics["signal_approximation_diff"])
+
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+        # rel_down=down/bkg
+        # only up because symmetrized
+        for i in range(len(metrics["NOSYS"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        # plt.axvline(x=185,color="black",label="Epoch 185")
+        plt.xlabel("Epoch")
+        plt.ylabel("Binned KDE/Nominal")
+        plt.legend()
+        plt.tight_layout()
+
+        plot_path = config["results_path"] + "signal_approximation_diff.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+
+    if "bkg_approximation_diff" in metrics.keys():
+        plt.figure(figsize=(10, 4))
+        up = np.array(metrics["bkg_approximation_diff"])
+
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+        # rel_down=down/bkg
+        # only up because symmetrized
+        for i in range(len(metrics["NOSYS"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        # plt.axvline(x=185,color="black",label="Epoch 185")
+        plt.xlabel("Epoch")
+        plt.ylabel("Binned KDE/Nominal")
+        plt.legend()
+        plt.tight_layout()
+
+        plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+
+
+def hist(config, bins, yields, metrics):
     fig = plt.figure(figsize=fig_size)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         # if "JET" in l or "GEN" in l:
@@ -304,13 +334,26 @@ def hist(config, bins, yields):
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
+
+    plt.plot(
+        np.linspace(0, 1, 99),
+        metrics["kde_signal"][metrics["best_epoch"]],
+        label="kde signal",
+    )
+    plt.plot(
+        np.linspace(0, 1, 99),
+        metrics["kde_bkg"][metrics["best_epoch"]],
+        label="kde bkg",
+    )
     plt.legend(fontsize=5, ncol=3)
 
     plt.stairs(
         edges=bins,
-        values=yields["bkg"]
-        if config["objective"] == "bce"
-        else np.array(yields["bkg"]) * w_CR,
+        values=(
+            yields["bkg"]
+            if config["objective"] == "bce"
+            else np.array(yields["bkg"]) * w_CR
+        ),
         label="Background Estimate",
         fill=None,
         linewidth=2,

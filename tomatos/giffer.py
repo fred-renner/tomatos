@@ -104,7 +104,7 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     models = [
-        "tomatos_cls_5_2500_slope_50_ratios_0p8_0p5_binning"
+        "tomatos_cls_5_500_slope_1000_lr_0p01_bw_0p2_no_stat_error_fit_tol_0p01"
     ]
     ymax = 0
     for m in models:

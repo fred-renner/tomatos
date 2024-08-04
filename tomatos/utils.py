@@ -5,9 +5,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pyhf
-import relaxed
 
 import tomatos.histograms
+import tomatos.optimization
 
 Array = jnp.ndarray
 
@@ -35,13 +35,14 @@ def get_hist(config, nn, best_params, data):
             config=config,
             vbf_cut=best_params["vbf_cut"],
             eta_cut=best_params["eta_cut"],
-            bandwidth=1e-8,
+            bandwidth=1e-6,
+            slope=1e6,
             bins=best_params["bins"] if config.include_bins else config.bins,
         )
     logging.info(
         (
             "Asimov Significance: ",
-            relaxed.metrics.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
+            tomatos.optimization.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
         )
     )
 

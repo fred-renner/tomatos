@@ -28,13 +28,17 @@ def get_generator_weight_envelope(hists):
 
 def get_bkg_weight(hists):
     # simple transferfactor
-    # CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
-    # CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
+    CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
+    CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
     # binned transferfactor
-    CR_4b_Data = hists["bkg_CR_xbb_2"]
-    CR_2b_Data = hists["bkg_CR_xbb_1"]
+    # CR_4b_Data = hists["bkg_CR_xbb_2"]
+    # CR_2b_Data = hists["bkg_CR_xbb_1"]
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
+
+    # it really does not like literally empty bins
+    CR_4b_Data += 1e-15
+    CR_2b_Data += 1e-15
     w_CR = CR_4b_Data / CR_2b_Data
     err_w_CR = w_CR * jnp.sqrt(
         jnp.square(errCR1 / CR_4b_Data) + jnp.square(errCR2 / CR_2b_Data)
@@ -50,6 +54,11 @@ def get_symmetric_up_down(nom, sys):
     relative = jnp.abs((nom - sys) / nom)
     up = 1 + relative
     down = 1 - relative
+    # penalize when going below zero for down
+    up = jnp.where(down < 0, up * (1 - down), up)
+    # promote more events in background estimate if less than 1 event in a bin
+    # use this with care
+    up = jnp.where(sys < 1, up * (1 + (1 - sys)), up)
     down = jnp.where(down < 0, 0, down)
     return up, down
 
@@ -66,8 +75,9 @@ def model_from_hists(
     rel_err_w_CR = err_w_CR / w_CR
 
     hists["bkg"] *= w_CR
-    hists["bkg_stat_up"] *= w_CR
-    hists["bkg_stat_down"] *= w_CR
+    if config.do_stat_error:
+        hists["bkg_stat_up"] *= w_CR
+        hists["bkg_stat_down"] *= w_CR
 
     bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
 
@@ -174,7 +184,7 @@ def model_from_hists(
                     },
                 },
             )
-        if do_stat_error:
+        if config.do_stat_error:
             for i in range(len(config.bins) - 1):
                 # this .at.set makes a copy without altering the original!
                 hists[f"NOSYS_stat_up_bin_{i}"] = (
@@ -210,7 +220,6 @@ def model_from_hists(
                         },
                     },
                 )
-
         spec = {
             "channels": [
                 {

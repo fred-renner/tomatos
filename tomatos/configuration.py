@@ -10,9 +10,6 @@ class Setup:
             "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
             "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
             "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-ps.h5",
-            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-l1cvv0cv1.h5",
-            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-run2.h5",
-            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_trigger_cuts/dump-ps.h5",
         }
         # fmt: on
 
@@ -65,7 +62,7 @@ class Setup:
         ]
 
         self.systematics_raw = []
-        self.do_stat_error = True
+        self.do_stat_error = False
         self.do_systematics = True
         for sys in self.systematics:
             if "1up" in sys:
@@ -76,12 +73,10 @@ class Setup:
 
         self.n_features = len(self.vars)
 
+        # norm.cdf in histogramming includes 1.0
         self.bins = np.linspace(0, 1, args.bins + 1)
-        # dont need this as norm.cdf includes 1.0
-        # self.bins[-1] = 1.001
 
-        # 0.2 seems optimal, smaller results in nan's at some point
-        self.bandwidth = 0.2
+        self.bandwidth = args.bw
 
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
@@ -103,34 +98,38 @@ class Setup:
         self.batch_size = int(1e5)  # int is necessary
 
         # with all systs 0.001 seems too small
-        self.lr = 0.01
+        self.lr = args.lr
         # one step is one batch, not epoch
         if self.debug:
             self.num_steps = 10
         else:
-            self.num_steps = 2500
+            self.num_steps = args.steps
 
-        # share of data used for training vs testing
-        self.train_valid_ratio = 0.8
-        self.valid_test_ratio = 0.5
         # slope parameter used by the sigmoid for cut optimization
-        self.slope = 50
+        self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
 
         # if initialize parameters of a trained model
         self.preload_model = False
-        self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_2500_slope_50/neos_model.eqx"
+        if self.preload_model:
+            self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500_slope_6400_lr_0p001_bw_0p2_slope_study_bkg_penalize_on/neos_model.eqx"
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
-        else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_ratios_0p8_0p5/"
+        elif self.objective == "cls":
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}/"
+        elif self.objective == "bce":
+            results_folder = (
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}/"
+            )
+        results_folder = results_folder.replace(".", "p")
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
+
         self.metadata_file_path = self.results_path + "metadata.json"

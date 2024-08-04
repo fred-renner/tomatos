@@ -16,7 +16,7 @@ JAX_CHECK_TRACER_LEAKS = True
 Array = jnp.ndarray
 import relaxed
 
-w_CR = 0.0036312547281962607
+w_CR = 0.003785385121790652
 
 
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
@@ -123,7 +123,7 @@ def get_w2sum(
     #        [3]])
 
     cdf = jsp.stats.norm.cdf(bins.reshape(-1, 1), loc=data, scale=bandwidth)
-    cdf = cdf * (weights**2)
+    cdf = cdf * jnp.power(weights, 2)
 
     # sum kde contributions in each bin
     counts = (cdf[1:, :] - cdf[:-1, :]).sum(axis=1)
@@ -133,7 +133,6 @@ def get_w2sum(
 
 def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut, slope):
     # check a sigmoid plot for values between 0,1
-    # slope of 1000 runs but seems to tight
     m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=slope, keep="above")
     eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=slope, keep="above")
     return m_jj_cut_w * eta_cut_w
@@ -145,6 +144,7 @@ def hists_from_nn(
     data: dict[str, Array],
     nn: Callable,
     bandwidth: float,
+    slope: float,
     bins: Array,
     vbf_cut: Array,
     eta_cut: Array,
@@ -155,14 +155,17 @@ def hists_from_nn(
     # indexing is horrible I know
     # k index is sample index
     values = {k: data[k][:, 0, :] for k in data}
-    # it prints 0. but they are not
     weights = {k: data[k][:, 1, 0] for k in data}
 
     # apply cuts to weights
     if config.objective == "cls":
         for k in values.keys():
             cutted_weight = get_cut_weights(
-                values[k][:, -2], values[k][:, -1], vbf_cut, eta_cut, config.slope
+                values[k][:, -2],
+                values[k][:, -1],
+                vbf_cut,
+                eta_cut,
+                slope,
             )
 
             weights[k] *= cutted_weight
@@ -188,9 +191,6 @@ def hists_from_nn(
         "VR_xbb_2",
     ]
 
-    # need another bandwidth hist since we want sharp hists, though looses gradient
-    # sharp_hist = partial(hist, bandwidth=1e-4, bins=bins)
-
     # apply m_jj and eta_jj cut on the estimate_regions
     for reg in estimate_regions:
         cutted_weight_estimate = get_cut_weights(
@@ -198,7 +198,7 @@ def hists_from_nn(
             config.bkg_estimate[reg][:, 0, -1],
             vbf_cut,
             eta_cut,
-            config.slope,
+            slope,
         )
         bkg_estimate_data = config.bkg_estimate[reg]
 
@@ -207,28 +207,29 @@ def hists_from_nn(
             weights=cutted_weight_estimate,  # nominal weights are 1.0 since data
         )
 
-    # calculate stat error
-    NOSYS_stat_err = jnp.sqrt(
-        get_w2sum(
-            data=nn_output["NOSYS"],
-            weights=weights["NOSYS"],
-            bandwidth=bandwidth,
-            bins=bins,
+    if config.do_stat_error:
+        # calculate stat error
+        NOSYS_stat_err = jnp.sqrt(
+            get_w2sum(
+                data=nn_output["NOSYS"],
+                weights=weights["NOSYS"],
+                bandwidth=bandwidth,
+                bins=bins,
+            )
         )
-    )
-    bkg_stat_err = jnp.sqrt(
-        get_w2sum(
-            data=nn_output["bkg"],
-            weights=weights["bkg"],
-            bandwidth=bandwidth,
-            bins=bins,
+        bkg_stat_err = jnp.sqrt(
+            get_w2sum(
+                data=nn_output["bkg"],
+                weights=weights["bkg"],
+                bandwidth=bandwidth,
+                bins=bins,
+            )
         )
-    )
 
-    hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
-    hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
-    hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
-    hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
+        hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
+        hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
+        hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
+        hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
 
     if config.objective == "bce":
         hists["bkg"] *= w_CR
