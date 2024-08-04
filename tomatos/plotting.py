@@ -280,6 +280,7 @@ def hist(config, bins, yields, metrics):
             "bkg_stat_down",
             "NOSYS_stat_up",
             "NOSYS_stat_down",
+            "kde",
         ]
         if any([l == reg for reg in bkg_regions]):
             continue
@@ -336,12 +337,12 @@ def hist(config, bins, yields, metrics):
         #     break
 
     plt.plot(
-        np.linspace(0, 1, 99),
+        np.linspace(0, 1, 999),
         metrics["kde_signal"][metrics["best_epoch"]],
         label="kde signal",
     )
     plt.plot(
-        np.linspace(0, 1, 99),
+        np.linspace(0, 1, 999),
         metrics["kde_bkg"][metrics["best_epoch"]],
         label="kde bkg",
     )
