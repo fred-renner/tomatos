@@ -112,7 +112,6 @@ def run(
                 data=train,
             )
 
-
         # warm reset doesn't seem to work
         # if i % 20 == 0:
         #     state = solver.init_state(
@@ -222,8 +221,11 @@ def run(
         logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
         metrics["signal_approximation_diff"].append(signal_approximation_diff)
         metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
-        metrics["kde_signal"].append(kde["NOSYS"])
-        metrics["kde_bkg"].append(kde["bkg"])
+
+        metrics["kde_signal"].append(
+            rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
+        )
+        metrics["kde_bkg"].append(rescale_kde(histograms["bkg"], kde["bkg"], bins))
         # once some bin value is nan, everything breaks unrecoverable, also
         # re-init does not work
         if any(np.isnan(bins)):
@@ -285,6 +287,25 @@ def asimov_sig(s, b) -> float:
     return q0**0.5
 
 
+def rescale_kde(hist, kde, bins):
+    # find the largest bin of binned kde hist
+    max_bin_idx = jnp.argmax(hist)
+    # get the indices from the fined grained kde that would fall into each
+    # bin
+    splitted_kde = jnp.array_split(kde, len(bins) - 1)
+    # integrate the fine grained ones
+    kde_count = splitted_kde[max_bin_idx].sum()
+    # areas for both bins must be same when integerated
+    area_hist = hist[max_bin_idx] * (bins[max_bin_idx + 1] - bins[max_bin_idx])
+    kde_width = (bins[-1] - bins[0]) / len(kde)
+    area_kde = kde_count * kde_width
+
+    scale_factor = area_hist / area_kde
+    kde *= scale_factor
+
+    return kde
+
+
 def get_yields(config, nn, params, data):
     data_dct = {k: v for k, v in zip(config.data_types, data)}
     if config.do_m_hh:
@@ -310,7 +331,7 @@ def get_yields(config, nn, params, data):
         )
         # dont need them for all
         kde_dict = dict((k, data_dct[k]) for k in ("NOSYS", "bkg"))
-        kde_bins = jnp.linspace(bins[0], bins[-1], 100)
+        kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
         kde = tomatos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
             config=config,
@@ -324,6 +345,5 @@ def get_yields(config, nn, params, data):
         )
     if config.objective == "cls":
         yields["bkg"] *= w_CR
-        # kde["bkg"] *= w_CR * len(kde_bins) / len(bins)
-        # kde["NOSYS"] *= len(kde_bins) / len(bins)
+
     return yields, kde
