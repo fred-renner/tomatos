@@ -215,17 +215,20 @@ def run(
         def safe_divide(a, b):
             return jnp.where(b == 0, 0, a / b)
 
-        signal_approximation_diff = safe_divide(histograms["NOSYS"], yields["NOSYS"])
-        bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
-        logging.info(f"signal estimate diff: {signal_approximation_diff}")
-        logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
-        metrics["signal_approximation_diff"].append(signal_approximation_diff)
-        metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
+        if config.objective == "cls":
+            signal_approximation_diff = safe_divide(
+                histograms["NOSYS"], yields["NOSYS"]
+            )
+            bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
+            logging.info(f"signal estimate diff: {signal_approximation_diff}")
+            logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
+            metrics["signal_approximation_diff"].append(signal_approximation_diff)
+            metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
 
-        metrics["kde_signal"].append(
-            rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
-        )
-        metrics["kde_bkg"].append(rescale_kde(histograms["bkg"], kde["bkg"], bins))
+            metrics["kde_signal"].append(
+                rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
+            )
+            metrics["kde_bkg"].append(rescale_kde(histograms["bkg"], kde["bkg"], bins))
         # once some bin value is nan, everything breaks unrecoverable, also
         # re-init does not work
         if any(np.isnan(bins)):

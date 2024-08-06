@@ -56,9 +56,10 @@ def get_symmetric_up_down(nom, sys):
     down = 1 - relative
     # penalize when going below zero for down
     up = jnp.where(down < 0, up * (1 - down), up)
-    # promote more events in background estimate if less than 1 event in a bin
+    # promote more events in error estimate if less than 1 event in a bin
     # use this with care
-    up = jnp.where(sys < 1, up * (1 + (1 - sys)), up)
+    min_sys_value = 1
+    up = jnp.where(sys < min_sys_value, up * (1 + (min_sys_value - sys)), up)
     down = jnp.where(down < 0, 0, down)
     return up, down
 
