@@ -47,23 +47,24 @@ def plot_metrics(metrics, config):
         plt.figure(figsize=fig_size)
         plt.plot(
             epoch_grid,
-            metrics["cls_train"] / np.max(metrics["cls_train"]),
+            metrics["cls_train"],  # / np.max(metrics["cls_train"]),
             label=r"$CL_s$ train",
         )
         plt.plot(
             epoch_grid,
-            metrics["cls_valid"] / np.max(metrics["cls_valid"]),
+            metrics["cls_valid"],  # / np.max(metrics["cls_valid"]),
             label=r"$CL_s$ valid",
         )
         plt.plot(
             epoch_grid,
-            metrics["cls_test"] / np.max(metrics["cls_test"]),
+            metrics["cls_test"],  # / np.max(metrics["cls_test"]),
             label=r"$CL_s$ test",
         )
 
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
+        # plt.ylim([0, 1])
         plt.tight_layout()
         plot_path = config["results_path"] + "cls.pdf"
         ax = plt.gca()
@@ -337,14 +338,16 @@ def hist(config, bins, yields, metrics):
         #     break
 
     plt.plot(
-        np.linspace(0, 1, 999),
+        np.linspace(0, 1, len(metrics["kde_signal"][0])),
         metrics["kde_signal"][metrics["best_epoch"]],
         label="kde signal",
+        color="tab:orange",
     )
     plt.plot(
-        np.linspace(0, 1, 999),
+        np.linspace(0, 1, len(metrics["kde_bkg"][0])),
         metrics["kde_bkg"][metrics["best_epoch"]],
         label="kde bkg",
+        color="tab:blue",
     )
     plt.legend(fontsize=5, ncol=3)
 
