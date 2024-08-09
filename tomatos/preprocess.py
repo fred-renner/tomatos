@@ -74,6 +74,11 @@ def stack_inputs(
         # init array
         arr = np.zeros((ranged_n_events, 2, config.n_features))
         # fill per var
+
+        shufled_indices_table = {
+            # (n_var_events, idx_0, idx_1): [1, 3, 4,...],
+        }
+
         for i, var in enumerate(config.vars):
             var_name = var + "_" + sys + "." + region
             w_name = "weights_" + sys + "." + region
@@ -83,14 +88,28 @@ def stack_inputs(
             n_var_events = f[var_name].shape[0]
             idx_0 = int(np.floor(event_range[0] * n_var_events))
             idx_1 = int(np.floor(event_range[1] * n_var_events))
-            indices = np.arange(idx_0, idx_1)
 
+            # want shuffled indices
+            if (n_var_events, idx_0, idx_1) not in shufled_indices_table:
+                # Set a seed for reproducibility
+                np.random.seed(42)
+                shuffled_indices = np.arange(n_var_events)
+                np.random.shuffle(shuffled_indices)
+                indices = shuffled_indices[idx_0:idx_1]
+                # h5py requires increasing ordered indices
+                shufled_indices_table[(n_var_events, idx_0, idx_1)] = np.sort(indices)
+
+            indices = shufled_indices_table[(n_var_events, idx_0, idx_1)]
+            
             # up (or down) scale
-            arr[:, 0, i] = np.resize(f[var_name][indices], (ranged_n_events))
+            # load the whole array and select then because its much faster as
+            # h5py is really slow with single idx access. however this will run
+            # into trouble of course when datset become really large
+            arr[:, 0, i] = np.resize(f[var_name][:][indices], (ranged_n_events))
 
             # same for weights
             if is_mc:
-                arr[:, 1, i] = np.resize(f[w_name][indices], (ranged_n_events))
+                arr[:, 1, i] = np.resize(f[w_name][:][indices], (ranged_n_events))
             else:
                 arr[:, 1, i] = np.ones(ranged_n_events)
 
@@ -213,6 +232,7 @@ def get_max_events(config):
 
 def prepare_data(config):
     max_events = get_max_events(config)
+
     train = stack_data(config, max_events, event_range=[0.0, 0.8])
     # last values in arrays are somewhat shuffled as they are filled in the
     # order from large to small input files
