@@ -23,10 +23,12 @@ jax.config.update("jax_debug_nans", False)
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=5)
 parser.add_argument("--steps", type=int, default=200)
-parser.add_argument("--slope", type=int, default=256e3)
+parser.add_argument("--slope", type=int, default=16e3)
 parser.add_argument("--lr", type=float, default=0.001)
-parser.add_argument("--bw", type=float, default=0.14)
+parser.add_argument("--bw", type=float, default=0.16)
 parser.add_argument("--debug", action="store_true", default=False)
+parser.add_argument("--unc-estimate-min-count", type=float, default=1)
+
 
 args = parser.parse_args()
 
@@ -66,7 +68,6 @@ def run():
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=train)
-    config = tomatos.utils.delete_aux_data(config)
 
     results = {
         "config": tomatos.utils.to_python_lists(config.__dict__),

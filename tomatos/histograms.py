@@ -151,7 +151,8 @@ def hists_from_nn(
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs
     yields."""
-
+    vbf_cut *= 3
+    eta_cut *= 3
     # indexing is horrible I know
     # k index is sample index
     values = {k: data[k][:, 0, :] for k in data}
@@ -182,30 +183,6 @@ def hists_from_nn(
         k: make_hist(data=nn_output[k], weights=weights[k])
         for k, v in nn_output.items()
     }
-
-    # add VR and CR from data für bkg estimate
-    estimate_regions = [
-        "CR_xbb_1",
-        "CR_xbb_2",
-        "VR_xbb_1",
-        "VR_xbb_2",
-    ]
-
-    # apply m_jj and eta_jj cut on the estimate_regions
-    for reg in estimate_regions:
-        cutted_weight_estimate = get_cut_weights(
-            config.bkg_estimate[reg][:, 0, -2],
-            config.bkg_estimate[reg][:, 0, -1],
-            vbf_cut,
-            eta_cut,
-            slope,
-        )
-        bkg_estimate_data = config.bkg_estimate[reg]
-
-        hists[f"bkg_{reg}"] = make_hist(
-            data=jax.vmap(nn_apply)(bkg_estimate_data[:, 0, :]).ravel(),
-            weights=cutted_weight_estimate,  # nominal weights are 1.0 since data
-        )
 
     if config.do_stat_error:
         # calculate stat error
