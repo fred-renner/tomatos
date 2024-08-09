@@ -7,9 +7,9 @@ class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-l1cvv0cv1.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-run2.h5",
-            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut/dump-ps.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-l1cvv0cv1.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-run2.h5",
+            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-ps.h5",
         }
         # fmt: on
 
@@ -94,8 +94,9 @@ class Setup:
                 ]
             )  # rel 21 analysis
 
-        # if we would actually batch, would need to account for in weights...
-        self.batch_size = int(1e5)  # int is necessary
+        # Actual batching needs to implemented properly, e.g. account for in
+        # weights...currently not needed
+        self.batch_size = int(1e6)  # int is necessary
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
@@ -109,6 +110,10 @@ class Setup:
         self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
+        # promote minimum count for shape systematic estimate
+        self.unc_estimate_min_count = args.unc_estimate_min_count
+        # simple factor or binned transferfactor
+        self.binned_w_CR = False
 
         # if initialize parameters of a trained model
         self.preload_model = False
@@ -120,7 +125,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_no_bkg_shape/"
         elif self.objective == "bce":
             results_folder = (
                 f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}/"

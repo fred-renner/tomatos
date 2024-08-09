@@ -172,7 +172,7 @@ def plot_metrics(metrics, config):
 
         # ax = plt.gca()
         # ax.set_yscale("log")
-        plt.ylim(1, 3)
+        # plt.ylim(1, 3)
 
         plt.tight_layout()
         plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
@@ -275,13 +275,14 @@ def hist(config, bins, yields, metrics):
             "bkg_CR_xbb_2",
             "bkg_VR_xbb_1",
             "bkg_VR_xbb_2",
+            "bkg_VR_xbb_1_NW",
+            "bkg_VR_xbb_2_NW",
             "bkg_stat_up",
             "bkg_stat_down",
             "bkg_stat_up",
             "bkg_stat_down",
             "NOSYS_stat_up",
             "NOSYS_stat_down",
-            "kde",
         ]
         if any([l == reg for reg in bkg_regions]):
             continue

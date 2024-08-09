@@ -26,13 +26,17 @@ def get_generator_weight_envelope(hists):
     return envelope_up, envelope_down
 
 
-def get_bkg_weight(hists):
-    # simple transferfactor
-    CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
-    CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
-    # binned transferfactor
-    # CR_4b_Data = hists["bkg_CR_xbb_2"]
-    # CR_2b_Data = hists["bkg_CR_xbb_1"]
+def get_bkg_weight(hists, config):
+
+    if config.binned_w_CR:
+        # binned transferfactor
+        CR_4b_Data = hists["bkg_CR_xbb_2"]
+        CR_2b_Data = hists["bkg_CR_xbb_1"]
+    else:
+        # simple transferfactor
+        CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
+        CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
+
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
 
@@ -47,7 +51,7 @@ def get_bkg_weight(hists):
     return w_CR, err_w_CR
 
 
-def get_symmetric_up_down(nom, sys):
+def get_symmetric_up_down(nom, sys, min_sys_value=0):
     # it really does not like literally empty bins
     nom += 1e-15
     sys += 1e-15
@@ -58,8 +62,8 @@ def get_symmetric_up_down(nom, sys):
     up = jnp.where(down < 0, up * (1 - down), up)
     # promote more events in error estimate if less than 1 event in a bin
     # use this with care
-    min_sys_value = 1
-    up = jnp.where(sys < min_sys_value, up * (1 + (min_sys_value - sys)), up)
+    if min_sys_value != 0:
+        up = jnp.where(sys < min_sys_value, up * (1 + (min_sys_value - sys)), up)
     down = jnp.where(down < 0, 0, down)
     return up, down
 
@@ -72,7 +76,7 @@ def model_from_hists(
     do_stat_error: bool,
 ) -> pyhf.Model:
     """How to make your HistFactory model from your histograms."""
-    w_CR, err_w_CR = get_bkg_weight(hists)
+    w_CR, err_w_CR = get_bkg_weight(hists, config)
     rel_err_w_CR = err_w_CR / w_CR
 
     hists["bkg"] *= w_CR
@@ -83,8 +87,11 @@ def model_from_hists(
     bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
 
     bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
-        bkg_estimate_in_VR, hists["bkg_VR_xbb_2"]
+        bkg_estimate_in_VR,
+        hists["bkg_VR_xbb_2"],
+        min_sys_value=config.unc_estimate_min_count,
     )
+    print(hists["bkg_VR_xbb_2"])
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
 
@@ -176,14 +183,14 @@ def model_from_hists(
                         "lo_data": hists["bkg"] * (1 - rel_err_w_CR),
                     },
                 },
-                {
-                    "name": "bkg_estimate_shape",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": hists["bkg_shape_sys_up"],
-                        "lo_data": hists["bkg_shape_sys_down"],
-                    },
-                },
+                # {
+                #     "name": "bkg_estimate_shape",
+                #     "type": "histosys",
+                #     "data": {
+                #         "hi_data": hists["bkg_shape_sys_up"],
+                #         "lo_data": hists["bkg_shape_sys_down"],
+                #     },
+                # },
             )
         if config.do_stat_error:
             for i in range(len(config.bins) - 1):

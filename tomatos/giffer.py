@@ -103,9 +103,7 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
-    models = [
-        "tomatos_cls_5_500_slope_1000_lr_0p01_bw_0p2_no_stat_error_fit_tol_0p01"
-    ]
+    models = ["tomatos_cls_5_1000_slope_16000_lr_0p001_bw_0p16_slope_study"]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
@@ -126,7 +124,7 @@ if __name__ == "__main__":
             #     continue
             print(i)
             # loop over hists
-            plt.figure(figsize=(5, 4))
+            plt.figure(figsize=(10, 8))
             for hist_name in meta_data["config"]["data_types"]:
                 # if "JET" in hist_name or "GEN" in hist_name:
                 #     break
@@ -154,14 +152,29 @@ if __name__ == "__main__":
                 ax = plt.gca()
                 ylim = ax.get_ylim()
                 if ylim[1] > ymax:
-                    ymax = ylim[1]
-                ymax = 12
+                    ymax = ylim[1] * 1.3
+
                 ax.set_ylim([0, ymax])
 
             if meta_data["config"]["do_m_hh"]:
                 plt.xlabel("m$_{hh}$ (MeV)")
             else:
                 plt.xlabel("NN score")
+
+            if "kde_signal" in meta_data["metrics"]:
+                plt.plot(
+                    np.linspace(0, 1, len(meta_data["metrics"]["kde_signal"][0])),
+                    meta_data["metrics"]["kde_signal"][i],
+                    label="kde signal",
+                    color="tab:orange",
+                )
+                plt.plot(
+                    np.linspace(0, 1, len(meta_data["metrics"]["kde_bkg"][0])),
+                    meta_data["metrics"]["kde_bkg"][i],
+                    label="kde bkg",
+                    color="tab:blue",
+                )
+
             plt.stairs(
                 edges=meta_data["config"]["bins"],
                 values=meta_data["metrics"]["bkg"][i],
@@ -179,7 +192,7 @@ if __name__ == "__main__":
 
             plt.title(f"Epoch {i}")
             plt.ylabel("Events")
-            plt.legend(prop={"size": 5}, ncols=3)  # prop={"size": 6})
+            plt.legend(prop={"size": 5}, ncols=3,loc="upper center")  # prop={"size": 6})
             plt.tight_layout()
             plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=200)
             plt.close()

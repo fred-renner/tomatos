@@ -172,7 +172,9 @@ def run(
         # additional_logging(config, params, histograms)
 
         def unscale_value(value, idx):
-            # cut optimization is supported with rescaling of parameter in histograms.py
+            # cut optimization is supported with rescaling of parameter in
+            # histograms.py
+            value *= 3
             value -= config.scaler_min[idx]
             value /= config.scaler_scale[idx]
             return value
@@ -211,7 +213,7 @@ def run(
         logging.info(f"Z_A: {z_a:.8f}")
         metrics["Z_A"].append(z_a)
 
-        # # measure diff between true and estimated hist
+        # # # measure diff between true and estimated hist
         def safe_divide(a, b):
             return jnp.where(b == 0, 0, a / b)
 
@@ -318,9 +320,7 @@ def get_yields(config, nn, params, data):
             bins=params["bins"] if config.include_bins else config.bins,
         )
     else:
-        bins = (
-            jnp.array([0, *params["bins"], 1]) if config.include_bins else config.bins
-        )
+        bins = params["bins"] if config.include_bins else config.bins
         yields = tomatos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
             config=config,
@@ -347,6 +347,8 @@ def get_yields(config, nn, params, data):
             bins=kde_bins,
         )
     if config.objective == "cls":
-        yields["bkg"] *= w_CR
+        for y in yields.keys():
+            if "bkg" in y:
+                yields[y] *= w_CR
 
     return yields, kde
