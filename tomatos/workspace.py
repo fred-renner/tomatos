@@ -91,7 +91,7 @@ def model_from_hists(
         hists["bkg_VR_xbb_2"],
         min_sys_value=config.unc_estimate_min_count,
     )
-    print(hists["bkg_VR_xbb_2"])
+
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
 
