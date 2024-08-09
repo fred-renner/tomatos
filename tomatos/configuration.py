@@ -125,7 +125,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_no_bkg_shape/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_no_bkg_shape_shuffling/"
         elif self.objective == "bce":
             results_folder = (
                 f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}/"

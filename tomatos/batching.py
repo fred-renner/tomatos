@@ -16,31 +16,6 @@ def split_data(data, ratio):
     return train, test
 
 
-def adjust_weights(config, train, valid, test):
-    # Calculate weight adjustments for each split
-    # such that weights match the original hist counts for each data set
-    train_weight_adjustment = 1 / config.train_valid_ratio
-    valid_weight_adjustment = (1 / (1 - config.train_valid_ratio)) * (
-        1 / config.valid_test_ratio
-    )
-    test_weight_adjustment = (1 / (1 - config.train_valid_ratio)) * (
-        1 / (1 - config.valid_test_ratio)
-    )
-
-    # Apply weight adjustments to the training data
-    for n in range(len(train)):
-        train[n][:, 1, :] *= train_weight_adjustment
-
-    # Apply weight adjustments to the validation data
-    for n in range(len(valid)):
-        valid[n][:, 1, :] *= valid_weight_adjustment
-
-    # Apply weight adjustments to the test data
-    for n in range(len(test)):
-        test[n][:, 1, :] *= test_weight_adjustment
-    return train, valid, test
-
-
 def make_iterator(train, batch_size):
     def batches(training_data: Array, batch_size: int) -> Generator:
         num_train = training_data[0].shape[0]
