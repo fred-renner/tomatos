@@ -99,8 +99,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = config.cuts_init
-            init_pars["eta_cut"] = config.cuts_init
+            init_pars["vbf_cut"] = config.cuts_init / config.cuts_factor
+            init_pars["eta_cut"] = config.cuts_init / config.cuts_factor
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -174,7 +174,7 @@ def run(
         def unscale_value(value, idx):
             # cut optimization is supported with rescaling of parameter in
             # histograms.py
-            value *= config.cuts_push
+            value *= config.cuts_factor
             value -= config.scaler_min[idx]
             value /= config.scaler_scale[idx]
             return value

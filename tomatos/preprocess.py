@@ -230,8 +230,8 @@ def prepare_data(config):
     train = stack_data(config, max_events, event_range=[0.0, 0.8])
     # last values in arrays are somewhat shuffled as they are filled in the
     # order from large to small input files
-    valid = stack_data(config, max_events, event_range=[0.8, 0.99])
-    test = stack_data(config, max_events, event_range=[0.99, 1.0])
+    valid = stack_data(config, max_events, event_range=[0.8, 0.9])
+    test = stack_data(config, max_events, event_range=[0.9, 1.0])
 
     train, valid, test, scaler = min_max_norm(train, valid, test)
 
