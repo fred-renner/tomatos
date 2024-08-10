@@ -29,6 +29,7 @@ parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--bw", type=float, default=0.16)
 parser.add_argument("--debug", action="store_true", default=False)
 parser.add_argument("--unc-estimate-min-count", type=float, default=0)
+parser.add_argument("--k-fold", type=int, default=0)
 
 
 args = parser.parse_args()
@@ -67,6 +68,11 @@ def run():
         init_pars=init_pars,
         nn=nn,
     )
+
+    # save best epoch
+    with open(config.best_epoch_results_path, "w") as file:
+        json.dump(tomatos.utils.to_python_lists(metrics["best_results"]), file)
+        logging.info(config.best_epoch_results_path)
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=train)
 
