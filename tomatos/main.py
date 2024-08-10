@@ -13,6 +13,7 @@ import tomatos.utils
 import json
 import numpy as np
 import pprint
+
 jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
 JAX_CHECK_TRACER_LEAKS = True
 jax.config.update("jax_enable_x64", True)
@@ -28,8 +29,6 @@ parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--bw", type=float, default=0.16)
 parser.add_argument("--debug", action="store_true", default=False)
 parser.add_argument("--unc-estimate-min-count", type=float, default=0)
-parser.add_argument("--cuts-push", type=float, default=1)
-parser.add_argument("--cuts-init", type=float, default=0.005)
 
 
 args = parser.parse_args()

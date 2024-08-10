@@ -116,13 +116,18 @@ class Setup:
         self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
+        # cuts scaled to parameter range [0,1]
+        self.cuts_init = 0.001
+        # scale cut parameter to increase wiggling
+        self.cuts_push = 1
+        # scale factor for k-folds
+        self.n_k_folds = 2
+        # simple factor or binned transferfactor
+        self.binned_w_CR = False
+
         # promote minimum count for shape systematic estimate
         # 0 turns it off
         self.unc_estimate_min_count = args.unc_estimate_min_count
-        self.cuts_init=args.cuts_init
-        self.cuts_push=args.cuts_push
-        # simple factor or binned transferfactor
-        self.binned_w_CR = False
 
         # if initialize parameters of a trained model
         self.preload_model = False
@@ -134,7 +139,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_0_cuts_init_{self.cuts_init}_cuts_push_{self.cuts_push}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_0/"
             # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
         elif self.objective == "bce":
             results_folder = (

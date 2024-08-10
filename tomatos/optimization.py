@@ -144,19 +144,6 @@ def run(
             slope=1e6,
         )
 
-
-        print("valid")
-        print(valid_hists["NOSYS"])
-        print(valid_hists["bkg"])
-        print(valid_hists["bkg_VR_xbb_2"])
-        print()
-
-        print("test")
-        print(test_hists["NOSYS"])
-        print(test_hists["bkg"])
-        print(test_hists["bkg_VR_xbb_2"])
-        print()
-
         metrics[f"{config.objective}_valid"].append(valid_result)
         metrics[f"{config.objective}_test"].append(test_result)
         logging.info(
@@ -174,12 +161,6 @@ def run(
             for k in histograms.keys():
                 metrics[k] = []
 
-
-        print("train")
-        print(histograms["NOSYS"])
-        print(histograms["bkg"])
-        print(histograms["bkg_VR_xbb_2"])
-        print()
         bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
         if config.include_bins:
