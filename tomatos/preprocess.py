@@ -117,10 +117,8 @@ def stack_inputs(
             selected_sf = n_events / ranged_n_events
             # amount for actual up/down scaling of values
             rescale_sf = len(indices) / ranged_n_events
-            # amount for splitting of data
-            k_fold_factor = 2
-
-            arr[:, 1, i] *= selected_sf * rescale_sf * k_fold_factor
+            # amount for k-fold splits
+            arr[:, 1, i] *= selected_sf * rescale_sf * config.n_k_folds
 
         return arr
 
