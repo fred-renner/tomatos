@@ -18,6 +18,7 @@ class Setup:
             # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-ps.h5",
         }
         # fmt: on
+        k_fold = 0 if "k_0" in self.files["run2"] else 1
 
         self.do_m_hh = False
         self.include_bins = False
@@ -108,7 +109,7 @@ class Setup:
         self.lr = args.lr
         # one step is one batch, not epoch
         if self.debug:
-            self.num_steps = 5
+            self.num_steps = 10
         else:
             self.num_steps = args.steps
 
@@ -119,7 +120,7 @@ class Setup:
         # cuts scaled to parameter range [0,1]
         self.cuts_init = 0.001
         # scale cut parameter to increase wiggling
-        self.cuts_push = 1
+        self.cuts_factor = 1
         # scale factor for k-folds
         self.n_k_folds = 2
         # simple factor or binned transferfactor
@@ -139,7 +140,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_0/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{k_fold}/"
             # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
         elif self.objective == "bce":
             results_folder = (
