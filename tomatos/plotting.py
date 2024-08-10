@@ -64,7 +64,7 @@ def plot_metrics(metrics, config):
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
-        # plt.ylim([0, 1])
+        plt.ylim([0, np.max(metrics["cls_train"])*1.1])
         plt.tight_layout()
         plot_path = config["results_path"] + "cls.pdf"
         ax = plt.gca()

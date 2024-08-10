@@ -7,9 +7,15 @@ class Setup:
     def __init__(self, args):
         # fmt: off
         self.files = {
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-l1cvv0cv1.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-run2.h5",
-            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-ps.h5",
+            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-l1cvv0cv1.h5",
+            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-run2.h5",
+            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-ps.h5",
+            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-l1cvv0cv1.h5",
+            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-run2.h5",
+            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-ps.h5",
+            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-l1cvv0cv1.h5", 
+            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-run2.h5",
+            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-ps.h5",
         }
         # fmt: on
 
@@ -111,7 +117,10 @@ class Setup:
         # can choose from "cls", "discovery", "bce"
         self.objective = "cls"
         # promote minimum count for shape systematic estimate
+        # 0 turns it off
         self.unc_estimate_min_count = args.unc_estimate_min_count
+        self.cuts_init=args.cuts_init
+        self.cuts_push=args.cuts_push
         # simple factor or binned transferfactor
         self.binned_w_CR = False
 
@@ -125,7 +134,8 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_no_bkg_shape_shuffling/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_0_cuts_init_{self.cuts_init}_cuts_push_{self.cuts_push}/"
+            # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
         elif self.objective == "bce":
             results_folder = (
                 f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}/"

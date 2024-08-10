@@ -12,7 +12,7 @@ import tomatos.preprocess
 import tomatos.utils
 import json
 import numpy as np
-
+import pprint
 jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
 JAX_CHECK_TRACER_LEAKS = True
 jax.config.update("jax_enable_x64", True)
@@ -27,7 +27,9 @@ parser.add_argument("--slope", type=int, default=16e3)
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--bw", type=float, default=0.16)
 parser.add_argument("--debug", action="store_true", default=False)
-parser.add_argument("--unc-estimate-min-count", type=float, default=1)
+parser.add_argument("--unc-estimate-min-count", type=float, default=0)
+parser.add_argument("--cuts-push", type=float, default=1)
+parser.add_argument("--cuts-init", type=float, default=0.005)
 
 
 args = parser.parse_args()
@@ -46,7 +48,7 @@ def run():
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
-    logging.info(json.dumps(tomatos.utils.to_python_lists(config.__dict__), indent=4))
+    pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
 
     train, valid, test = tomatos.preprocess.prepare_data(config)
     logging.info(f"datasets: {len(train)}")

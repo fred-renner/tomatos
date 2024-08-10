@@ -103,7 +103,7 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
-    models = ["tomatos_cls_5_1000_slope_16000_lr_0p001_bw_0p16_slope_study"]
+    models = ["tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16"]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"

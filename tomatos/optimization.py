@@ -99,8 +99,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = 0.0
-            init_pars["eta_cut"] = 0.0
+            init_pars["vbf_cut"] = config.cuts_init
+            init_pars["eta_cut"] = config.cuts_init
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -129,14 +129,14 @@ def run(
 
         # Evaluate losses.
         # small bandwidth + large slope for true hists
-        valid_result = loss(
+        valid_result, valid_hists = loss(
             params,
             data=valid,
             loss_type=config.objective,
             bandwidth=1e-6,
             slope=1e6,
         )
-        test_result = loss(
+        test_result, test_hists = loss(
             params,
             data=test,
             loss_type=config.objective,
@@ -144,8 +144,21 @@ def run(
             slope=1e6,
         )
 
-        metrics[f"{config.objective}_valid"].append(valid_result[0])
-        metrics[f"{config.objective}_test"].append(test_result[0])
+
+        print("valid")
+        print(valid_hists["NOSYS"])
+        print(valid_hists["bkg"])
+        print(valid_hists["bkg_VR_xbb_2"])
+        print()
+
+        print("test")
+        print(test_hists["NOSYS"])
+        print(test_hists["bkg"])
+        print(test_hists["bkg_VR_xbb_2"])
+        print()
+
+        metrics[f"{config.objective}_valid"].append(valid_result)
+        metrics[f"{config.objective}_test"].append(test_result)
         logging.info(
             f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.8f}"
         )
@@ -161,6 +174,12 @@ def run(
             for k in histograms.keys():
                 metrics[k] = []
 
+
+        print("train")
+        print(histograms["NOSYS"])
+        print(histograms["bkg"])
+        print(histograms["bkg_VR_xbb_2"])
+        print()
         bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
         if config.include_bins:
@@ -174,7 +193,7 @@ def run(
         def unscale_value(value, idx):
             # cut optimization is supported with rescaling of parameter in
             # histograms.py
-            value *= 3
+            value *= config.cuts_push
             value -= config.scaler_min[idx]
             value /= config.scaler_scale[idx]
             return value
