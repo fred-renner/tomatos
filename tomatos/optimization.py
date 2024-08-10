@@ -197,14 +197,6 @@ def run(
             f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.8f}"
         )
 
-        # pick best training from valid.
-        objective = config.objective + "_valid"
-        if metrics[objective][-1] < best_valid_loss:
-            best_params = params
-            best_valid_loss = metrics[objective][-1]
-            metrics["best_epoch"] = i
-            logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
-
         # get yields from sharp hists using training data set
         yields, kde = get_yields(config, nn, params, train)
 
@@ -237,6 +229,35 @@ def run(
             sys.exit(
                 "\n\033[0;31m" + f"ERROR: I tried bad bins: {metrics['bins'][i-1]}"
             )
+
+        # pick best training from valid.
+        objective = config.objective + "_valid"
+        if metrics[objective][-1] < best_valid_loss:
+            best_params = params
+            best_valid_loss = metrics[objective][-1]
+            metrics["best_results"] = {
+                "epoch": i,
+                "train_loss": metrics[f"{config.objective}_train"][-1],
+                "valid_loss": metrics[f"{config.objective}_valid"][-1],
+                "test_loss": metrics[f"{config.objective}_test"][-1],
+                "vbf_cut": optimized_m_jj,
+                "eta_cut": optimized_eta_jj,
+                "Z_A": z_a,
+                "bins": bins if config.include_bins else None,
+                "signal_approximation_diff": (
+                    metrics.get("signal_approximation_diff", [])[-1]
+                    if config.objective == "cls"
+                    else None
+                ),
+                "bkg_approximation_diff": (
+                    metrics.get("bkg_approximation_diff", [])[-1]
+                    if config.objective == "cls"
+                    else None
+                ),
+                "histograms": histograms,
+            }
+
+            logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
 
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")

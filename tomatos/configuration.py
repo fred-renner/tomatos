@@ -5,20 +5,12 @@ import numpy as np
 
 class Setup:
     def __init__(self, args):
-        # fmt: off
+
         self.files = {
-            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-l1cvv0cv1.h5",
-            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-run2.h5",
-            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_no_vbf_cut_vr_split/dump-ps.h5",
-            "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-l1cvv0cv1.h5",
-            "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-run2.h5",
-            "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_0/dump-ps.h5",
-            # "k2v0": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-l1cvv0cv1.h5", 
-            # "run2": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-run2.h5",
-            # "ps": "/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_1/dump-ps.h5",
+            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-run2.h5",
+            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-ps.h5",
         }
-        # fmt: on
-        k_fold = 0 if "k_0" in self.files["run2"] else 1
 
         self.do_m_hh = False
         self.include_bins = False
@@ -140,7 +132,7 @@ class Setup:
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{k_fold}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{args.k_fold}/"
             # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
         elif self.objective == "bce":
             results_folder = (
@@ -154,3 +146,5 @@ class Setup:
             os.makedirs(self.results_path)
 
         self.metadata_file_path = self.results_path + "metadata.json"
+
+        self.best_epoch_results_path = self.results_path + "best_epoch_results.json"
