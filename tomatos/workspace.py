@@ -58,8 +58,6 @@ def get_symmetric_up_down(nom, sys, min_sys_value=0):
     relative = jnp.abs((nom - sys) / nom)
     up = 1 + relative
     down = 1 - relative
-    # penalize when going below zero for down
-    up = jnp.where(down < 0, up * (1 - down), up)
     # promote more events in error estimate if less than 1 event in a bin
     # use this with care
     if min_sys_value != 0:
@@ -183,14 +181,14 @@ def model_from_hists(
                         "lo_data": hists["bkg"] * (1 - rel_err_w_CR),
                     },
                 },
-                # {
-                #     "name": "bkg_estimate_shape",
-                #     "type": "histosys",
-                #     "data": {
-                #         "hi_data": hists["bkg_shape_sys_up"],
-                #         "lo_data": hists["bkg_shape_sys_down"],
-                #     },
-                # },
+                {
+                    "name": "bkg_estimate_shape",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["bkg_shape_sys_up"],
+                        "lo_data": hists["bkg_shape_sys_down"],
+                    },
+                },
             )
         if config.do_stat_error:
             for i in range(len(config.bins) - 1):

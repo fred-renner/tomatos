@@ -70,7 +70,9 @@ def pipeline(
     model = tomatos.workspace.model_from_hists(
         do_m_hh, hists, config, do_systematics, do_stat_error
     )
-
+    # fit_lr is the fit tolerance (same value as used by MINOS)
+    # can speed up if model converges early by reducing fit iterations in
+    # relaxed hypotest
     return (
         neos.loss_from_model(model, loss=loss_type, fit_lr=1e-3),
         hists,

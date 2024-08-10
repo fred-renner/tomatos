@@ -9,7 +9,6 @@ def stack_inputs(
     region,
     n_events=0,
     sys="NOSYS",
-    rescale_weights=True,
     event_range=[0.0, 0.8],
 ):
     """make array of input variables and attach desired weights to keep the
@@ -100,7 +99,7 @@ def stack_inputs(
                 shufled_indices_table[(n_var_events, idx_0, idx_1)] = np.sort(indices)
 
             indices = shufled_indices_table[(n_var_events, idx_0, idx_1)]
-            
+
             # up (or down) scale
             # load the whole array and select then because its much faster as
             # h5py is really slow with single idx access. however this will run
@@ -118,9 +117,10 @@ def stack_inputs(
             selected_sf = n_events / ranged_n_events
             # amount for actual up/down scaling of values
             rescale_sf = len(indices) / ranged_n_events
-            # apply to weights
-            if rescale_weights:
-                arr[:, 1, i] *= selected_sf * rescale_sf
+            # amount for splitting of data
+            k_fold_factor = 2
+
+            arr[:, 1, i] *= selected_sf * rescale_sf * k_fold_factor
 
         return arr
 
@@ -158,7 +158,6 @@ def stack_data(config, max_events, event_range):
         config,
         region="SR_xbb_1",
         n_events=max_events,
-        rescale_weights=True,
         event_range=event_range,
     )
 
@@ -169,7 +168,6 @@ def stack_data(config, max_events, event_range):
             region="SR_xbb_2",
             n_events=max_events,
             sys=sys,
-            rescale_weights=True,
             event_range=event_range,
         )
 
@@ -179,7 +177,6 @@ def stack_data(config, max_events, event_range):
         region="SR_xbb_2",
         n_events=max_events,
         sys="NOSYS",
-        rescale_weights=True,
         event_range=event_range,
     )
 
@@ -196,7 +193,6 @@ def stack_data(config, max_events, event_range):
             region=reg,
             n_events=max_events,
             sys="NOSYS",
-            rescale_weights=True,
             event_range=event_range,
         )
 
@@ -236,8 +232,8 @@ def prepare_data(config):
     train = stack_data(config, max_events, event_range=[0.0, 0.8])
     # last values in arrays are somewhat shuffled as they are filled in the
     # order from large to small input files
-    valid = stack_data(config, max_events, event_range=[0.8, 0.9])
-    test = stack_data(config, max_events, event_range=[0.9, 1.0])
+    valid = stack_data(config, max_events, event_range=[0.8, 0.99])
+    test = stack_data(config, max_events, event_range=[0.99, 1.0])
 
     train, valid, test, scaler = min_max_norm(train, valid, test)
 

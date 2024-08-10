@@ -151,8 +151,9 @@ def hists_from_nn(
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs
     yields."""
-    vbf_cut *= 3
-    eta_cut *= 3
+    # help the optimization a bit for cut parameters --> coupled to lr 
+    vbf_cut *= config.cuts_push
+    eta_cut *= config.cuts_push
     # indexing is horrible I know
     # k index is sample index
     values = {k: data[k][:, 0, :] for k in data}
