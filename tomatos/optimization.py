@@ -166,26 +166,10 @@ def run(
         if config.include_bins:
             logging.info((f"next bin edges: {bins}"))
             metrics["bins"].append(bins)
-        logging.info((f"hist sig: {histograms['NOSYS']}"))
-        logging.info((f"hist bkg: {histograms['bkg']}"))
+        logging.info((f"bKDE hist sig: {histograms['NOSYS']}"))
+        logging.info((f"bKDE hist bkg: {histograms['bkg']}"))
 
         # additional_logging(config, params, histograms)
-
-        def unscale_value(value, idx):
-            # cut optimization is supported with rescaling of parameter in
-            # histograms.py
-            value *= config.cuts_factor
-            value -= config.scaler_min[idx]
-            value /= config.scaler_scale[idx]
-            return value
-
-        optimized_m_jj = unscale_value(params["vbf_cut"], -2)
-        optimized_eta_jj = unscale_value(params["eta_cut"], -1)
-
-        logging.info(f"vbf cut: {optimized_m_jj}")
-        logging.info(f"eta cut: {optimized_eta_jj}")
-        metrics["vbf_cut"].append(optimized_m_jj)
-        metrics["eta_cut"].append(optimized_eta_jj)
 
         for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
@@ -210,6 +194,23 @@ def run(
             return jnp.where(b == 0, 0, a / b)
 
         if config.objective == "cls":
+
+            def unscale_value(value, idx):
+                # cut optimization is supported with rescaling of parameter in
+                # histograms.py
+                value *= config.cuts_factor
+                value -= config.scaler_min[idx]
+                value /= config.scaler_scale[idx]
+                return value
+
+            optimized_m_jj = unscale_value(params["vbf_cut"], -2)
+            optimized_eta_jj = unscale_value(params["eta_cut"], -1)
+
+            logging.info(f"vbf cut: {optimized_m_jj}")
+            logging.info(f"eta cut: {optimized_eta_jj}")
+            metrics["vbf_cut"].append(optimized_m_jj)
+            metrics["eta_cut"].append(optimized_eta_jj)
+
             signal_approximation_diff = safe_divide(
                 histograms["NOSYS"], yields["NOSYS"]
             )
@@ -223,6 +224,7 @@ def run(
                 rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
             )
             metrics["kde_bkg"].append(rescale_kde(histograms["bkg"], kde["bkg"], bins))
+
         # once some bin value is nan, everything breaks unrecoverable, also
         # re-init does not work
         if any(np.isnan(bins)):
@@ -240,23 +242,23 @@ def run(
                 "train_loss": metrics[f"{config.objective}_train"][-1],
                 "valid_loss": metrics[f"{config.objective}_valid"][-1],
                 "test_loss": metrics[f"{config.objective}_test"][-1],
-                "vbf_cut": optimized_m_jj,
-                "eta_cut": optimized_eta_jj,
                 "Z_A": z_a,
                 "bins": bins if config.include_bins else None,
-                "signal_approximation_diff": (
-                    metrics.get("signal_approximation_diff", [])[-1]
-                    if config.objective == "cls"
-                    else None
-                ),
-                "bkg_approximation_diff": (
-                    metrics.get("bkg_approximation_diff", [])[-1]
-                    if config.objective == "cls"
-                    else None
-                ),
                 "histograms": histograms,
             }
-
+            if config.objective == "cls":
+                metrics.update(
+                    {
+                        "vbf_cut": optimized_m_jj,
+                        "eta_cut": optimized_eta_jj,
+                        "signal_approximation_diff": (
+                            metrics["signal_approximation_diff"][-1]
+                        ),
+                        "bkg_approximation_diff": (
+                            metrics["bkg_approximation_diff"][-1]
+                        ),
+                    }
+                )
             logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
 
         end = perf_counter()
