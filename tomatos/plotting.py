@@ -33,238 +33,11 @@ def interpolate_gaps(values, limit=None):
     return filled
 
 
-def plot_metrics(metrics, config):
-    plt.rcParams.update({"font.size": 16})
-    # plt.rcParams["lines.linewidth"] = 0.9
-    epoch_grid = range(1, config["num_steps"] + 1)
-
-    # cls
-    if len(metrics["cls_train"]) > 0:
-        # lets account for possible nan's
-        metrics["cls_train"] = interpolate_gaps(np.array(metrics["cls_train"]))
-        metrics["cls_valid"] = interpolate_gaps(np.array(metrics["cls_valid"]))
-        metrics["cls_test"] = interpolate_gaps(np.array(metrics["cls_test"]))
-        plt.figure(figsize=fig_size)
-        plt.plot(
-            epoch_grid,
-            metrics["cls_train"],  # / np.max(metrics["cls_train"]),
-            label=r"$CL_s$ train",
-        )
-        plt.plot(
-            epoch_grid,
-            metrics["cls_valid"],  # / np.max(metrics["cls_valid"]),
-            label=r"$CL_s$ valid",
-        )
-        plt.plot(
-            epoch_grid,
-            metrics["cls_test"],  # / np.max(metrics["cls_test"]),
-            label=r"$CL_s$ test",
-        )
-
-        plt.legend()
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.ylim([0, np.max(metrics["cls_train"])*1.1])
-        plt.tight_layout()
-        plot_path = config["results_path"] + "cls.pdf"
-        ax = plt.gca()
-        # ax.set_yscale("log")
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-    # bce
-    if len(metrics["bce_train"]) > 0:
-        plt.figure(figsize=fig_size)
-        # scale train test for visual comparison
-        # could also do ratio, maybe better
-        # scale = metrics["cls_test"][0] / metrics["cls_train"][0]
-        plt.plot(epoch_grid, metrics["bce_train"], label=r"bce train")
-        plt.plot(epoch_grid, metrics["bce_valid"], label=r"bce valid")
-        plt.plot(epoch_grid, metrics["bce_test"], label=r"bce test")
-        # plt.plot(epoch_grid, scale * metrics["cls_train"], label=r"$CL_s$ train (scaled)")
-        plt.legend()
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        ax = plt.gca()
-        # ax.set_yscale("log")
-        plt.tight_layout()
-        plot_path = config["results_path"] + "bce.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-    # Z_A
-    plt.figure(figsize=fig_size)
-    plt.plot(epoch_grid, metrics["Z_A"], label="Asimov Significance")
-    plt.legend()
-    plt.xlabel("Epoch")
-    plt.ylabel(r"$Z_A$")
-    plt.tight_layout()
-    plot_path = config["results_path"] + "Z_A.pdf"
-    print(plot_path)
-    plt.savefig(plot_path)
-    plt.close()
-
-    # bins
-    if len(metrics["bins"]) > 0:
-        plt.figure(figsize=fig_size)
-        for i, bins in enumerate(metrics["bins"]):
-            if config["do_m_hh"] and config["include_bins"]:
-                bins = (np.array(bins) - config["scaler_min"][0]) / config[
-                    "scaler_scale"
-                ][0]
-                plt.xlabel("m$_{hh}$ (MeV)")
-            else:
-                plt.xlabel("NN score")
-                # plt.xlim([0, 1])
-            plt.vlines(x=bins, ymin=i, ymax=i + 1)
-            plt.ylabel("epoch")
-        plt.tight_layout()
-        plot_path = config["results_path"] + "bins.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-    plt.rcParams["lines.linewidth"] = 1
-
-    # cuts
-    if len(np.array(metrics["vbf_cut"])) > 0:
-        fig, ax1 = plt.subplots(figsize=fig_size)
-        color = "tab:red"
-        ax1.set_xlabel("Epoch")
-        ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
-        ax1.plot(np.array(metrics["vbf_cut"]) * 1e-6, color=color)
-        ax1.tick_params(axis="y", labelcolor=color)
-
-        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
-
-        color = "tab:blue"
-        ax2.set_ylabel(
-            r"$|\Delta\eta(j,j)|$", color=color
-        )  # we already handled the x-label with ax1
-        ax2.plot(metrics["eta_cut"], color=color)
-        ax2.tick_params(axis="y", labelcolor=color)
-
-        fig.tight_layout()  # otherwise the right y-label is slightly clipped
-
-        plt.xlabel("Epoch")
-        plt.tight_layout()
-        plot_path = config["results_path"] + "cuts.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-    if "bkg_shape_sys_up" in metrics.keys():
-        plt.figure(figsize=(10, 4))
-        up = np.array(metrics["bkg_shape_sys_up"])
-        down = np.array(metrics["bkg_shape_sys_down"])
-        bkg = np.array(metrics["bkg"])
-        rel_up = up / bkg
-        # rel_down=down/bkg
-        # only up because symmetrized
-        for i in range(len(metrics["bkg_shape_sys_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        # plt.axvline(x=185,color="black",label="Epoch 185")
-        plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
-        plt.legend()
-
-        # ax = plt.gca()
-        # ax.set_yscale("log")
-        # plt.ylim(1, 3)
-
-        plt.tight_layout()
-        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-
-    if "ps_up" in metrics.keys():
-        plt.figure(figsize=(10, 4))
-        up = np.array(metrics["ps_up"])
-        down = np.array(metrics["ps_down"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-        # rel_down=down/bkg
-        # only up because symmetrized
-        for i in range(len(metrics["ps_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        # plt.axvline(x=185,color="black",label="Epoch 185")
-        plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
-        plt.legend()
-        plt.tight_layout()
-
-        plot_path = config["results_path"] + "ps_rel_error.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-
-    if "xbb_pt_bin_3" in metrics.keys():
-        plt.figure(figsize=(10, 4))
-        up = np.array(metrics["xbb_pt_bin_3__1up"])
-        down = np.array(metrics["ps_down"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-        # rel_down=down/bkg
-        # only up because symmetrized
-        for i in range(len(metrics["ps_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        # plt.axvline(x=185,color="black",label="Epoch 185")
-        plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
-        plt.legend()
-        plt.tight_layout()
-
-        plot_path = config["results_path"] + "xbb_pt_bin_3_rel_error.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-
-    if "signal_approximation_diff" in metrics.keys():
-        plt.figure(figsize=(10, 4))
-        up = np.array(metrics["signal_approximation_diff"])
-
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-        # rel_down=down/bkg
-        # only up because symmetrized
-        for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        # plt.axvline(x=185,color="black",label="Epoch 185")
-        plt.xlabel("Epoch")
-        plt.ylabel("Binned KDE/Nominal")
-        plt.legend()
-        plt.tight_layout()
-
-        plot_path = config["results_path"] + "signal_approximation_diff.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-
-    if "bkg_approximation_diff" in metrics.keys():
-        plt.figure(figsize=(10, 4))
-        up = np.array(metrics["bkg_approximation_diff"])
-
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-        # rel_down=down/bkg
-        # only up because symmetrized
-        for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        # plt.axvline(x=185,color="black",label="Epoch 185")
-        plt.xlabel("Epoch")
-        plt.ylabel("Binned KDE/Nominal")
-        plt.legend()
-        plt.tight_layout()
-
-        plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
+import matplotlib.pyplot as plt
+import numpy as np
 
 
-def hist(config, bins, yields, metrics):
+def plot_hist(config, bins, yields, metrics):
     fig = plt.figure(figsize=fig_size)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         # if "JET" in l or "GEN" in l:
@@ -337,19 +110,19 @@ def hist(config, bins, yields, metrics):
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
-
-    plt.plot(
-        np.linspace(0, 1, len(metrics["kde_signal"][0])),
-        metrics["kde_signal"][metrics["best_epoch"]],
-        label="kde signal",
-        color="tab:orange",
-    )
-    plt.plot(
-        np.linspace(0, 1, len(metrics["kde_bkg"][0])),
-        metrics["kde_bkg"][metrics["best_epoch"]],
-        label="kde bkg",
-        color="tab:blue",
-    )
+    if config["objective"] == "cls":
+        plt.plot(
+            np.linspace(0, 1, len(metrics["kde_signal"][0])),
+            metrics["kde_signal"][metrics["best_epoch"]],
+            label="kde signal",
+            color="tab:orange",
+        )
+        plt.plot(
+            np.linspace(0, 1, len(metrics["kde_bkg"][0])),
+            metrics["kde_bkg"][metrics["best_epoch"]],
+            label="kde bkg",
+            color="tab:blue",
+        )
     plt.legend(fontsize=5, ncol=3)
 
     plt.stairs(
@@ -384,3 +157,224 @@ def hist(config, bins, yields, metrics):
     plt.tight_layout()
     print(config["results_path"] + "hist.pdf")
     plt.savefig(config["results_path"] + "hist.pdf")
+
+
+def plot_cls(metrics, config, epoch_grid, fig_size):
+    if len(metrics["cls_train"]) > 0:
+        metrics["cls_train"] = interpolate_gaps(np.array(metrics["cls_train"]))
+        metrics["cls_valid"] = interpolate_gaps(np.array(metrics["cls_valid"]))
+        metrics["cls_test"] = interpolate_gaps(np.array(metrics["cls_test"]))
+
+        plt.figure(figsize=fig_size)
+        plt.plot(epoch_grid, metrics["cls_train"], label=r"$CL_s$ train")
+        plt.plot(epoch_grid, metrics["cls_valid"], label=r"$CL_s$ valid")
+        plt.plot(epoch_grid, metrics["cls_test"], label=r"$CL_s$ test")
+
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.ylim([0, np.max(metrics["cls_train"]) * 1.1])
+        plt.tight_layout()
+        plot_path = config["results_path"] + "cls.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_bce(metrics, config, epoch_grid, fig_size):
+    if len(metrics["bce_train"]) > 0:
+        plt.figure(figsize=fig_size)
+        plt.plot(epoch_grid, metrics["bce_train"], label=r"bce train")
+        plt.plot(epoch_grid, metrics["bce_valid"], label=r"bce valid")
+        plt.plot(epoch_grid, metrics["bce_test"], label=r"bce test")
+
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bce.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_Z_A(metrics, config, epoch_grid, fig_size):
+    if len(metrics["Z_A"]) > 0:
+        plt.figure(figsize=fig_size)
+        plt.plot(epoch_grid, metrics["Z_A"], label="Asimov Significance")
+
+        plt.legend()
+        plt.xlabel("Epoch")
+        plt.ylabel(r"$Z_A$")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "Z_A.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_bins(metrics, config, epoch_grid, fig_size):
+    if len(metrics["bins"]) > 0:
+        plt.figure(figsize=fig_size)
+        for i, bins in enumerate(metrics["bins"]):
+            if config["do_m_hh"] and config["include_bins"]:
+                bins = (np.array(bins) - config["scaler_min"][0]) / config[
+                    "scaler_scale"
+                ][0]
+                plt.xlabel("m$_{hh}$ (MeV)")
+            else:
+                plt.xlabel("NN score")
+            plt.vlines(x=bins, ymin=i, ymax=i + 1)
+            plt.ylabel("epoch")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bins.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_cuts(metrics, config, epoch_grid, fig_size):
+    if len(np.array(metrics["vbf_cut"])) > 0:
+        fig, ax1 = plt.subplots(figsize=fig_size)
+        color = "tab:red"
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel(r"$m_{jj}$ (TeV)", color=color)
+        ax1.plot(np.array(metrics["vbf_cut"]) * 1e-6, color=color)
+        ax1.tick_params(axis="y", labelcolor=color)
+
+        ax2 = ax1.twinx()
+        color = "tab:blue"
+        ax2.set_ylabel(r"$|\Delta\eta(j,j)|$", color=color)
+        ax2.plot(metrics["eta_cut"], color=color)
+        ax2.tick_params(axis="y", labelcolor=color)
+
+        fig.tight_layout()
+        plot_path = config["results_path"] + "cuts.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_bkg_shape_sys(metrics, config, epoch_grid, fig_size):
+    if len(metrics["bkg_shape_sys_up"]) > 0:
+        plt.figure(figsize=fig_size)
+        up = np.array(metrics["bkg_shape_sys_up"])
+        down = np.array(metrics["bkg_shape_sys_down"])
+        bkg = np.array(metrics["bkg"])
+        rel_up = up / bkg
+
+        for i in range(len(metrics["bkg_shape_sys_up"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error (err/nominal)")
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_ps(metrics, config, epoch_grid, fig_size):
+    if len(metrics["ps_up"]) > 0:
+        plt.figure(figsize=fig_size)
+        up = np.array(metrics["ps_up"])
+        down = np.array(metrics["ps_down"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+
+        for i in range(len(metrics["ps_up"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error (err/nominal)")
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "ps_rel_error.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_xbb_pt(metrics, config, epoch_grid, fig_size):
+    if len(metrics["xbb_pt_bin_3__1up"]) > 0:
+        plt.figure(figsize=fig_size)
+        up = np.array(metrics["xbb_pt_bin_3__1up"])
+        down = np.array(metrics["ps_down"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+
+        for i in range(len(metrics["xbb_pt_bin_3__1up"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Relative Error (err/nominal)")
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "xbb_pt_bin_3_rel_error.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
+    if len(metrics["signal_approximation_diff"]) > 0:
+        plt.figure(figsize=fig_size)
+        up = np.array(metrics["signal_approximation_diff"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+
+        for i in range(len(metrics["NOSYS"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Binned KDE/Nominal")
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "signal_approximation_diff.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
+    if len(metrics["bkg_approximation_diff"]) > 0:
+        plt.figure(figsize=fig_size)
+        up = np.array(metrics["bkg_approximation_diff"])
+        bkg = np.array(metrics["NOSYS"])
+        rel_up = up / bkg
+
+        for i in range(len(metrics["NOSYS"][0])):
+            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Binned KDE/Nominal")
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+# Main function to call the plots
+def main(config, bins, yields, metrics):
+    plt.rcParams.update({"font.size": 16})
+    epoch_grid = range(1, config["num_steps"] + 1)
+    fig_size = (10, 6)
+    plot_hist(config, bins, yields, metrics)
+    plot_Z_A(metrics, config, epoch_grid, fig_size)
+    if config["objective"] == "cls":
+        plot_cls(metrics, config, epoch_grid, fig_size)
+        plot_bins(metrics, config, epoch_grid, fig_size)
+        plot_cuts(metrics, config, epoch_grid, fig_size)
+        plot_bkg_shape_sys(metrics, config, epoch_grid, fig_size)
+        plot_ps(metrics, config, epoch_grid, fig_size)
+        plot_xbb_pt(metrics, config, epoch_grid, fig_size)
+        plot_signal_approximation(metrics, config, epoch_grid, fig_size)
+        plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
+    elif config["objective"] == "bce":
+        plot_bce(metrics, config, epoch_grid, fig_size)
+
+    plt.rcParams["lines.linewidth"] = 1

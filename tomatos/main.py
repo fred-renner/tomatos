@@ -101,18 +101,9 @@ def plot():
     with open(config.metadata_file_path, "r") as file:
         results = json.load(file)
 
-    tomatos.plotting.plot_metrics(
-        results["metrics"],
-        results["config"],
-    )
-    tomatos.plotting.hist(
+    tomatos.plotting.main(
         results["config"],
         results["bins"],
         results["yields"],
         results["metrics"],
     )
-
-
-if __name__ == "__main__":
-    # run()
-    plot()

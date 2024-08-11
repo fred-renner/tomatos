@@ -108,7 +108,7 @@ class Setup:
         # slope parameter used by the sigmoid for cut optimization
         self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
-        self.objective = "cls"
+        self.objective = "bce"
         # cuts scaled to parameter range [0,1]
         self.cuts_init = 0.001
         # scale cut parameter to increase wiggling
@@ -136,7 +136,7 @@ class Setup:
             # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
         elif self.objective == "bce":
             results_folder = (
-                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}/"
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
             )
         results_folder = results_folder.replace(".", "p")
         if self.debug:
