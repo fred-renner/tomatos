@@ -14,22 +14,26 @@ import json
 import numpy as np
 import pprint
 
-jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
+# jax.numpy.set_printoptions(precision=2, suppress=True, floatmode="fixed")
+# jax.config.update("jax_disable_jit", True)
 JAX_CHECK_TRACER_LEAKS = True
 jax.config.update("jax_enable_x64", True)
 
-# useful to find the cause of nan's
-jax.config.update("jax_debug_nans", False)
+# # useful to find the cause of nan's
+# jax.config.update("jax_debug_nans", True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=5)
+parser.add_argument("--suffix", type=str, default="_")
 parser.add_argument("--steps", type=int, default=200)
-parser.add_argument("--slope", type=int, default=16e3)
+parser.add_argument("--slope", type=int, default=250)
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--bw", type=float, default=0.16)
 parser.add_argument("--debug", action="store_true", default=False)
 parser.add_argument("--unc-estimate-min-count", type=float, default=0)
 parser.add_argument("--k-fold", type=int, default=0)
+parser.add_argument("--loss", type=str, default="cls")
+parser.add_argument("--valid-bw", type=float, default=0.1)
 
 
 args = parser.parse_args()

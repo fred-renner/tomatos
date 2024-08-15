@@ -66,6 +66,17 @@ def get_symmetric_up_down(nom, sys, min_sys_value=0):
     return up, down
 
 
+# def empty_bin_protection(h):
+#     min = 1
+#     relative_error = jnp.where(h < min, (1 + jnp.abs(min - h)), 1)
+
+#     up = 1 + relative_error
+#     down = 1 - relative_error
+#     down = jnp.where(down < 0, 0, down)
+
+#     return up, down
+
+
 def model_from_hists(
     do_m_hh,
     hists: dict[str, Array],
@@ -97,8 +108,6 @@ def model_from_hists(
     hists["ps_up"] = hists["NOSYS"] * ps_up
     hists["ps_down"] = hists["NOSYS"] * ps_down
 
-    # for key, h in hists.items():
-    #     print(key, h)
     if do_m_hh:
         spec = {
             "channels": [

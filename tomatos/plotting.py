@@ -11,8 +11,6 @@ import logging
 
 w_CR = 0.003785385121790652
 
-fig_size = (6, 5)
-
 
 def interpolate_gaps(values, limit=None):
     """
@@ -37,7 +35,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_hist(config, bins, yields, metrics):
+def plot_hist(config, bins, yields, metrics, fig_size):
     fig = plt.figure(figsize=fig_size)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         # if "JET" in l or "GEN" in l:
@@ -113,13 +111,13 @@ def plot_hist(config, bins, yields, metrics):
     if config["objective"] == "cls":
         plt.plot(
             np.linspace(0, 1, len(metrics["kde_signal"][0])),
-            metrics["kde_signal"][metrics["best_epoch"]],
+            metrics["kde_signal"][metrics["best_results"]["epoch"]],
             label="kde signal",
             color="tab:orange",
         )
         plt.plot(
             np.linspace(0, 1, len(metrics["kde_bkg"][0])),
-            metrics["kde_bkg"][metrics["best_epoch"]],
+            metrics["kde_bkg"][metrics["best_results"]["epoch"]],
             label="kde bkg",
             color="tab:blue",
         )
@@ -173,7 +171,7 @@ def plot_cls(metrics, config, epoch_grid, fig_size):
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
-        plt.ylim([0, np.max(metrics["cls_train"]) * 1.1])
+        plt.ylim([0, np.max(metrics["cls_train"]) * 1.3])
         plt.tight_layout()
         plot_path = config["results_path"] + "cls.pdf"
         print(plot_path)
@@ -361,9 +359,10 @@ def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
 # Main function to call the plots
 def main(config, bins, yields, metrics):
     plt.rcParams.update({"font.size": 16})
+    plt.rcParams["lines.linewidth"] = 1
     epoch_grid = range(1, config["num_steps"] + 1)
-    fig_size = (10, 6)
-    plot_hist(config, bins, yields, metrics)
+    fig_size = (6, 5)
+    plot_hist(config, bins, yields, metrics, fig_size)
     plot_Z_A(metrics, config, epoch_grid, fig_size)
     if config["objective"] == "cls":
         plot_cls(metrics, config, epoch_grid, fig_size)
@@ -376,5 +375,3 @@ def main(config, bins, yields, metrics):
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
     elif config["objective"] == "bce":
         plot_bce(metrics, config, epoch_grid, fig_size)
-
-    plt.rcParams["lines.linewidth"] = 1
