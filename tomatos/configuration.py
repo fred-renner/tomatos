@@ -7,9 +7,9 @@ class Setup:
     def __init__(self, args):
 
         self.files = {
-            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-run2.h5",
-            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_k_{args.k_fold}/dump-ps.h5",
+            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-run2.h5",
+            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-ps.h5",
         }
 
         self.do_m_hh = False
@@ -76,6 +76,7 @@ class Setup:
         self.bins = np.linspace(0, 1, args.bins + 1)
 
         self.bandwidth = args.bw
+        self.valid_bw = args.valid_bw
 
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
@@ -93,29 +94,28 @@ class Setup:
                 ]
             )  # rel 21 analysis
 
-        # Actual batching needs to implemented properly, e.g. account for in
-        # weights...currently not needed
+        # Actual batching needs a reimplementation
         self.batch_size = int(1e6)  # int is necessary
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
         # one step is one batch, not epoch
-        if self.debug:
+        self.num_steps = args.steps
+
+        if args.debug:
             self.num_steps = 10
-        else:
-            self.num_steps = args.steps
 
         # slope parameter used by the sigmoid for cut optimization
         self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
-        self.objective = "bce"
+        self.objective = args.loss
         # cuts scaled to parameter range [0,1]
-        self.cuts_init = 0.001
-        # scale cut parameter to increase wiggling
+        self.cuts_init = 0.001 # slope 50: 0.066
+        # scale cut parameter to speed up convergence on cuts
         self.cuts_factor = 1
-        # scale factor for k-folds
-        self.n_k_folds = 2
-        # simple factor or binned transferfactor
+        # nr of k-folds used for scaling the weights
+        self.n_k_folds = 4
+        # simple transfer factor or binned transferfactor
         self.binned_w_CR = False
 
         # promote minimum count for shape systematic estimate
@@ -125,19 +125,22 @@ class Setup:
         # if initialize parameters of a trained model
         self.preload_model = False
         if self.preload_model:
-            self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500_slope_6400_lr_0p001_bw_0p2_slope_study_bkg_penalize_on/neos_model.eqx"
+            self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_valid_bw_1e-06_slope_study_k_0/neos_model.eqx"
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
         elif self.objective == "cls":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{args.k_fold}/"
-            # results_folder = "tomatos_cls_5_200_slope_16000_lr_0p001_bw_0p16_k_0_cuts_0p005_factor_5_valid_merged/"
+            # k_fold at end!
+            if args.suffix != "":
+                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_{args.suffix}_k_{args.k_fold}/"
+            else:
+                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{args.k_fold}/"
+
+            # results_folder = "tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_k_1/"
         elif self.objective == "bce":
-            results_folder = (
-                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
-            )
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_{args.suffix}_k_{args.k_fold}/"
         results_folder = results_folder.replace(".", "p")
         if self.debug:
             results_folder = "tomatos_debug/"

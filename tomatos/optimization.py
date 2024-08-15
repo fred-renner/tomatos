@@ -99,8 +99,8 @@ def run(
         train, batch_num, num_batches = next(batch_iterator)
         # initialize with or without binning
         if i == 0:
-            init_pars["vbf_cut"] = config.cuts_init / config.cuts_factor
-            init_pars["eta_cut"] = config.cuts_init / config.cuts_factor
+            init_pars["vbf_cut"] = config.cuts_init
+            init_pars["eta_cut"] = config.cuts_init
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
@@ -133,21 +133,21 @@ def run(
             params,
             data=valid,
             loss_type=config.objective,
-            bandwidth=1e-6,
+            bandwidth=config.valid_bw,
             slope=1e6,
         )
         test_result, test_hists = loss(
             params,
             data=test,
             loss_type=config.objective,
-            bandwidth=1e-6,
+            bandwidth=config.valid_bw,
             slope=1e6,
         )
 
         metrics[f"{config.objective}_valid"].append(valid_result)
         metrics[f"{config.objective}_test"].append(test_result)
         logging.info(
-            f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.8f}"
+            f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.4f}"
         )
 
         # update
@@ -178,7 +178,7 @@ def run(
         # evaluation is expensive
         metrics[f"{config.objective}_train"].append(state.value)
         logging.info(
-            f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.8f}"
+            f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.4f}"
         )
 
         # get yields from sharp hists using training data set
@@ -186,10 +186,10 @@ def run(
 
         # # Z_A
         z_a = asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
-        logging.info(f"Z_A: {z_a:.8f}")
+        logging.info(f"Z_A: {z_a:.4f}")
         metrics["Z_A"].append(z_a)
 
-        # # # measure diff between true and estimated hist
+        # measure diff between true and estimated hist
         def safe_divide(a, b):
             return jnp.where(b == 0, 0, a / b)
 
@@ -211,14 +211,14 @@ def run(
             metrics["vbf_cut"].append(optimized_m_jj)
             metrics["eta_cut"].append(optimized_eta_jj)
 
-            signal_approximation_diff = safe_divide(
-                histograms["NOSYS"], yields["NOSYS"]
-            )
-            bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
-            logging.info(f"signal estimate diff: {signal_approximation_diff}")
-            logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
-            metrics["signal_approximation_diff"].append(signal_approximation_diff)
-            metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
+            # signal_approximation_diff = safe_divide(
+            #     histograms["NOSYS"], yields["NOSYS"]
+            # )
+            # bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
+            # logging.info(f"signal estimate diff: {signal_approximation_diff}")
+            # logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
+            # metrics["signal_approximation_diff"].append(signal_approximation_diff)
+            # metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
 
             metrics["kde_signal"].append(
                 rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
@@ -237,6 +237,7 @@ def run(
         if metrics[objective][-1] < best_valid_loss:
             best_params = params
             best_valid_loss = metrics[objective][-1]
+            # write best results
             metrics["best_results"] = {
                 "epoch": i,
                 "train_loss": metrics[f"{config.objective}_train"][-1],
@@ -247,16 +248,17 @@ def run(
                 "histograms": histograms,
             }
             if config.objective == "cls":
-                metrics.update(
+                metrics["best_results"].update(
                     {
                         "vbf_cut": optimized_m_jj,
                         "eta_cut": optimized_eta_jj,
-                        "signal_approximation_diff": (
-                            metrics["signal_approximation_diff"][-1]
-                        ),
-                        "bkg_approximation_diff": (
-                            metrics["bkg_approximation_diff"][-1]
-                        ),
+                        # "signal_approximation_diff": (
+                        #     metrics["signal_approximation_diff"][-1]
+                        # ),
+                        # "bkg_approximation_diff": (
+                        #     metrics["bkg_approximation_diff"][-1]
+                        # ),
+                        "inverted": 1 if np.argmax(histograms["bkg"]) != 0 else 0,
                     }
                 )
             logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
@@ -264,7 +266,7 @@ def run(
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
         logging.info("\n")
-        clear_caches()
+        # clear_caches()
 
     return best_params, metrics
 

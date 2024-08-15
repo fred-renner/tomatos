@@ -103,7 +103,7 @@ def stack_inputs(
             # up (or down) scale
             # load the whole array and select then because its much faster as
             # h5py is really slow with single idx access. however this will run
-            # into trouble of course when datset become really large
+            # into trouble of course when datasets become too large
             arr[:, 0, i] = np.resize(f[var_name][:][indices], (ranged_n_events))
 
             # same for weights
@@ -118,8 +118,9 @@ def stack_inputs(
             # amount for actual up/down scaling of values
             rescale_sf = len(indices) / ranged_n_events
             # amount for k-fold splits
-            arr[:, 1, i] *= selected_sf * rescale_sf * config.n_k_folds
+            k_fold_sf = config.n_k_folds / (config.n_k_folds - 1)
 
+            arr[:, 1, i] *= selected_sf * rescale_sf * k_fold_sf
         return arr
 
 
@@ -204,8 +205,6 @@ def get_max_events(config):
         for sys in config.systematics:
             var_sys = var + "_" + sys + ".SR_xbb_2"
             n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
-            # print( var_sys)
-            # print(n)
             if n > max_events:
                 max_events = n
     # run 2
@@ -228,8 +227,6 @@ def prepare_data(config):
     max_events = get_max_events(config)
 
     train = stack_data(config, max_events, event_range=[0.0, 0.8])
-    # last values in arrays are somewhat shuffled as they are filled in the
-    # order from large to small input files
     valid = stack_data(config, max_events, event_range=[0.8, 0.9])
     test = stack_data(config, max_events, event_range=[0.9, 1.0])
 

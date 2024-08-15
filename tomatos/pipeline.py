@@ -47,9 +47,6 @@ def pipeline(
             include_bins=include_bins,
         )
     else:
-        # logging.info("Cuts are fixed in pipeline.py")
-        # pars["vbf_cut"] = -10.0
-        # pars["eta_cut"] = -10.0
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,
@@ -65,16 +62,15 @@ def pipeline(
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type.lower() in ["bce", "binary cross-entropy"]:
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
-
+    # protect against empty bins
+    hists = {k: v + 1e-3 for k, v in hists.items()}
     # build our statistical model, and calculate the loss!
     model = tomatos.workspace.model_from_hists(
         do_m_hh, hists, config, do_systematics, do_stat_error
     )
-    # fit_lr is the fit tolerance (same value as used by MINOS)
-    # can speed up if model converges early by reducing fit iterations in
-    # relaxed hypotest
+
     return (
-        neos.loss_from_model(model, loss=loss_type, fit_lr=1e-3),
+        neos.loss_from_model(model, loss=loss_type),
         hists,
     )
 
