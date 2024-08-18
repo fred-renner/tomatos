@@ -75,9 +75,6 @@ class Setup:
         # norm.cdf in histogramming includes 1.0
         self.bins = np.linspace(0, 1, args.bins + 1)
 
-        self.bandwidth = args.bw
-        self.valid_bw = args.valid_bw
-
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
                 [
@@ -99,18 +96,21 @@ class Setup:
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
+
         # one step is one batch, not epoch
         self.num_steps = args.steps
 
         if args.debug:
-            self.num_steps = 10
+            self.num_steps = 10 if args.steps == 200 else args.steps
 
+        # bw per epoch
+        self.bw = np.linspace(0.2, 0.001, self.num_steps)
         # slope parameter used by the sigmoid for cut optimization
         self.slope = args.slope
         # can choose from "cls", "discovery", "bce"
         self.objective = args.loss
         # cuts scaled to parameter range [0,1]
-        self.cuts_init = 0.001 # slope 50: 0.066
+        self.cuts_init = 0.001
         # scale cut parameter to speed up convergence on cuts
         self.cuts_factor = 1
         # nr of k-folds used for scaling the weights
@@ -134,13 +134,13 @@ class Setup:
         elif self.objective == "cls":
             # k_fold at end!
             if args.suffix != "":
-                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_{args.suffix}_k_{args.k_fold}/"
+                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_{args.suffix}_k_{args.k_fold}/"
             else:
-                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_slope_{self.slope}_lr_{self.lr}_bw_{self.bandwidth}_k_{args.k_fold}/"
+                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
 
             # results_folder = "tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_k_1/"
         elif self.objective == "bce":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_{args.suffix}_k_{args.k_fold}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
         results_folder = results_folder.replace(".", "p")
         if self.debug:
             results_folder = "tomatos_debug/"

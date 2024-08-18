@@ -24,11 +24,13 @@ def pipeline(
     slope: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
     config: object,
+    delta_hist_update: dict[str, Array],
     include_bins=True,
     do_m_hh=False,
     do_systematics=False,
     do_stat_error=False,
 ) -> float:
+
     # zip up our data arrays with the corresponding sample names
     data_dct = {k: v for k, v in zip(sample_names, data)}
 
@@ -54,7 +56,7 @@ def pipeline(
             vbf_cut=pars["vbf_cut"],
             eta_cut=pars["eta_cut"],
             data=data_dct,
-            bandwidth=bandwidth,  # for the bKDEs
+            bandwidth=bandwidth,
             slope=slope,
             bins=bins,
         )
@@ -62,11 +64,17 @@ def pipeline(
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type.lower() in ["bce", "binary cross-entropy"]:
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
-    # protect against empty bins
-    hists = {k: v + 1e-3 for k, v in hists.items()}
+
+    # protect against empty bins, because this can make the fit fail
+    hists = {k: v + 0.001 for k, v in hists.items()}
     # build our statistical model, and calculate the loss!
     model = tomatos.workspace.model_from_hists(
-        do_m_hh, hists, config, do_systematics, do_stat_error
+        do_m_hh,
+        hists,
+        config,
+        do_systematics,
+        do_stat_error,
+        delta_hist_update,
     )
 
     return (

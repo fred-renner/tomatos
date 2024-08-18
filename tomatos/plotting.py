@@ -179,6 +179,49 @@ def plot_cls(metrics, config, epoch_grid, fig_size):
         plt.close()
 
 
+def plot_bw(metrics, config, epoch_grid, fig_size):
+    if len(metrics["bw"]) > 0:
+
+        plt.figure(figsize=fig_size)
+        plt.plot(epoch_grid, metrics["bw"])
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Bandwidth")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "bandwidth.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def delta_hist(metrics, config, epoch_grid, fig_size):
+    if len(metrics["delta_NOSYS"]) > 0:
+        plt.figure(figsize=fig_size)
+        hists = np.array(metrics["delta_NOSYS"])
+        for i in range(len(hists[0])):
+            plt.plot(hists[:, i], label=f"Bin {i+1}")
+        plt.xlabel("Epoch")
+        plt.ylabel("3-Step Moving Average Update Difference")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "delta_hist_signal.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+    if len(metrics["delta_bkg"]) > 0:
+        plt.figure(figsize=fig_size)
+        hists = np.array(metrics["delta_bkg"])
+        for i in range(len(hists[0])):
+            plt.plot(hists[:, i], label=f"Bin {i+1}")
+        plt.xlabel("Epoch")
+        plt.ylabel("3-Step Moving Average Update Difference")
+        plt.tight_layout()
+        plot_path = config["results_path"] + "delta_hist_bkg.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
 def plot_bce(metrics, config, epoch_grid, fig_size):
     if len(metrics["bce_train"]) > 0:
         plt.figure(figsize=fig_size)
@@ -328,6 +371,7 @@ def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
+        plt.ylim([0, 2])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "signal_approximation_diff.pdf"
@@ -348,6 +392,7 @@ def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
+        plt.ylim([0, 2])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
@@ -366,6 +411,7 @@ def main(config, bins, yields, metrics):
     plot_Z_A(metrics, config, epoch_grid, fig_size)
     if config["objective"] == "cls":
         plot_cls(metrics, config, epoch_grid, fig_size)
+        plot_bw(metrics, config, epoch_grid, fig_size)
         plot_bins(metrics, config, epoch_grid, fig_size)
         plot_cuts(metrics, config, epoch_grid, fig_size)
         plot_bkg_shape_sys(metrics, config, epoch_grid, fig_size)
@@ -373,5 +419,6 @@ def main(config, bins, yields, metrics):
         plot_xbb_pt(metrics, config, epoch_grid, fig_size)
         plot_signal_approximation(metrics, config, epoch_grid, fig_size)
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
+        delta_hist(metrics, config, epoch_grid, fig_size)
     elif config["objective"] == "bce":
         plot_bce(metrics, config, epoch_grid, fig_size)
