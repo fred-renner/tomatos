@@ -89,6 +89,11 @@ import matplotlib.pyplot as plt
 import json
 import os
 import numpy as np
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("model")
+args = parser.parse_args()
 
 
 def create_gif_from_folder(folder_path, output_filename, duration=0.5):
@@ -103,11 +108,8 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
-    models = [
-        "tomatos_cls_5_1000_slope_16000_lr_0p001_bw_0p16_valid_bw_1e-06_k_1",
-        "tomatos_cls_5_1000_slope_16000_lr_0p001_bw_0p16_valid_bw_1e-06_k_3",
-        "tomatos_cls_5_1000_slope_50_lr_0p001_bw_0p16_cuts_factor_10_k_0",
-    ]
+    # models = ["tomatos_debug"]
+    models = [args.model]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
@@ -130,8 +132,23 @@ if __name__ == "__main__":
             # loop over hists
             plt.figure(figsize=(10, 8))
             for hist_name in meta_data["config"]["data_types"]:
-                # if "JET" in hist_name or "GEN" in hist_name:
-                #     break
+
+                bkg_regions = [
+                    "bkg_CR_xbb_1",
+                    "bkg_CR_xbb_2",
+                    "bkg_VR_xbb_1",
+                    "bkg_VR_xbb_2",
+                    "bkg_VR_xbb_1_NW",
+                    "bkg_VR_xbb_2_NW",
+                    "bkg_stat_up",
+                    "bkg_stat_down",
+                    "bkg_stat_up",
+                    "bkg_stat_down",
+                    "NOSYS_stat_up",
+                    "NOSYS_stat_down",
+                ]
+                if any([reg in hist_name for reg in bkg_regions]):
+                    continue
 
                 label = hist_name.replace("_", " ")
 

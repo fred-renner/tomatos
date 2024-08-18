@@ -54,7 +54,7 @@ def run(
         do_m_hh=config.do_m_hh,
         loss_type=config.objective,
         config=config,
-        bandwidth=config.bandwidth,
+        bandwidth=0.2,
         slope=config.slope,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
@@ -67,6 +67,7 @@ def run(
     params = init_pars
     best_params = init_pars
     best_valid_loss = 999
+
     print(config.data_types)
     metrics = {
         k: []
@@ -89,6 +90,7 @@ def run(
             "kde_signal",
             "kde_bkg",
             "best_epoch",
+            "bw",
         ]
     }
 
@@ -101,17 +103,31 @@ def run(
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
+
             if config.include_bins:
                 init_pars["bins"] = config.bins
             else:
                 init_pars.pop("bins", None)
+            delta_hist_update = dict(
+                {
+                    "NOSYS": jnp.zeros((len(config.bins) - 1)),
+                    "bkg": jnp.zeros((len(config.bins) - 1)),
+                },
+            )
 
             logging.info(init_pars)
             state = solver.init_state(
                 init_pars,
                 data=train,
+                delta_hist_update=delta_hist_update,
+                bandwidth=config.bw[i],
             )
 
+            histograms = state.aux
+
+            for k in histograms.keys():
+                metrics[k] = []
+                metrics["delta_" + k] = []
         # warm reset doesn't seem to work
         # if i % 20 == 0:
         #     state = solver.init_state(
@@ -133,15 +149,17 @@ def run(
             params,
             data=valid,
             loss_type=config.objective,
-            bandwidth=config.valid_bw,
+            bandwidth=config.bw[i],
             slope=1e6,
+            delta_hist_update=delta_hist_update,
         )
         test_result, test_hists = loss(
             params,
             data=test,
             loss_type=config.objective,
-            bandwidth=config.valid_bw,
+            bandwidth=config.bw[i],
             slope=1e6,
+            delta_hist_update=delta_hist_update,
         )
 
         metrics[f"{config.objective}_valid"].append(valid_result)
@@ -150,17 +168,20 @@ def run(
             f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.4f}"
         )
 
+        # increase slope over time for better cut estimate
+        slope = update_slope(config, i)
+
         # update
         params, state = solver.update(
             params,
             state,
             data=train,
+            slope=slope,
+            delta_hist_update=delta_hist_update,
+            bandwidth=config.bw[i],
         )
-        histograms = state.aux
-        if i == 0:
-            for k in histograms.keys():
-                metrics[k] = []
 
+        histograms = state.aux
         bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
         if config.include_bins:
@@ -168,11 +189,20 @@ def run(
             metrics["bins"].append(bins)
         logging.info((f"bKDE hist sig: {histograms['NOSYS']}"))
         logging.info((f"bKDE hist bkg: {histograms['bkg']}"))
+        logging.info(f"slope: {slope}")
 
         # additional_logging(config, params, histograms)
 
         for hist in histograms.keys():
+            if i > 0:
+                delta_hist_update[hist] = jnp.abs(histograms[hist] - metrics[hist][-1])
+            if i > 3:
+                delta_hist_update[hist] = jnp.abs(
+                    histograms[hist] - np.mean(metrics[hist][-4:-1], axis=0)
+                )
             metrics[hist].append(histograms[hist])
+        metrics["delta_NOSYS"].append(delta_hist_update["NOSYS"])
+        metrics["delta_bkg"].append(delta_hist_update["bkg"])
 
         # write train loss here, as optaxsolver state.value holds loss[i-1] and
         # evaluation is expensive
@@ -182,7 +212,7 @@ def run(
         )
 
         # get yields from sharp hists using training data set
-        yields, kde = get_yields(config, nn, params, train)
+        yields, kde = get_yields(config, nn, params, train, config.bw[i])
 
         # # Z_A
         z_a = asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
@@ -208,17 +238,20 @@ def run(
 
             logging.info(f"vbf cut: {optimized_m_jj}")
             logging.info(f"eta cut: {optimized_eta_jj}")
+            logging.info(f"bw: {config.bw[i]}")
+
             metrics["vbf_cut"].append(optimized_m_jj)
             metrics["eta_cut"].append(optimized_eta_jj)
+            metrics["bw"].append(config.bw[i])
 
-            # signal_approximation_diff = safe_divide(
-            #     histograms["NOSYS"], yields["NOSYS"]
-            # )
-            # bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
-            # logging.info(f"signal estimate diff: {signal_approximation_diff}")
-            # logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
-            # metrics["signal_approximation_diff"].append(signal_approximation_diff)
-            # metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
+            signal_approximation_diff = safe_divide(
+                histograms["NOSYS"], yields["NOSYS"]
+            )
+            bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
+            logging.info(f"signal estimate diff: {signal_approximation_diff}")
+            logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
+            metrics["signal_approximation_diff"].append(signal_approximation_diff)
+            metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
 
             metrics["kde_signal"].append(
                 rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
@@ -252,12 +285,12 @@ def run(
                     {
                         "vbf_cut": optimized_m_jj,
                         "eta_cut": optimized_eta_jj,
-                        # "signal_approximation_diff": (
-                        #     metrics["signal_approximation_diff"][-1]
-                        # ),
-                        # "bkg_approximation_diff": (
-                        #     metrics["bkg_approximation_diff"][-1]
-                        # ),
+                        "signal_approximation_diff": (
+                            metrics["signal_approximation_diff"][-1]
+                        ),
+                        "bkg_approximation_diff": (
+                            metrics["bkg_approximation_diff"][-1]
+                        ),
                         "inverted": 1 if np.argmax(histograms["bkg"]) != 0 else 0,
                     }
                 )
@@ -269,6 +302,25 @@ def run(
         # clear_caches()
 
     return best_params, metrics
+
+
+def update_slope(config, i):
+    # sigmoid slope m scales as 1/x with the cut uncertainty of the slope
+    # to decrase linearly stepwise over the desired range
+    # m_{i+1}=(1/m_i - unc)^{-1} = 1/m_0 - i*unc)^{-1}
+    # unc = ((1 / m_0) - (1 / m_n) ) / n
+    # init slope
+    m_0 = 10
+    # final_slope
+    m_n = 20_000
+    delta_x = ((1 / m_0) - (1 / m_n)) / config.num_steps
+    slope = ((1 / m_0) - (i + 1) * delta_x) ** (-1)
+
+    # # linear alternative, steeper loss decay
+    # m = (m_n - m_0) / config.num_steps
+    # slope = m * i + m_0
+
+    return slope
 
 
 def additional_logging(config, params, histograms):
@@ -336,7 +388,7 @@ def rescale_kde(hist, kde, bins):
     return kde
 
 
-def get_yields(config, nn, params, data):
+def get_yields(config, nn, params, data, bw):
     data_dct = {k: v for k, v in zip(config.data_types, data)}
     if config.do_m_hh:
         yields = tomatos.histograms.hists_from_mhh(
@@ -367,7 +419,7 @@ def get_yields(config, nn, params, data):
             eta_cut=params["eta_cut"],
             nn=nn,
             data=kde_dict,
-            bandwidth=config.bandwidth,
+            bandwidth=bw,
             slope=config.slope,
             bins=kde_bins,
         )

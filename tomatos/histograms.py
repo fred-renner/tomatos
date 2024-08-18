@@ -151,7 +151,8 @@ def hists_from_nn(
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs
     yields."""
-    # help the optimization a bit for cut parameters --> coupled to lr 
+
+    # help the optimization for cut parameters
     vbf_cut *= config.cuts_factor
     eta_cut *= config.cuts_factor
     # indexing is horrible I know

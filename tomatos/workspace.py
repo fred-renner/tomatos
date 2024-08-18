@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 import numpy as np
 import pyhf
-import logging
 
 Array = jnp.ndarray
 
@@ -58,23 +57,35 @@ def get_symmetric_up_down(nom, sys, min_sys_value=0):
     relative = jnp.abs((nom - sys) / nom)
     up = 1 + relative
     down = 1 - relative
-    # promote more events in error estimate if less than 1 event in a bin
-    # use this with care
+    # penalize against a minimum sys uncertainty
     if min_sys_value != 0:
         up = jnp.where(sys < min_sys_value, up * (1 + (min_sys_value - sys)), up)
     down = jnp.where(down < 0, 0, down)
     return up, down
 
 
-# def empty_bin_protection(h):
-#     min = 1
-#     relative_error = jnp.where(h < min, (1 + jnp.abs(min - h)), 1)
+def empty_bin_protection(h, target, delta_hist_update):
+    # dynamically increase threshold if hist updates are ~larger as when the
+    # protection actually begins
 
-#     up = 1 + relative_error
-#     down = 1 - relative_error
-#     down = jnp.where(down < 0, 0, down)
+    threshold = target + (2 * delta_hist_update)
+    # some options, plug this into wolfram alpha
+    # abs(1-x)/x, e^(-5x+10), abs(1-x)/x^2, -10*x+10, -log(x) for x=[0,1],y=[0,5]
+    # log worked best
+    penalty = jnp.where(h < threshold, -100 * jnp.log(jnp.abs(h / threshold)), 0)
 
-#     return up, down
+    up = 1 + penalty
+    down = 1 - penalty
+    down = jnp.where(down < 0, 0, down)
+
+    # print(target)
+    # print(h)
+    # print(delta_hist_update)
+    # print(threshold)
+    # print(up)
+    # print()
+
+    return up, down
 
 
 def model_from_hists(
@@ -83,30 +94,49 @@ def model_from_hists(
     config: object,
     do_systematics: bool,
     do_stat_error: bool,
+    delta_hist_update: dict[str, Array],
 ) -> pyhf.Model:
     """How to make your HistFactory model from your histograms."""
+
+    # bkg
     w_CR, err_w_CR = get_bkg_weight(hists, config)
     rel_err_w_CR = err_w_CR / w_CR
-
     hists["bkg"] *= w_CR
     if config.do_stat_error:
         hists["bkg_stat_up"] *= w_CR
         hists["bkg_stat_down"] *= w_CR
 
     bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
-
     bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
         bkg_estimate_in_VR,
         hists["bkg_VR_xbb_2"],
         min_sys_value=config.unc_estimate_min_count,
     )
-
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
 
+    bkg_protect_up, bkg_protect_down = empty_bin_protection(
+        hists["bkg"],
+        target=0.1,
+        delta_hist_update=delta_hist_update["bkg"],
+    )
+
+    hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
+    hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
+
+    # signal
     ps_up, ps_down = get_symmetric_up_down(hists["NOSYS"], hists["ps"])
     hists["ps_up"] = hists["NOSYS"] * ps_up
     hists["ps_down"] = hists["NOSYS"] * ps_down
+
+    signal_protect_up, signal_protect_down = empty_bin_protection(
+        hists["NOSYS"],
+        target=0.1,
+        delta_hist_update=delta_hist_update["NOSYS"],
+    )
+
+    hists["signal_protect_up"] = hists["NOSYS"] * signal_protect_up
+    hists["signal_protect_down"] = hists["NOSYS"] * signal_protect_down
 
     if do_m_hh:
         spec = {
@@ -164,6 +194,14 @@ def model_from_hists(
                 )
             signal_modifiers += (
                 {
+                    "name": "signal_empty_bin_protect",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["signal_protect_up"],
+                        "lo_data": hists["signal_protect_down"],
+                    },
+                },
+                {
                     "name": "branching_ratio_bb",
                     "type": "histosys",
                     "data": {
@@ -182,6 +220,14 @@ def model_from_hists(
             )
 
             bkg_modifiers += (
+                {
+                    "name": "bkg_empty_bin_protect",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["bkg_protect_up"],
+                        "lo_data": hists["bkg_protect_down"],
+                    },
+                },
                 {
                     "name": "bkg_estimate_norm",
                     "type": "histosys",
