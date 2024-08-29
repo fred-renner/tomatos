@@ -106,7 +106,7 @@ class Setup:
         # bw per epoch
         # also tried bw in optimization, basically linear decrease, but
         # unbounded, so manual
-        self.decay_quantile = 0.8 # also used for slope 
+        self.decay_quantile = 0.8  # also used for slope
         # self.bw = np.linspace(
         #     0.2,
         #     0.01,
@@ -127,10 +127,6 @@ class Setup:
         self.n_k_folds = 4
         # simple transfer factor or binned transferfactor
         self.binned_w_CR = False
-
-        # promote minimum count for shape systematic estimate
-        # 0 turns it off
-        self.unc_estimate_min_count = args.unc_estimate_min_count
 
         # if initialize parameters of a trained model
         self.preload_model = False

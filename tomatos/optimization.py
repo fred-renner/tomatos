@@ -54,7 +54,7 @@ def run(
         loss_type=config.objective,
         config=config,
         bandwidth=0.2,
-        slope=config.slope,
+        slope=50,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
@@ -120,7 +120,6 @@ def run(
             state = solver.init_state(
                 init_pars,
                 data=train,
-                bandwidth=config.bw[i],
             )
 
             histograms = state.aux
@@ -176,7 +175,6 @@ def run(
             state,
             data=train,
             slope=slope,
-            bandwidth=config.bw[i],
         )
 
         histograms = state.aux
