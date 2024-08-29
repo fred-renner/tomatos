@@ -104,9 +104,19 @@ class Setup:
             self.num_steps = 10 if args.steps == 200 else args.steps
 
         # bw per epoch
-        self.bw = np.linspace(0.2, 0.001, self.num_steps)
-        # slope parameter used by the sigmoid for cut optimization
-        self.slope = args.slope
+        # also tried bw in optimization, basically linear decrease, but
+        # unbounded, so manual
+        self.decay_quantile = 0.8 # also used for slope 
+        # self.bw = np.linspace(
+        #     0.2,
+        #     0.01,
+        #     int(self.num_steps * self.decay_quantile),
+        # )
+        # # Pad the array to the desired size
+        # self.bw = np.pad(self.bw, (0, self.num_steps - self.bw.size), mode="edge")
+        # # fixed bw
+        # # self.bw = np.full(self.bw.shape, 0.15)
+
         # can choose from "cls", "discovery", "bce"
         self.objective = args.loss
         # cuts scaled to parameter range [0,1]
@@ -125,7 +135,7 @@ class Setup:
         # if initialize parameters of a trained model
         self.preload_model = False
         if self.preload_model:
-            self.preload_model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_valid_bw_1e-06_slope_study_k_0/neos_model.eqx"
+            self.preload_model_path = f"/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_2000_lr_0p0001_bw_0p15_slope_100k_{args.k_fold}/neos_model.eqx"
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"

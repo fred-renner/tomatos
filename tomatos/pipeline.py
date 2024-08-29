@@ -24,11 +24,11 @@ def pipeline(
     slope: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
     config: object,
-    delta_hist_update: dict[str, Array],
     include_bins=True,
     do_m_hh=False,
     do_systematics=False,
     do_stat_error=False,
+    validate_only=False,
 ) -> float:
 
     # zip up our data arrays with the corresponding sample names
@@ -49,6 +49,8 @@ def pipeline(
             include_bins=include_bins,
         )
     else:
+        # bound bw
+        pars["bw"] = jnp.maximum(pars["bw"], 0.01)
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,
@@ -56,7 +58,7 @@ def pipeline(
             vbf_cut=pars["vbf_cut"],
             eta_cut=pars["eta_cut"],
             data=data_dct,
-            bandwidth=bandwidth,
+            bandwidth=pars["bw"],
             slope=slope,
             bins=bins,
         )
@@ -65,16 +67,14 @@ def pipeline(
     if loss_type.lower() in ["bce", "binary cross-entropy"]:
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
 
-    # protect against empty bins, because this can make the fit fail
-    hists = {k: v + 0.001 for k, v in hists.items()}
     # build our statistical model, and calculate the loss!
-    model = tomatos.workspace.model_from_hists(
+    model, hists = tomatos.workspace.model_from_hists(
         do_m_hh,
         hists,
         config,
         do_systematics,
         do_stat_error,
-        delta_hist_update,
+        validate_only,
     )
 
     return (
