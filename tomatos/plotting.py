@@ -201,7 +201,7 @@ def delta_hist(metrics, config, epoch_grid, fig_size):
         for i in range(len(hists[0])):
             plt.plot(hists[:, i], label=f"Bin {i+1}")
         plt.xlabel("Epoch")
-        plt.ylabel("3-Step Moving Average Update Difference")
+        plt.ylabel("Update Difference")
         plt.tight_layout()
         plot_path = config["results_path"] + "delta_hist_signal.pdf"
         print(plot_path)
@@ -214,7 +214,7 @@ def delta_hist(metrics, config, epoch_grid, fig_size):
         for i in range(len(hists[0])):
             plt.plot(hists[:, i], label=f"Bin {i+1}")
         plt.xlabel("Epoch")
-        plt.ylabel("3-Step Moving Average Update Difference")
+        plt.ylabel("Update Difference")
         plt.tight_layout()
         plot_path = config["results_path"] + "delta_hist_bkg.pdf"
         print(plot_path)
@@ -362,16 +362,13 @@ def plot_xbb_pt(metrics, config, epoch_grid, fig_size):
 def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
     if len(metrics["signal_approximation_diff"]) > 0:
         plt.figure(figsize=fig_size)
-        up = np.array(metrics["signal_approximation_diff"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-
+        diff = np.array(metrics["signal_approximation_diff"])
         for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.75)
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
-        plt.ylim([0, 2])
+        plt.ylim([0.75, 1.25])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "signal_approximation_diff.pdf"
@@ -383,19 +380,43 @@ def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
 def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
     if len(metrics["bkg_approximation_diff"]) > 0:
         plt.figure(figsize=fig_size)
-        up = np.array(metrics["bkg_approximation_diff"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
+        diff = np.array(metrics["bkg_approximation_diff"])
 
         for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.75)
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
-        plt.ylim([0, 2])
+        plt.ylim([0.75, 2])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
+        print(plot_path)
+        plt.savefig(plot_path)
+        plt.close()
+
+
+def plot_total_diff(metrics, config, fig_size):
+    if len(metrics["signal_approximation_diff"]) > 0:
+        plt.figure(figsize=fig_size)
+        n_bins = len(metrics["signal_approximation_diff"][0])
+        total_sig_diff = np.sum(
+            np.abs(np.array(metrics["signal_approximation_diff"]) - 1), axis=1
+        )
+        total_bkg_diff = np.sum(
+            np.abs(np.array(metrics["bkg_approximation_diff"]) - 1), axis=1
+        )
+
+        for i in range(len(metrics["NOSYS"][0])):
+            plt.plot(total_sig_diff)  # alpha=0.75)
+            plt.plot(total_bkg_diff)  # alpha=0.75)
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Summed relative Binned KDE/Nominal")
+        plt.ylim([0, 5])
+        plt.legend()
+        plt.tight_layout()
+        plot_path = config["results_path"] + "summed_diff.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
@@ -420,5 +441,6 @@ def main(config, bins, yields, metrics):
         plot_signal_approximation(metrics, config, epoch_grid, fig_size)
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
         delta_hist(metrics, config, epoch_grid, fig_size)
+        plot_total_diff(metrics, config, fig_size)
     elif config["objective"] == "bce":
         plot_bce(metrics, config, epoch_grid, fig_size)

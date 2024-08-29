@@ -91,9 +91,9 @@ import os
 import numpy as np
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("model")
-args = parser.parse_args()
+# parser = argparse.ArgumentParser()
+# parser.add_argument("model")
+# args = parser.parse_args()
 
 
 def create_gif_from_folder(folder_path, output_filename, duration=0.5):
@@ -109,7 +109,8 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     # models = ["tomatos_debug"]
-    models = [args.model]
+    # models = [args.model]
+    models = ["tomatos_cls_5_3000_lr_0p0001_bw_opt_0p0001_bw_jump_0p01_bkg_protect_0p1_vr_protect_5_slope_1k_k_1"]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
