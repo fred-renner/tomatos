@@ -108,6 +108,11 @@ def plot_hist(config, bins, yields, metrics, fig_size):
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
+    
+    ax = plt.gca()
+    newLim = list(ax.get_ylim())
+    newLim[1] = newLim[1] * 1.3
+    ax.set_ylim(newLim)
     if config["objective"] == "cls":
         plt.plot(
             np.linspace(0, 1, len(metrics["kde_signal"][0])),
@@ -147,10 +152,10 @@ def plot_hist(config, bins, yields, metrics, fig_size):
     )
 
     plt.ylabel("Events")
-    ax = plt.gca()
-    newLim = list(ax.get_ylim())
-    newLim[1] = newLim[1] * 1.3
-    ax.set_ylim(newLim)
+    # ax = plt.gca()
+    # newLim = list(ax.get_ylim())
+    # newLim[1] = newLim[1] * 1.3
+    # ax.set_ylim(newLim)
     # plt.legend()  # prop={"size": 6})
     plt.tight_layout()
     print(config["results_path"] + "hist.pdf")
@@ -189,34 +194,6 @@ def plot_bw(metrics, config, epoch_grid, fig_size):
         plt.ylabel("Bandwidth")
         plt.tight_layout()
         plot_path = config["results_path"] + "bandwidth.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-
-def delta_hist(metrics, config, epoch_grid, fig_size):
-    if len(metrics["delta_NOSYS"]) > 0:
-        plt.figure(figsize=fig_size)
-        hists = np.array(metrics["delta_NOSYS"])
-        for i in range(len(hists[0])):
-            plt.plot(hists[:, i], label=f"Bin {i+1}")
-        plt.xlabel("Epoch")
-        plt.ylabel("Update Difference")
-        plt.tight_layout()
-        plot_path = config["results_path"] + "delta_hist_signal.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-    if len(metrics["delta_bkg"]) > 0:
-        plt.figure(figsize=fig_size)
-        hists = np.array(metrics["delta_bkg"])
-        for i in range(len(hists[0])):
-            plt.plot(hists[:, i], label=f"Bin {i+1}")
-        plt.xlabel("Epoch")
-        plt.ylabel("Update Difference")
-        plt.tight_layout()
-        plot_path = config["results_path"] + "delta_hist_bkg.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
@@ -407,9 +384,8 @@ def plot_total_diff(metrics, config, fig_size):
             np.abs(np.array(metrics["bkg_approximation_diff"]) - 1), axis=1
         )
 
-        for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(total_sig_diff)  # alpha=0.75)
-            plt.plot(total_bkg_diff)  # alpha=0.75)
+        plt.plot(total_sig_diff, label=r"$\kappa_\mathrm{2V}=0$ signal")
+        plt.plot(total_bkg_diff, label="Background Estimate")
 
         plt.xlabel("Epoch")
         plt.ylabel("Summed relative Binned KDE/Nominal")
@@ -440,7 +416,6 @@ def main(config, bins, yields, metrics):
         plot_xbb_pt(metrics, config, epoch_grid, fig_size)
         plot_signal_approximation(metrics, config, epoch_grid, fig_size)
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
-        delta_hist(metrics, config, epoch_grid, fig_size)
         plot_total_diff(metrics, config, fig_size)
     elif config["objective"] == "bce":
         plot_bce(metrics, config, epoch_grid, fig_size)

@@ -57,6 +57,8 @@ def get_symmetric_up_down(nom, sys):
     relative = jnp.abs((nom - sys) / nom)
     up = 1 + relative
     down = 1 - relative
+
+    up = jnp.where(up > 100, 100, up)
     down = jnp.where(down < 0, 0, down)
 
     return up, down
@@ -67,9 +69,10 @@ def min_count_up_down(h, threshold):
     # abs(1-x)/x, e^(-5x+10), abs(1-x)/x^2, -10*x+10, -log(x) for x=[0,1],y=[0,5]
     # log worked best
     penalty = jnp.where(h < threshold, -50 * jnp.log(jnp.abs(h / threshold)), 0)
-
     up = 1 + penalty
     down = 1 - penalty
+
+    up = jnp.where(up > 100, 100, up)
     down = jnp.where(down < 0, 0, down)
 
     return up, down
@@ -94,33 +97,44 @@ def model_from_hists(
         hists["bkg_stat_down"] *= w_CR
 
     bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
+
+    # need to protect several times
+    hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
+    hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
+
     bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
         bkg_estimate_in_VR,
         hists["bkg_VR_xbb_2"],
     )
-    hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up * 10
-    hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down * 10
-
-    # minimum bin value otherwise optimization fails
-    hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
+    hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
+    hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
 
     # minimum counts via penalization
-    bkg_protect_up, bkg_protect_down = min_count_up_down(hists["bkg"], threshold=0.1)
+    bkg_protect_up, bkg_protect_down = min_count_up_down(
+        hists["bkg"],
+        threshold=1,
+    )
+
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
-    # bkg_vr_protect_up, bkg_vr_protect_down = min_count_up_down(
-    #     hists["bkg_VR_xbb_2"],
-    #     threshold=2
-    # )
+    bkg_vr_protect_up, bkg_vr_protect_down = min_count_up_down(
+        hists["bkg_VR_xbb_2"],
+        threshold=2,
+    )
 
-    # hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
-    # hists["bkg_vr_protect_down"] = hists["bkg"] * bkg_vr_protect_down
+    hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
+    hists["bkg_vr_protect_down"] = hists["bkg"] * bkg_vr_protect_down
 
     # signal
     ps_up, ps_down = get_symmetric_up_down(hists["NOSYS"], hists["ps"])
     hists["ps_up"] = hists["NOSYS"] * ps_up
     hists["ps_down"] = hists["NOSYS"] * ps_down
+
+    # minimum bin value otherwise optimization can fail
+    # important that this happens after the last nominal hist creations
+    hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
+
 
     if do_m_hh:
         spec = {
@@ -171,8 +185,8 @@ def model_from_hists(
                         "name": "scale_variations",
                         "type": "histosys",
                         "data": {
-                            "hi_data": gen_up,
-                            "lo_data": gen_down,
+                            "hi_data": hists["gen_up"],
+                            "lo_data": hists["gen_down"],
                         },
                     },
                 )
@@ -223,14 +237,14 @@ def model_from_hists(
                             "lo_data": hists["bkg_protect_down"],
                         },
                     },
-                    # {
-                    #     "name": "bkg_empty_bin_protect_vr",
-                    #     "type": "histosys",
-                    #     "data": {
-                    #         "hi_data": hists["bkg_vr_protect_up"],
-                    #         "lo_data": hists["bkg_vr_protect_down"],
-                    #     },
-                    # },
+                    {
+                        "name": "bkg_empty_bin_protect_vr",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists["bkg_vr_protect_up"],
+                            "lo_data": hists["bkg_vr_protect_down"],
+                        },
+                    },
                 )
 
         if config.do_stat_error:

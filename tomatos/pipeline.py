@@ -3,7 +3,7 @@ from typing import Callable, Iterable
 import jax.numpy as jnp
 import neos
 import pyhf
-
+import jax
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
@@ -24,6 +24,7 @@ def pipeline(
     slope: float,
     sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
     config: object,
+    aux_info: dict,
     include_bins=True,
     do_m_hh=False,
     do_systematics=False,
@@ -49,8 +50,6 @@ def pipeline(
             include_bins=include_bins,
         )
     else:
-        # bound bw
-        pars["bw"] = jnp.maximum(pars["bw"], 0.01)
         hists = tomatos.histograms.hists_from_nn(
             nn_pars=pars["nn_pars"],
             nn=nn,
@@ -77,10 +76,18 @@ def pipeline(
         validate_only,
     )
 
-    return (
-        neos.loss_from_model(model, loss=loss_type),
-        hists,
-    )
+    if validate_only:
+        loss_value = neos.loss_from_model(model, loss=loss_type)
+    else:
+        # cant get sharp evaluation of hists here as hists with e.g. bw=1e-6
+        # loses gradient, --> send in
+        # start at 2
+        kde_error_penality = jnp.minimum(aux_info["kde_error"], 2)
+        # scale to sth comparable as cls
+        kde_error_penality *= 0.01
+        # this means we start when drops below 0.01
+        loss_value = neos.loss_from_model(model, loss=loss_type)  # + kde_error_penality
+    return loss_value, hists
 
 
 # would be better to tell optimization gradient to vanish if bins gets out of bound
