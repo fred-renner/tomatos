@@ -32,7 +32,8 @@ parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--debug", action="store_true", default=False)
 parser.add_argument("--k-fold", type=int, default=0)
 parser.add_argument("--loss", type=str, default="cls")
-
+parser.add_argument("--aux", type=float, default=1)
+parser.add_argument("--aux-list", type=lambda s: [float(item) for item in s.split("_")])
 
 args = parser.parse_args()
 
@@ -62,13 +63,14 @@ def run():
 
     batch_iterator = tomatos.batching.make_iterator(train, batch_size=config.batch_size)
 
-    best_params, metrics = tomatos.optimization.run(
+    best_params, last_params, metrics = tomatos.optimization.run(
         config=config,
         valid=valid,
         test=test,
         batch_iterator=batch_iterator,
         init_pars=init_pars,
         nn=nn,
+        args=args,
     )
 
     # save best epoch
@@ -88,6 +90,9 @@ def run():
     # save model to file
     model = eqx.combine(best_params["nn_pars"], nn_setup)
     eqx.tree_serialise_leaves(config.results_path + "neos_model.eqx", model)
+
+    model = eqx.combine(best_params["nn_pars"], nn_setup)
+    eqx.tree_serialise_leaves(config.results_path + "last_epoch_neos_model.eqx", model)
 
     # save metadata
     with open(config.metadata_file_path, "w") as file:

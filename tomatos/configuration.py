@@ -100,29 +100,31 @@ class Setup:
         # one step is one batch, not epoch
         self.num_steps = args.steps
 
-        if args.debug:
-            self.num_steps = 10 if args.steps == 200 else args.steps
-
         # bw per epoch
-        # also tried bw in optimization, basically linear decrease, but
-        # unbounded, so manual
-        self.decay_quantile = 0.8  # also used for slope
+        # also tried bw in optimization, basically linear decrease
+        self.decay_quantile = 0.5
         # self.bw = np.linspace(
         #     0.2,
-        #     0.01,
+        #     args.aux,
         #     int(self.num_steps * self.decay_quantile),
         # )
         # # Pad the array to the desired size
         # self.bw = np.pad(self.bw, (0, self.num_steps - self.bw.size), mode="edge")
-        # # fixed bw
-        # # self.bw = np.full(self.bw.shape, 0.15)
 
+        # fixed bw
+        # self.bw = np.full(self.bw.shape, 0.15)
+
+        if args.debug:
+            self.num_steps = 10 if args.steps == 200 else args.steps
+            # self.bw = np.full(self.num_steps, 0.15)
         # can choose from "cls", "discovery", "bce"
         self.objective = args.loss
         # cuts scaled to parameter range [0,1]
-        self.cuts_init = 0.001
-        # scale cut parameter to speed up convergence on cuts
+        self.cuts_init = 0.01
+        # scale cut parameter to increase update steps
         self.cuts_factor = 1
+        self.aux = float(args.aux)
+
         # nr of k-folds used for scaling the weights
         self.n_k_folds = 4
         # simple transfer factor or binned transferfactor
@@ -137,16 +139,13 @@ class Setup:
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
         if self.do_m_hh:
             results_folder = "tomatos_m_hh/"
-        elif self.objective == "cls":
-            # k_fold at end!
-            if args.suffix != "":
-                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_{args.suffix}_k_{args.k_fold}/"
-            else:
-                results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
+        # k_fold at end!
+        if args.suffix != "":
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}_k_{args.k_fold}/"
+        else:
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_k_{args.k_fold}/"
 
-            # results_folder = "tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_k_1/"
-        elif self.objective == "bce":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_lr_{self.lr}_k_{args.k_fold}/"
+        # results_folder = "tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_k_1/"
         results_folder = results_folder.replace(".", "p")
         if self.debug:
             results_folder = "tomatos_debug/"

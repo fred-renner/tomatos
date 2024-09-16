@@ -41,10 +41,12 @@ def run(
     batch_iterator,
     init_pars,
     nn,
+    args,
 ) -> tuple[Array, dict[str, list]]:
     # even though config is passed, need to keep redundant args here as this
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
+    aux_info = {"kde_error": 0.0}
     loss = partial(
         tomatos.pipeline.pipeline,
         nn=nn,
@@ -54,17 +56,59 @@ def run(
         loss_type=config.objective,
         config=config,
         bandwidth=0.2,
-        slope=50,
+        slope=1000,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
+        aux_info=aux_info,
     )
 
-    # here you can add optax gradient transformations
+    # Define a mask function that selectively scales only 'vbf_cut' and 'eta_cut'
+    def mask_fn(params):
+        # Return True for 'vbf_cut' and 'eta_cut', False otherwise
+        return {key: key in ["vbf_cut", "eta_cut"] for key in params}
+
+    # increase cut steps
+    scale_cut_step = optax.masked(optax.scale(config.cuts_factor), mask_fn)
+    # lr_schedule = optax.cosine_decay_schedule(
+    #     init_value=1e-3, decay_steps=config.num_steps, alpha=1e-4
+    # )
+
+    # lr_schedule = optax.cosine_onecycle_schedule(
+    #     transition_steps=config.num_steps,
+    #     peak_value=args.aux_list[0],  # Set the peak learning rate
+    #     pct_start=args.aux_list[1],  # Percentage of steps to reach the peak value
+    #     div_factor=args.aux_list[
+    #         2
+    #     ],  # Factor by which to divide the peak value for the initial learning rate
+    #     final_div_factor=args.aux_list[
+    #         3
+    #     ],  # Factor by which to divide the peak value for the final learning rate
+    # )
+    # lr_schedule = optax.linear_onecycle_schedule(
+    #     transition_steps=config.num_steps,
+    #     peak_value=args.aux_list[0],  # Set the peak learning rate
+    #     pct_start=args.aux_list[1],  # Percentage of steps to reach the peak value
+    #     div_factor=args.aux_list[
+    #         2
+    #     ],  # Factor by which to divide the peak value for the initial learning rate
+    #     final_div_factor=args.aux_list[
+    #         3
+    #     ],  # Factor by which to divide the peak value for the final learning rate
+    #     pct_final=0.85,
+    # )
+
+    # for i in range(config.num_steps+10):
+    #     print(lr_schedule(i))
+
     optimizer = optax.chain(
-        # optax.clip_by_global_norm(1e-6),
+        optax.zero_nans(), # otherwise optimization entirely broken
         optax.adam(config.lr),
+        # scale_cut_step,
+        # optax.masked(optax.clip(max_delta=config.aux), mask_fn),
+        # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
     )
+
     solver = OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)
 
     pyhf.set_backend("jax", default=True, precision="64b")
@@ -109,7 +153,7 @@ def run(
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
-            init_pars["bw"] = 0.2
+            init_pars["bw"] = 0.15
 
             if config.include_bins:
                 init_pars["bins"] = config.bins
@@ -168,6 +212,7 @@ def run(
         )
 
         slope = update_slope(config, i)
+        slope = 1000
 
         # update
         params, state = solver.update(
@@ -177,6 +222,11 @@ def run(
             slope=slope,
         )
 
+        # bound bw
+        params["bw"] = np.maximum(params["bw"], 0.01)
+        # pars["bw"] = jnp.abs(pars["bw"])
+        # pars["bw"] = 0.05
+
         histograms = state.aux
         bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
@@ -185,6 +235,14 @@ def run(
             metrics["bins"].append(bins)
         logging.info((f"bKDE hist sig: {histograms['NOSYS']}"))
         logging.info((f"bKDE hist bkg: {histograms['bkg']}"))
+
+        logging.info((f"valid VR xbb 2: {valid_hists['bkg_VR_xbb_2']}"))
+
+        logging.info(
+            (f"valid ratio hist sig: {valid_hists['NOSYS']/histograms['NOSYS']}")
+        )
+        logging.info((f"valid ratio hist bkg: {valid_hists['bkg']/histograms['bkg']}"))
+
         logging.info(f"slope: {slope}")
         metrics["slope"].append(slope)
         # additional_logging(config, params, histograms)
@@ -215,9 +273,6 @@ def run(
         if config.objective == "cls":
 
             def unscale_value(value, idx):
-                # cut optimization is supported with rescaling of parameter in
-                # histograms.py
-                value *= config.cuts_factor
                 value -= config.scaler_min[idx]
                 value /= config.scaler_scale[idx]
                 return value
@@ -239,9 +294,11 @@ def run(
             bkg_approximation_diff = safe_divide(histograms["bkg"], yields["bkg"])
             logging.info(f"signal estimate diff: {signal_approximation_diff}")
             logging.info(f"bkg estimate diff: {bkg_approximation_diff}")
+            aux_info["kde_error"] = np.sum(
+                np.abs(signal_approximation_diff - 1)
+            ) + np.sum(np.abs(bkg_approximation_diff - 1))
             metrics["signal_approximation_diff"].append(signal_approximation_diff)
             metrics["bkg_approximation_diff"].append(bkg_approximation_diff)
-
             metrics["kde_signal"].append(
                 rescale_kde(histograms["NOSYS"], kde["NOSYS"], bins)
             )
@@ -272,15 +329,15 @@ def run(
             }
 
             # Calculate the midpoint of the histogram
-            midpoint = len(histograms["bkg"]) // 2
+            midpoint = len(histograms["NOSYS"]) // 2
 
             # Split the histogram into lower and upper halves
-            lower_half = histograms["bkg"][:midpoint]
-            upper_half = histograms["bkg"][midpoint:]
+            lower_half = histograms["NOSYS"][:midpoint]
+            upper_half = histograms["NOSYS"][midpoint:]
 
             # Set inverted based on which half has the greater sum
             metrics["best_results"]["inverted"] = (
-                0 if lower_half.sum() > upper_half.sum() else 1
+                1 if lower_half.sum() > upper_half.sum() else 0
             )
 
             if config.objective == "cls":
@@ -304,7 +361,7 @@ def run(
 
         clear_caches()  # otherwise memore explodes
 
-    return best_params, metrics
+    return best_params, params, metrics
 
 
 def update_slope(config, i):
@@ -328,6 +385,14 @@ def update_slope(config, i):
     # slope = ((1 / m_0) - (i + 1) * delta_x) ** (-1)
 
     # truncate to largest value because want limited decay
+
+    # if i > int(0.75 * config.num_steps):
+    #     # the gradient scales linear with m
+    #     m = (1000 - 100) / int(0.25 * config.num_steps)
+    #     slope = m * i + 100
+    # else:
+    #     slope = 100
+
     if slope > m_n:
         return m_n
 
