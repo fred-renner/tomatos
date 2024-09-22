@@ -3,6 +3,7 @@ import numpy as np
 import pyhf
 
 Array = jnp.ndarray
+from functools import partial
 
 
 def get_generator_weight_envelope(hists):
@@ -64,7 +65,7 @@ def get_symmetric_up_down(nom, sys):
     return up, down
 
 
-def min_count_up_down(h, threshold):
+def threshold_uncertainty(h, threshold):
     # some options, plug this into wolfram alpha
     # abs(1-x)/x, e^(-5x+10), abs(1-x)/x^2, -10*x+10, -log(x) for x=[0,1],y=[0,5]
     # log worked best
@@ -108,9 +109,8 @@ def model_from_hists(
     )
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
-
     # minimum counts via penalization
-    bkg_protect_up, bkg_protect_down = min_count_up_down(
+    bkg_protect_up, bkg_protect_down = threshold_uncertainty(
         hists["bkg"],
         threshold=1,
     )
@@ -118,7 +118,7 @@ def model_from_hists(
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
-    bkg_vr_protect_up, bkg_vr_protect_down = min_count_up_down(
+    bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
         hists["bkg_VR_xbb_2"],
         threshold=2,
     )
@@ -134,7 +134,6 @@ def model_from_hists(
     # minimum bin value otherwise optimization can fail
     # important that this happens after the last nominal hist creations
     hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
-
 
     if do_m_hh:
         spec = {

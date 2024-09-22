@@ -13,6 +13,7 @@ from jaxopt import OptaxSolver
 
 import tomatos.histograms
 import tomatos.pipeline
+import equinox as eqx
 
 Array = jnp.ndarray
 
@@ -41,6 +42,7 @@ def run(
     batch_iterator,
     init_pars,
     nn,
+    nn_setup,
     args,
 ) -> tuple[Array, dict[str, list]]:
     # even though config is passed, need to keep redundant args here as this
@@ -55,8 +57,8 @@ def run(
         do_m_hh=config.do_m_hh,
         loss_type=config.objective,
         config=config,
-        bandwidth=0.2,
-        slope=1000,
+        bandwidth=0.15,
+        slope=700,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
@@ -70,46 +72,42 @@ def run(
 
     # increase cut steps
     scale_cut_step = optax.masked(optax.scale(config.cuts_factor), mask_fn)
-    # lr_schedule = optax.cosine_decay_schedule(
-    #     init_value=1e-3, decay_steps=config.num_steps, alpha=1e-4
+    # bw_decay = optax.cosine_decay_schedule(
+    #     init_value=0.15,
+    #     decay_steps=2000,
+    #     alpha=0.01 / 0.15,
     # )
+    bw_decay = optax.linear_schedule(
+        init_value=0.15,
+        end_value=0.01,
+        transition_steps=2500 if config.lr <= 1e-4 else 250,
+    )
 
-    # lr_schedule = optax.cosine_onecycle_schedule(
-    #     transition_steps=config.num_steps,
-    #     peak_value=args.aux_list[0],  # Set the peak learning rate
-    #     pct_start=args.aux_list[1],  # Percentage of steps to reach the peak value
-    #     div_factor=args.aux_list[
-    #         2
-    #     ],  # Factor by which to divide the peak value for the initial learning rate
-    #     final_div_factor=args.aux_list[
-    #         3
-    #     ],  # Factor by which to divide the peak value for the final learning rate
+    # bw_decay = optax.linear_schedule(
+    #     init_value=0.15,
+    #     end_value=0.01,
+    #     transition_steps=9,
     # )
-    # lr_schedule = optax.linear_onecycle_schedule(
-    #     transition_steps=config.num_steps,
-    #     peak_value=args.aux_list[0],  # Set the peak learning rate
-    #     pct_start=args.aux_list[1],  # Percentage of steps to reach the peak value
-    #     div_factor=args.aux_list[
-    #         2
-    #     ],  # Factor by which to divide the peak value for the initial learning rate
-    #     final_div_factor=args.aux_list[
-    #         3
-    #     ],  # Factor by which to divide the peak value for the final learning rate
-    #     pct_final=0.85,
-    # )
-
-    # for i in range(config.num_steps+10):
-    #     print(lr_schedule(i))
+    lr_schedule = optax.linear_onecycle_schedule(
+        transition_steps=config.num_steps,
+        peak_value=0.002,  # Set the peak learning rate
+        pct_start=0.3,  # Percentage of steps to reach the peak value
+        div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
+        final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
+        pct_final=0.85,
+    )
 
     optimizer = optax.chain(
-        optax.zero_nans(), # otherwise optimization entirely broken
+        optax.zero_nans(),  # otherwise optimization can break entirely
         optax.adam(config.lr),
         # scale_cut_step,
         # optax.masked(optax.clip(max_delta=config.aux), mask_fn),
         # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
     )
 
-    solver = OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)
+    solver = OptaxSolver(
+        loss, opt=optimizer, has_aux=True, jit=True, implicit_diff=True
+    )
 
     pyhf.set_backend("jax", default=True, precision="64b")
 
@@ -153,7 +151,6 @@ def run(
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
-            init_pars["bw"] = 0.15
 
             if config.include_bins:
                 init_pars["bins"] = config.bins
@@ -170,6 +167,7 @@ def run(
 
             for k in histograms.keys():
                 metrics[k] = []
+                metrics[k + "_test"] = []
 
         # warm reset doesn't seem to work
         # if i % 20 == 0:
@@ -188,6 +186,10 @@ def run(
 
         # Evaluate losses.
         # small bandwidth + large slope for true hists
+
+        slope = args.aux
+        bw = bw_decay(i)
+
         valid_result, valid_hists = loss(
             params.copy(),  # let's be sure we are not influencing the training
             data=valid,
@@ -211,21 +213,17 @@ def run(
             f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.4f}"
         )
 
-        slope = update_slope(config, i)
-        slope = 1000
-
+        # slope = update_slope(config, i)
+        # bw = bw_decay(i)
+        # bw = 0.01
         # update
         params, state = solver.update(
             params,
             state,
+            bandwidth=bw,
             data=train,
             slope=slope,
         )
-
-        # bound bw
-        params["bw"] = np.maximum(params["bw"], 0.01)
-        # pars["bw"] = jnp.abs(pars["bw"])
-        # pars["bw"] = 0.05
 
         histograms = state.aux
         bins = np.array(params["bins"]) if "bins" in params else config.bins
@@ -249,6 +247,7 @@ def run(
 
         for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
+            metrics[hist + "_test"].append(test_hists[hist])
 
         # write train loss here, as optaxsolver state.value holds loss[i-1] and
         # evaluation is expensive
@@ -258,8 +257,7 @@ def run(
             f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.4f}"
         )
 
-        # get yields from sharp hists using training data set
-        yields, kde = get_yields(config, nn, params, train, params["bw"], slope)
+        yields, kde = get_yields(config, nn, params, train, bw, slope)
 
         # # Z_A
         z_a = asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
@@ -282,11 +280,11 @@ def run(
 
             logging.info(f"vbf cut: {optimized_m_jj}")
             logging.info(f"eta cut: {optimized_eta_jj}")
-            logging.info(f"bw: {params['bw']}")
+            logging.info(f"bw: {bw}")
 
             metrics["vbf_cut"].append(optimized_m_jj)
             metrics["eta_cut"].append(optimized_eta_jj)
-            metrics["bw"].append(params["bw"])
+            metrics["bw"].append(bw)
 
             signal_approximation_diff = safe_divide(
                 histograms["NOSYS"], yields["NOSYS"]
@@ -325,7 +323,7 @@ def run(
                 "Z_A": z_a,
                 "bins": bins if config.include_bins else None,
                 "histograms": histograms,
-                "bandwidth": params["bw"],
+                "bandwidth": bw,
             }
 
             # Calculate the midpoint of the histogram
@@ -360,6 +358,11 @@ def run(
         logging.info("\n")
 
         clear_caches()  # otherwise memore explodes
+
+        # save model to file
+        if i % 10 == 0:
+            model = eqx.combine(params["nn_pars"], nn_setup)
+            eqx.tree_serialise_leaves(config.model_path + f"neos_model_{i}.eqx", model)
 
     return best_params, params, metrics
 
@@ -397,6 +400,17 @@ def update_slope(config, i):
         return m_n
 
     return slope
+
+
+def update_bw(config, i):
+    bw_0 = 0.15
+    # scale with lr
+    if config.lr > 1e-4:
+        m = -bw_0 / 500
+    else:
+        m = -bw_0 / 2500
+    y = m * i + bw_0
+    return np.maximum(y, 0.01)
 
 
 def additional_logging(config, params, histograms):
@@ -447,7 +461,7 @@ def asimov_sig(s, b) -> float:
 
 def rescale_kde(hist, kde, bins):
     # need to upscale very fine binned version of the histogram,
-    # resulting in much less entries per bin, to the actual bKDE to get a view
+    # results in much less entries per bin, to the actual bKDE to get a view
     # of the original kde
 
     # find the largest bin of binned kde hist
@@ -468,8 +482,8 @@ def rescale_kde(hist, kde, bins):
     return kde
 
 
-def get_yields(config, nn, params, data, bw, slope):
-    data_dct = {k: v for k, v in zip(config.data_types, data)}
+def get_yields(config, nn, params, train, bw, slope):
+    data_dct = {k: v for k, v in zip(config.data_types, train)}
     if config.do_m_hh:
         yields = tomatos.histograms.hists_from_mhh(
             data=data_dct,

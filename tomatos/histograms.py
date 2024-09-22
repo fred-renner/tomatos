@@ -54,7 +54,8 @@ def hist(
     # proof is for gaussian... and also wrong above, must be 3.49*sigma*n^(-1/3)
     # https://www.stat.cmu.edu/~rnugent/PCMI2016/papers/ScottBandwidth.pdf
 
-    bins = jnp.array([-jnp.inf, *bins, jnp.inf]) if reflect_infinities else bins
+    # bins = jnp.array([-jnp.inf, *bins, jnp.inf]) if reflect_infinities else bins
+    bins = jnp.array([-jnp.inf, *bins[1:-1], jnp.inf])
 
     # 7.2.3 nathan thesis
     # get cumulative counts (area under kde) for each set of bin edges
