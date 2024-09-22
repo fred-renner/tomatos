@@ -100,23 +100,24 @@ class Setup:
         # one step is one batch, not epoch
         self.num_steps = args.steps
 
-        # bw per epoch
-        # also tried bw in optimization, basically linear decrease
-        self.decay_quantile = 0.5
-        # self.bw = np.linspace(
-        #     0.2,
-        #     args.aux,
-        #     int(self.num_steps * self.decay_quantile),
-        # )
-        # # Pad the array to the desired size
-        # self.bw = np.pad(self.bw, (0, self.num_steps - self.bw.size), mode="edge")
-
         # fixed bw
         # self.bw = np.full(self.bw.shape, 0.15)
 
         if args.debug:
             self.num_steps = 10 if args.steps == 200 else args.steps
             # self.bw = np.full(self.num_steps, 0.15)
+
+        # bw per epoch
+        # also tried bw in optimization, basically linear decrease
+        self.decay_quantile = 0.5
+        self.bw = np.linspace(
+            0.15,
+            0.01,
+            int(self.num_steps * self.decay_quantile),
+        )
+        # Pad the array with last value
+        self.bw = np.pad(self.bw, (0, self.num_steps - self.bw.size), mode="edge")
+
         # can choose from "cls", "discovery", "bce"
         self.objective = args.loss
         # cuts scaled to parameter range [0,1]
@@ -150,8 +151,10 @@ class Setup:
         if self.debug:
             results_folder = "tomatos_debug/"
         self.results_path += results_folder
+        self.model_path = self.results_path + "models/"
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
+            os.makedirs(self.model_path)
 
         self.metadata_file_path = self.results_path + "metadata.json"
 

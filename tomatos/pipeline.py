@@ -57,7 +57,7 @@ def pipeline(
             vbf_cut=pars["vbf_cut"],
             eta_cut=pars["eta_cut"],
             data=data_dct,
-            bandwidth=pars["bw"],
+            bandwidth=bandwidth,
             slope=slope,
             bins=bins,
         )

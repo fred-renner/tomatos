@@ -389,7 +389,7 @@ def plot_total_diff(metrics, config, fig_size):
 
         plt.xlabel("Epoch")
         plt.ylabel("Summed relative Binned KDE/Nominal")
-        plt.ylim([0, 5])
+        plt.ylim([0, 2])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "summed_diff.pdf"

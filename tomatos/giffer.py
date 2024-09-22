@@ -19,9 +19,7 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
-    models = [
-        "tomatos_bce_5_10000_lr_0p0001_k_0"
-    ]
+    models = ["tomatos_debug"]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
@@ -35,14 +33,16 @@ if __name__ == "__main__":
         meta_data["config"]["data_types"] += ["bkg_shape_sys_up", "bkg_shape_sys_down"]
         meta_data["config"]["data_types"] += ["ps_up", "ps_down"]
         meta_data["config"]["data_types"].remove("ps")
+        meta_data["config"]["data_types"] = ["NOSYS","bkg"]
         for i in range(len(meta_data["metrics"]["NOSYS"])):
-            if i % 50 != 0:
-                continue
+            # if i % 100 != 0:
+            #     continue
             # if i != 1986:
             #     continue
             print(i)
             # loop over hists
             plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(5, 5))
             for hist_name in meta_data["config"]["data_types"]:
 
                 bkg_regions = [

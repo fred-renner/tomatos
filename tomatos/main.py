@@ -70,6 +70,7 @@ def run():
         batch_iterator=batch_iterator,
         init_pars=init_pars,
         nn=nn,
+        nn_setup=nn_setup,
         args=args,
     )
 
@@ -78,7 +79,7 @@ def run():
         json.dump(tomatos.utils.to_python_lists(metrics["best_results"]), file)
         logging.info(config.best_epoch_results_path)
 
-    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=train)
+    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 
     results = {
         "config": tomatos.utils.to_python_lists(config.__dict__),
@@ -89,10 +90,10 @@ def run():
 
     # save model to file
     model = eqx.combine(best_params["nn_pars"], nn_setup)
-    eqx.tree_serialise_leaves(config.results_path + "neos_model.eqx", model)
+    eqx.tree_serialise_leaves(config.model_path + "best_epoch_neos_model.eqx", model)
 
-    model = eqx.combine(best_params["nn_pars"], nn_setup)
-    eqx.tree_serialise_leaves(config.results_path + "last_epoch_neos_model.eqx", model)
+    model = eqx.combine(last_params["nn_pars"], nn_setup)
+    eqx.tree_serialise_leaves(config.model_path + "last_epoch_neos_model.eqx", model)
 
     # save metadata
     with open(config.metadata_file_path, "w") as file:
