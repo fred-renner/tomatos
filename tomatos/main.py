@@ -81,23 +81,27 @@ def run():
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 
-    results = {
+    # save model to file
+    model = eqx.combine(best_params["nn_pars"], nn_setup)
+    eqx.tree_serialise_leaves(config.model_path + "epoch_best.eqx", model)
+
+    model = eqx.combine(last_params["nn_pars"], nn_setup)
+    eqx.tree_serialise_leaves(config.model_path + "epoch_last.eqx", model)
+
+    # save metrics
+    with open(config.metrics_file_path, "w") as file:
+        json.dump(tomatos.utils.to_python_lists(metrics), file)
+        logging.info(config.metrics_file_path)
+
+    md = {
         "config": tomatos.utils.to_python_lists(config.__dict__),
-        "metrics": tomatos.utils.to_python_lists(metrics),
         "bins": tomatos.utils.to_python_lists(bins),
         "yields": tomatos.utils.to_python_lists(yields),
     }
 
-    # save model to file
-    model = eqx.combine(best_params["nn_pars"], nn_setup)
-    eqx.tree_serialise_leaves(config.model_path + "best_epoch_neos_model.eqx", model)
-
-    model = eqx.combine(last_params["nn_pars"], nn_setup)
-    eqx.tree_serialise_leaves(config.model_path + "last_epoch_neos_model.eqx", model)
-
     # save metadata
     with open(config.metadata_file_path, "w") as file:
-        json.dump(results, file)
+        json.dump(md, file)
         logging.info(config.metadata_file_path)
 
     plot()
@@ -109,9 +113,11 @@ def plot():
     with open(config.metadata_file_path, "r") as file:
         results = json.load(file)
 
+    with open(config.metrics_file_path, "r") as file:
+        metrics = json.load(file)
     tomatos.plotting.main(
         results["config"],
         results["bins"],
         results["yields"],
-        results["metrics"],
+        metrics,
     )

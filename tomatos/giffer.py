@@ -19,31 +19,40 @@ def create_gif_from_folder(folder_path, output_filename, duration=0.5):
 if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
-    models = ["tomatos_debug"]
+    models = [
+        "tomatos_debug",
+    ]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
         with open(model_path + "metadata.json", "r") as file:
             meta_data = json.load(file)
+
+        with open(model_path + "metrics.json", "r") as file:
+            metrics = json.load(file)
         image_path = model_path + "/images"
         if not os.path.isdir(image_path):
             os.makedirs(image_path)
         # loop over epochs
 
-        meta_data["config"]["data_types"] += ["bkg_shape_sys_up", "bkg_shape_sys_down"]
-        meta_data["config"]["data_types"] += ["ps_up", "ps_down"]
-        meta_data["config"]["data_types"].remove("ps")
-        meta_data["config"]["data_types"] = ["NOSYS","bkg"]
-        for i in range(len(meta_data["metrics"]["NOSYS"])):
-            # if i % 100 != 0:
-            #     continue
-            # if i != 1986:
+        # meta_data["config"]["data_types"] += ["bkg_shape_sys_up", "bkg_shape_sys_down"]
+        # meta_data["config"]["data_types"] += ["ps_up", "ps_down"]
+        # meta_data["config"]["data_types"] += ["gen_up", "gen_down"]
+        # meta_data["config"]["data_types"].remove("ps")
+        # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
+        for i in range(len(metrics["NOSYS"])):
+            if i % 1 != 0:
+                continue
+            # if i != 9999:
             #     continue
             print(i)
             # loop over hists
-            plt.figure(figsize=(10, 8))
+            # plt.figure(figsize=(10, 8))
             plt.figure(figsize=(5, 5))
-            for hist_name in meta_data["config"]["data_types"]:
+            for hist_name, hist in metrics.items():
+                hist = np.array(hist)
+                if hist.ndim != 2:
+                    continue
 
                 bkg_regions = [
                     "bkg_CR_xbb_1",
@@ -58,8 +67,17 @@ if __name__ == "__main__":
                     "bkg_stat_down",
                     "NOSYS_stat_up",
                     "NOSYS_stat_down",
+                    "kde",
+                    "test",
+                    "ps",
+                    "diff",
                 ]
                 if any([reg in hist_name for reg in bkg_regions]):
+                    continue
+
+                if "GEN" in hist_name:
+                    continue
+                if "protect" in hist_name:
                     continue
 
                 label = hist_name.replace("_", " ")
@@ -75,7 +93,7 @@ if __name__ == "__main__":
 
                 plt.stairs(
                     edges=meta_data["config"]["bins"],
-                    values=meta_data["metrics"][hist_name][i],
+                    values=metrics[hist_name][i],
                     label=label,
                     fill=None,
                     linewidth=1,
@@ -94,30 +112,30 @@ if __name__ == "__main__":
             else:
                 plt.xlabel("NN score")
 
-            if "kde_signal" in meta_data["metrics"]:
+            if meta_data["config"]["objective"] == "cls":
                 plt.plot(
-                    np.linspace(0, 1, len(meta_data["metrics"]["kde_signal"][0])),
-                    meta_data["metrics"]["kde_signal"][i],
+                    np.linspace(0, 1, len(metrics["kde_signal"][0]))[1:-1],
+                    metrics["kde_signal"][i][1:-1],
                     label="kde signal",
                     color="tab:orange",
                 )
                 plt.plot(
-                    np.linspace(0, 1, len(meta_data["metrics"]["kde_bkg"][0])),
-                    meta_data["metrics"]["kde_bkg"][i],
+                    np.linspace(0, 1, len(metrics["kde_bkg"][0]))[1:-1],
+                    metrics["kde_bkg"][i][1:-1],
                     label="kde bkg",
                     color="tab:blue",
                 )
 
             plt.stairs(
                 edges=meta_data["config"]["bins"],
-                values=meta_data["metrics"]["bkg"][i],
+                values=metrics["bkg"][i],
                 fill=None,
                 linewidth=2,
                 color="tab:blue",
             )
             plt.stairs(
                 edges=meta_data["config"]["bins"],
-                values=meta_data["metrics"]["NOSYS"][i],
+                values=metrics["NOSYS"][i],
                 fill=None,
                 linewidth=2,
                 color="tab:orange",

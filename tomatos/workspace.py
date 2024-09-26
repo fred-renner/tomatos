@@ -17,9 +17,9 @@ def get_generator_weight_envelope(hists):
         "GEN_MUR20_MUF10_PDF260000",
         "GEN_MUR20_MUF20_PDF260000",
     ]
-    diffs = jnp.zeros((len(gens), nominal.shape[0]))
-    for i, gen in enumerate(gens):
-        diffs.at[i].set(jnp.abs(hists[gen] - nominal))
+
+    gen_hists = jnp.array([hists[gen] for gen in gens])
+    diffs = jnp.abs(gen_hists - nominal)
     max_diffs = jnp.max(diffs, axis=0)
     envelope_up = jnp.array(nominal + max_diffs)
     envelope_down = jnp.array(nominal - max_diffs)
@@ -65,11 +65,11 @@ def get_symmetric_up_down(nom, sys):
     return up, down
 
 
-def threshold_uncertainty(h, threshold):
+def threshold_uncertainty(h, threshold, a):
     # some options, plug this into wolfram alpha
     # abs(1-x)/x, e^(-5x+10), abs(1-x)/x^2, -10*x+10, -log(x) for x=[0,1],y=[0,5]
     # log worked best
-    penalty = jnp.where(h < threshold, -50 * jnp.log(jnp.abs(h / threshold)), 0)
+    penalty = jnp.where(h < threshold, -a * jnp.log(h / threshold), 0)
     up = 1 + penalty
     down = 1 - penalty
 
@@ -111,16 +111,14 @@ def model_from_hists(
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
     # minimum counts via penalization
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
-        hists["bkg"],
-        threshold=1,
+        hists["bkg"], threshold=1, a=config.aux
     )
 
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
-        hists["bkg_VR_xbb_2"],
-        threshold=2,
+        hists["bkg_VR_xbb_2"], threshold=2, a=config.aux
     )
 
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up

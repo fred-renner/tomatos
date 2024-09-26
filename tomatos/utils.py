@@ -8,6 +8,7 @@ import pyhf
 
 import tomatos.histograms
 import tomatos.optimization
+import tomatos.workspace
 
 Array = jnp.ndarray
 
@@ -38,6 +39,14 @@ def get_hist(config, nn, best_params, data):
             bandwidth=1e-6,
             slope=1e6,
             bins=best_params["bins"] if config.include_bins else config.bins,
+        )
+        model, yields = tomatos.workspace.model_from_hists(
+            do_m_hh=False,
+            hists=yields,
+            config=config,
+            do_systematics=config.do_systematics,
+            do_stat_error=config.do_stat_error,
+            validate_only=False,
         )
     logging.info(
         (

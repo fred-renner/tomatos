@@ -12,13 +12,11 @@ import pyhf
 from jaxopt import OptaxSolver
 
 import tomatos.histograms
+import tomatos.workspace
 import tomatos.pipeline
 import equinox as eqx
 
 Array = jnp.ndarray
-
-
-w_CR = 0.003785385121790652
 
 
 # clear caches each update otherwise memory explodes
@@ -57,13 +55,14 @@ def run(
         do_m_hh=config.do_m_hh,
         loss_type=config.objective,
         config=config,
-        bandwidth=0.15,
-        slope=700,
+        bandwidth=0.2,
+        slope=1000,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
         aux_info=aux_info,
     )
+    config.aux = args.aux
 
     # Define a mask function that selectively scales only 'vbf_cut' and 'eta_cut'
     def mask_fn(params):
@@ -78,24 +77,19 @@ def run(
     #     alpha=0.01 / 0.15,
     # )
     bw_decay = optax.linear_schedule(
-        init_value=0.15,
+        init_value=0.2,
         end_value=0.01,
         transition_steps=2500 if config.lr <= 1e-4 else 250,
     )
 
-    # bw_decay = optax.linear_schedule(
-    #     init_value=0.15,
-    #     end_value=0.01,
-    #     transition_steps=9,
+    # lr_schedule = optax.linear_onecycle_schedule(
+    #     transition_steps=config.num_steps,
+    #     peak_value=0.002,  # Set the peak learning rate
+    #     pct_start=0.3,  # Percentage of steps to reach the peak value
+    #     div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
+    #     final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
+    #     pct_final=0.85,
     # )
-    lr_schedule = optax.linear_onecycle_schedule(
-        transition_steps=config.num_steps,
-        peak_value=0.002,  # Set the peak learning rate
-        pct_start=0.3,  # Percentage of steps to reach the peak value
-        div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
-        final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
-        pct_final=0.85,
-    )
 
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
@@ -105,9 +99,7 @@ def run(
         # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
     )
 
-    solver = OptaxSolver(
-        loss, opt=optimizer, has_aux=True, jit=True, implicit_diff=True
-    )
+    solver = OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)
 
     pyhf.set_backend("jax", default=True, precision="64b")
 
@@ -187,7 +179,7 @@ def run(
         # Evaluate losses.
         # small bandwidth + large slope for true hists
 
-        slope = args.aux
+        slope = 1000
         bw = bw_decay(i)
 
         valid_result, valid_hists = loss(
@@ -213,9 +205,6 @@ def run(
             f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.4f}"
         )
 
-        # slope = update_slope(config, i)
-        # bw = bw_decay(i)
-        # bw = 0.01
         # update
         params, state = solver.update(
             params,
@@ -362,7 +351,7 @@ def run(
         # save model to file
         if i % 10 == 0:
             model = eqx.combine(params["nn_pars"], nn_setup)
-            eqx.tree_serialise_leaves(config.model_path + f"neos_model_{i}.eqx", model)
+            eqx.tree_serialise_leaves(config.model_path + f"epoch_{i}.eqx", model)
 
     return best_params, params, metrics
 
@@ -503,6 +492,14 @@ def get_yields(config, nn, params, train, bw, slope):
             slope=1e6,
             bins=bins,
         )
+        model, yields = tomatos.workspace.model_from_hists(
+            do_m_hh=False,
+            hists=yields,
+            config=config,
+            do_systematics=config.do_systematics,
+            do_stat_error=config.do_stat_error,
+            validate_only=False,
+        )
         # dont need them for all
         kde_dict = dict((k, data_dct[k]) for k in ("NOSYS", "bkg"))
         kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
@@ -517,9 +514,5 @@ def get_yields(config, nn, params, train, bw, slope):
             slope=slope,
             bins=kde_bins,
         )
-    if config.objective == "cls":
-        for y in yields.keys():
-            if "bkg" in y:
-                yields[y] *= w_CR
 
     return yields, kde
