@@ -62,10 +62,6 @@ def pipeline(
             bins=bins,
         )
 
-    # if you want s/b discrimination, no need to do anything complex!
-    if loss_type.lower() in ["bce", "binary cross-entropy"]:
-        return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
-
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
         do_m_hh,
@@ -75,6 +71,10 @@ def pipeline(
         do_stat_error,
         validate_only,
     )
+
+    # if you want s/b discrimination, no need to do anything complex!
+    if loss_type.lower() in ["bce", "binary cross-entropy"]:
+        return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
 
     if validate_only:
         loss_value = neos.loss_from_model(model, loss=loss_type)

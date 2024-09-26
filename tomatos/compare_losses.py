@@ -48,11 +48,12 @@ models = [
 
 plt.figure(figsize=(10, 6))
 for m in models:
-    
+
     model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
     with open(model_path + "metadata.json", "r") as file:
         md = json.load(file)
     n_bins = len(md["metrics"]["signal_approximation_diff"][0])
+
     total_sig_diff = np.sum(
         np.abs(np.array(md["metrics"]["signal_approximation_diff"]) - 1), axis=1
     )
@@ -63,12 +64,12 @@ for m in models:
 
     aux_str = ", bw=" + no_fold_m.split("_")[-1]
 
-    plt.plot(total_sig_diff, label=r"$\kappa_\mathrm{2V}=0$ signal" + aux_str)
-    plt.plot(total_bkg_diff, label="Background Estimate" + aux_str)
+    plt.plot(total_sig_diff / n_bins, label=r"$\kappa_\mathrm{2V}=0$ signal" + aux_str)
+    plt.plot(total_bkg_diff / n_bins, label="Background Estimate" + aux_str)
 
 plt.xlabel("Epoch")
-plt.ylabel("Summed relative Binned KDE/Nominal")
-plt.ylim([0, 1])
+plt.ylabel("Relative Bin Average Binned KDE/Yield")
+plt.ylim([0, 0.2])
 plt.legend()
 plt.tight_layout()
 plot_path = "/lustre/fs22/group/atlas/freder/hh/run/plots/compare_summed_diff.pdf"

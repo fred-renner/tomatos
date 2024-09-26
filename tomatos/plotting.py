@@ -3,13 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyhf
 import relaxed
-
+import os
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 import logging
-
-w_CR = 0.003785385121790652
 
 
 def interpolate_gaps(values, limit=None):
@@ -31,46 +29,39 @@ def interpolate_gaps(values, limit=None):
     return filled
 
 
-import matplotlib.pyplot as plt
-import numpy as np
-
-
 def plot_hist(config, bins, yields, metrics, fig_size):
     fig = plt.figure(figsize=fig_size)
     for l, a in zip(yields, jnp.array(list(yields.values()))):
         # if "JET" in l or "GEN" in l:
         #     break
-
-        bkg_regions = [
+        unwanted_hists = [
             "bkg_CR_xbb_1",
             "bkg_CR_xbb_2",
             "bkg_VR_xbb_1",
             "bkg_VR_xbb_2",
-            "bkg_VR_xbb_1_NW",
-            "bkg_VR_xbb_2_NW",
             "bkg_stat_up",
             "bkg_stat_down",
             "bkg_stat_up",
             "bkg_stat_down",
             "NOSYS_stat_up",
             "NOSYS_stat_down",
+            "ps",
         ]
-        if any([l == reg for reg in bkg_regions]):
+        if any([l == h for h in unwanted_hists]):
             continue
 
-        if "JET" in l:
+        if "GEN" in l:
             continue
+        if "protect" in l:
+            continue
+
         l = l.replace("_", " ")
 
         if "bkg" == l:
             l = "Background Estimate"
-            if config["objective"] != "bce":
-                a *= w_CR
         if "NOSYS" == l:
             l = r"$\kappa_\mathrm{2V}=0$ signal"
 
-        if "ps" == l:
-            l = "Parton Shower 1down"
         if config["do_m_hh"]:
             if config["include_bins"]:
                 bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
@@ -108,7 +99,7 @@ def plot_hist(config, bins, yields, metrics, fig_size):
         # this makes sig and bkg only
         # if l == "NOSYS":
         #     break
-    
+
     ax = plt.gca()
     newLim = list(ax.get_ylim())
     newLim[1] = newLim[1] * 1.3
@@ -126,15 +117,11 @@ def plot_hist(config, bins, yields, metrics, fig_size):
             label="kde bkg",
             color="tab:blue",
         )
-    plt.legend(fontsize=5, ncol=3)
+    plt.legend(fontsize=5, ncol=2, loc="upper center")
 
     plt.stairs(
         edges=bins,
-        values=(
-            yields["bkg"]
-            if config["objective"] == "bce"
-            else np.array(yields["bkg"]) * w_CR
-        ),
+        values=(yields["bkg"]),
         label="Background Estimate",
         fill=None,
         linewidth=2,
@@ -273,67 +260,45 @@ def plot_cuts(metrics, config, epoch_grid, fig_size):
         plt.close()
 
 
-def plot_bkg_shape_sys(metrics, config, epoch_grid, fig_size):
-    if len(metrics["bkg_shape_sys_up"]) > 0:
+def plot_rel_error(metrics, hist, config, epoch_grid, fig_size):
+    if len(metrics[hist]) > 0:
         plt.figure(figsize=fig_size)
-        up = np.array(metrics["bkg_shape_sys_up"])
-        down = np.array(metrics["bkg_shape_sys_down"])
+        err = np.array(metrics[hist])
         bkg = np.array(metrics["bkg"])
-        rel_up = up / bkg
+        ratio = err / bkg
 
-        for i in range(len(metrics["bkg_shape_sys_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
-
-        plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
-        plt.legend()
-        plt.tight_layout()
-        plot_path = config["results_path"] + "bkg_shape_sys_rel_error.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
-
-
-def plot_ps(metrics, config, epoch_grid, fig_size):
-    if len(metrics["ps_up"]) > 0:
-        plt.figure(figsize=fig_size)
-        up = np.array(metrics["ps_up"])
-        down = np.array(metrics["ps_down"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
-
-        for i in range(len(metrics["ps_up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+        for i in range(len(metrics[hist][0])):
+            plt.plot(ratio[:, i], label=f"Bin {i+1}")
 
         plt.xlabel("Epoch")
         plt.ylabel("Relative Error (err/nominal)")
         plt.legend()
         plt.tight_layout()
-        plot_path = config["results_path"] + "ps_rel_error.pdf"
+        plot_path = config["results_path"] + f"{hist}_rel_error.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_xbb_pt(metrics, config, epoch_grid, fig_size):
-    if len(metrics["xbb_pt_bin_3__1up"]) > 0:
-        plt.figure(figsize=fig_size)
-        up = np.array(metrics["xbb_pt_bin_3__1up"])
-        down = np.array(metrics["ps_down"])
-        bkg = np.array(metrics["NOSYS"])
-        rel_up = up / bkg
+def plot_hists(metrics, config, epoch_grid, fig_size):
+    for k, m in metrics.items():
+        if "kde" in k:
+            continue
+        m = np.array(m)
+        if m.ndim == 2:
+            plt.figure(figsize=fig_size)
 
-        for i in range(len(metrics["xbb_pt_bin_3__1up"][0])):
-            plt.plot(rel_up[:, i], label=f"Bin {i+1}")
+            for i in range(len(m[0])):
+                plt.plot(m[:, i], label=f"Bin {i+1}")
 
-        plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
-        plt.legend()
-        plt.tight_layout()
-        plot_path = config["results_path"] + "xbb_pt_bin_3_rel_error.pdf"
-        print(plot_path)
-        plt.savefig(plot_path)
-        plt.close()
+            plt.xlabel("Epoch")
+            plt.ylabel(k.replace("_", " "))
+            plt.legend()
+            plt.tight_layout()
+            plot_path = config["results_path"] + f"hists/{k}.pdf"
+            print(plot_path)
+            plt.savefig(plot_path)
+            plt.close()
 
 
 def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
@@ -345,7 +310,7 @@ def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
-        plt.ylim([0.75, 1.25])
+        plt.ylim([0.75, 2])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "signal_approximation_diff.pdf"
@@ -389,7 +354,7 @@ def plot_total_diff(metrics, config, fig_size):
 
         plt.xlabel("Epoch")
         plt.ylabel("Summed relative Binned KDE/Nominal")
-        plt.ylim([0, 2])
+        plt.ylim([0, 1])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "summed_diff.pdf"
@@ -400,22 +365,34 @@ def plot_total_diff(metrics, config, fig_size):
 
 # Main function to call the plots
 def main(config, bins, yields, metrics):
+
+    if not os.path.isdir(config["results_path"] + "/hists/"):
+        os.makedirs(config["results_path"] + "/hists/")
+
     plt.rcParams.update({"font.size": 16})
     plt.rcParams["lines.linewidth"] = 1
     epoch_grid = range(1, config["num_steps"] + 1)
     fig_size = (6, 5)
+
     plot_hist(config, bins, yields, metrics, fig_size)
     plot_Z_A(metrics, config, epoch_grid, fig_size)
     if config["objective"] == "cls":
+        plot_hists(metrics, config, epoch_grid, fig_size)
         plot_cls(metrics, config, epoch_grid, fig_size)
         plot_bw(metrics, config, epoch_grid, fig_size)
-        plot_bins(metrics, config, epoch_grid, fig_size)
+        # plot_bins(metrics, config, epoch_grid, fig_size)
         plot_cuts(metrics, config, epoch_grid, fig_size)
-        plot_bkg_shape_sys(metrics, config, epoch_grid, fig_size)
-        plot_ps(metrics, config, epoch_grid, fig_size)
-        plot_xbb_pt(metrics, config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "xbb_pt_bin_3__1up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "gen_up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "ps_up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "bkg_shape_sys_up", config, epoch_grid, fig_size)
         plot_signal_approximation(metrics, config, epoch_grid, fig_size)
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
         plot_total_diff(metrics, config, fig_size)
     elif config["objective"] == "bce":
+        plot_hists(metrics, config, epoch_grid, fig_size)
         plot_bce(metrics, config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "xbb_pt_bin_3__1up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "gen_up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "ps_up", config, epoch_grid, fig_size)
+        plot_rel_error(metrics, "bkg_shape_sys_up", config, epoch_grid, fig_size)

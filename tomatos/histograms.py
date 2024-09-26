@@ -16,7 +16,6 @@ JAX_CHECK_TRACER_LEAKS = True
 Array = jnp.ndarray
 import relaxed
 
-w_CR = 0.003785385121790652
 
 
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
@@ -207,9 +206,6 @@ def hists_from_nn(
         hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
         hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
         hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
-
-    if config.objective == "bce":
-        hists["bkg"] *= w_CR
 
     return hists
 
