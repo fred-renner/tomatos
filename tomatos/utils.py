@@ -86,7 +86,7 @@ def to_python_lists(obj):
     dict
         output dict
     """
-    if isinstance(obj, (np.ndarray, jnp.DeviceArray)):
+    if isinstance(obj, (np.ndarray, jnp.ndarray)):
         # Convert arrays to Python lists
         return obj.tolist()
     elif isinstance(obj, dict):

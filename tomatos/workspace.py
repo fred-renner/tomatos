@@ -40,9 +40,6 @@ def get_bkg_weight(hists, config):
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
 
-    # it really does not like literally empty bins
-    CR_4b_Data += 1e-15
-    CR_2b_Data += 1e-15
     w_CR = CR_4b_Data / CR_2b_Data
     err_w_CR = w_CR * jnp.sqrt(
         jnp.square(errCR1 / CR_4b_Data) + jnp.square(errCR2 / CR_2b_Data)
@@ -52,9 +49,6 @@ def get_bkg_weight(hists, config):
 
 
 def get_symmetric_up_down(nom, sys):
-    # it really does not like literally empty bins
-    nom += 1e-15
-    sys += 1e-15
     relative = jnp.abs((nom - sys) / nom)
     up = 1 + relative
     down = 1 - relative
@@ -66,14 +60,16 @@ def get_symmetric_up_down(nom, sys):
 
 
 def threshold_uncertainty(h, threshold, a):
-    # some options, plug this into wolfram alpha
-    # abs(1-x)/x, e^(-5x+10), abs(1-x)/x^2, -10*x+10, -log(x) for x=[0,1],y=[0,5]
-    # log worked best
-    penalty = jnp.where(h < threshold, -a * jnp.log(h / threshold), 0)
+    # log behavior is too little and exponential is too agressive, go for
+    # somplest divergent power law, needs h^2 otherwise penalty hist is only
+    # when applied back to nominal hist --> multiply h
+    # maybe h^2 too slow at beginning
+    # penalty = jnp.where(h < threshold, -a * (h - threshold) / (h**2), 0)
+    penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
     up = 1 + penalty
     down = 1 - penalty
 
-    up = jnp.where(up > 100, 100, up)
+    # up = jnp.where(up > 1000, 1000, up)
     down = jnp.where(down < 0, 0, down)
 
     return up, down
@@ -111,14 +107,18 @@ def model_from_hists(
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
     # minimum counts via penalization
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
-        hists["bkg"], threshold=1, a=config.aux
+        hists["bkg"],
+        threshold=1,
+        a=config.aux,
     )
 
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
-        hists["bkg_VR_xbb_2"], threshold=2, a=config.aux
+        hists["bkg_VR_xbb_2"],
+        threshold=2,
+        a=config.aux,
     )
 
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
@@ -176,7 +176,6 @@ def model_from_hists(
                     },
                 )
             if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
-                gen_up, gen_down = get_generator_weight_envelope(hists)
                 signal_modifiers += (
                     {
                         "name": "scale_variations",

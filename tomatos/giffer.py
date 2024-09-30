@@ -20,7 +20,18 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     models = [
-        "tomatos_debug",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_200_t_1_k_0",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_200_t_1_k_1",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_200_t_1_k_2",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_200_t_1_k_3",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_0100_t_1_k_0",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_0125_t_1_k_0",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_0150_t_1_k_0",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_0200_t_1_k_0",
+        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_0",
+        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_1",
+        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_2",
+        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_3",
     ]
     ymax = 0
     for m in models:
@@ -41,7 +52,7 @@ if __name__ == "__main__":
         # meta_data["config"]["data_types"].remove("ps")
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
         for i in range(len(metrics["NOSYS"])):
-            if i % 1 != 0:
+            if i % 100 != 0:
                 continue
             # if i != 9999:
             #     continue
@@ -77,9 +88,11 @@ if __name__ == "__main__":
 
                 if "GEN" in hist_name:
                     continue
-                if "protect" in hist_name:
-                    continue
+                # if "protect" in hist_name:
+                #     continue
 
+                # if "xbb" in hist_name:
+                #     continue
                 label = hist_name.replace("_", " ")
 
                 if "bkg" == label:
@@ -93,7 +106,8 @@ if __name__ == "__main__":
 
                 plt.stairs(
                     edges=meta_data["config"]["bins"],
-                    values=metrics[hist_name][i],
+                    # values=metrics[hist_name][i],
+                    values=metrics[hist_name + "_test"][i],
                     label=label,
                     fill=None,
                     linewidth=1,
