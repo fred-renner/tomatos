@@ -63,7 +63,7 @@ def run():
 
     batch_iterator = tomatos.batching.make_iterator(train, batch_size=config.batch_size)
 
-    best_params, last_params, metrics = tomatos.optimization.run(
+    best_params, last_params, metrics,infer_metrics = tomatos.optimization.run(
         config=config,
         valid=valid,
         test=test,
@@ -74,10 +74,10 @@ def run():
         args=args,
     )
 
-    # save best epoch
-    with open(config.best_epoch_results_path, "w") as file:
-        json.dump(tomatos.utils.to_python_lists(metrics["best_results"]), file)
-        logging.info(config.best_epoch_results_path)
+    # # save best epoch
+    # with open(config.best_epoch_results_path, "w") as file:
+    #     json.dump(tomatos.utils.to_python_lists(metrics["best_results"]), file)
+    #     logging.info(config.best_epoch_results_path)
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 
@@ -92,6 +92,11 @@ def run():
     with open(config.metrics_file_path, "w") as file:
         json.dump(tomatos.utils.to_python_lists(metrics), file)
         logging.info(config.metrics_file_path)
+
+    # save infer_metrics
+    with open(config.model_path + "infer_metrics.json", "w") as file:
+        json.dump(tomatos.utils.to_python_lists(infer_metrics), file)
+        logging.info(config.model_path + "infer_metrics.json")
 
     md = {
         "config": tomatos.utils.to_python_lists(config.__dict__),

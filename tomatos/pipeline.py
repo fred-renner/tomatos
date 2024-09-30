@@ -3,11 +3,9 @@ from typing import Callable, Iterable
 import jax.numpy as jnp
 import neos
 import pyhf
-import jax
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
-import logging
 
 pyhf.set_backend("jax")
 

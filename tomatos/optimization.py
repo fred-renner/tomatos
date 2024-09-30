@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pyhf
-
+import jax
 from jaxopt import OptaxSolver
 
 import tomatos.histograms
@@ -128,12 +128,12 @@ def run(
             "bkg_approximation_diff",
             "kde_signal",
             "kde_bkg",
-            "best_epoch",
             "bw",
             "slope",
+            "best_epoch",
         ]
     }
-
+    infer_metrics = {}
     # one step is one batch (not necessarily epoch)
     for i in range(config.num_steps):
         start = perf_counter()
@@ -291,6 +291,11 @@ def run(
             )
             metrics["kde_bkg"].append(rescale_kde(histograms["bkg"], kde["bkg"], bins))
 
+            infer_metrics_i = {
+                "inverted": is_inverted(histograms["NOSYS"]),
+                "vbf_cut": metrics["vbf_cut"][-1],
+                "eta_cut": metrics["eta_cut"][-1],
+            }
         # once some bin value is nan, everything breaks unrecoverable, also
         # re-init does not work
         if any(np.isnan(bins)):
@@ -303,57 +308,24 @@ def run(
         if metrics[objective][-1] < best_valid_loss:
             best_params = params
             best_valid_loss = metrics[objective][-1]
-            # write best results
-            metrics["best_results"] = {
-                "epoch": i,
-                "train_loss": metrics[f"{config.objective}_train"][-1],
-                "valid_loss": metrics[f"{config.objective}_valid"][-1],
-                "test_loss": metrics[f"{config.objective}_test"][-1],
-                "Z_A": z_a,
-                "bins": bins if config.include_bins else None,
-                "histograms": histograms,
-                "bandwidth": bw,
-            }
-
-            # Calculate the midpoint of the histogram
-            midpoint = len(histograms["NOSYS"]) // 2
-
-            # Split the histogram into lower and upper halves
-            lower_half = histograms["NOSYS"][:midpoint]
-            upper_half = histograms["NOSYS"][midpoint:]
-
-            # Set inverted based on which half has the greater sum
-            metrics["best_results"]["inverted"] = (
-                1 if lower_half.sum() > upper_half.sum() else 0
-            )
-
-            if config.objective == "cls":
-                metrics["best_results"].update(
-                    {
-                        "vbf_cut": optimized_m_jj,
-                        "eta_cut": optimized_eta_jj,
-                        "signal_approximation_diff": (
-                            metrics["signal_approximation_diff"][-1]
-                        ),
-                        "bkg_approximation_diff": (
-                            metrics["bkg_approximation_diff"][-1]
-                        ),
-                    }
-                )
-            logging.info(f"NEW BEST PARAMS IN EPOCH {i}")
-
+            metrics["epoch_best"] = i
+            infer_metrics["epoch_best"] = infer_metrics_i
+            infer_metrics["epoch_best"]["epoch"] = i
+        # save every 10th model to file
+        if i % 10 == 0 and i != 0:
+            infer_metrics[str(i)] = infer_metrics_i
+            model = eqx.combine(params["nn_pars"], nn_setup)
+            eqx.tree_serialise_leaves(config.model_path + f"epoch_{i:004d}.eqx", model)
+        if i == (config.num_steps - 1):
+            infer_metrics["epoch_last"] = infer_metrics_i
+        print(infer_metrics)
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
         logging.info("\n")
 
         clear_caches()  # otherwise memore explodes
 
-        # save model to file
-        if i % 10 == 0:
-            model = eqx.combine(params["nn_pars"], nn_setup)
-            eqx.tree_serialise_leaves(config.model_path + f"epoch_{i}.eqx", model)
-
-    return best_params, params, metrics
+    return best_params, params, metrics, infer_metrics
 
 
 def update_slope(config, i):
@@ -516,3 +488,16 @@ def get_yields(config, nn, params, train, bw, slope):
         )
 
     return yields, kde
+
+
+def is_inverted(hist):
+    # Set inverted based on which half has the greater sum
+
+    # Calculate the midpoint of the histogram
+    midpoint = len(hist) // 2
+
+    # Split the histogram into lower and upper halves
+    lower_half = hist[:midpoint]
+    upper_half = hist[midpoint:]
+
+    return 1 if lower_half.sum() > upper_half.sum() else 0
