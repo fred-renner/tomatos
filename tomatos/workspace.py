@@ -68,8 +68,7 @@ def threshold_uncertainty(h, threshold, a, apply="below"):
     if apply == "below":
         penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
     elif apply == "above":
-        penalty = jnp.where(h > threshold, -a * (h - threshold) / h, 0)
-
+        penalty = jnp.where(h > threshold, a * (h - threshold) / h, 0)
     up = 1 + penalty
     down = 1 - penalty
 
@@ -96,14 +95,14 @@ def model_from_hists(
         hists["bkg_stat_up"] *= w_CR
         hists["bkg_stat_down"] *= w_CR
 
-    bkg_estimate_in_VR = hists["bkg_VR_xbb_1"] * w_CR
+    hists["bkg_estimate_in_VR"] = hists["bkg_VR_xbb_1"] * w_CR
 
     # need to protect several times
     hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
     hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
 
     bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
-        bkg_estimate_in_VR,
+        hists["bkg_estimate_in_VR"],
         hists["bkg_VR_xbb_2"],
     )
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
@@ -113,7 +112,7 @@ def model_from_hists(
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
         hists["bkg"],
         threshold=1,
-        a=100,
+        a=config.aux,
         apply="below",
     )
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
@@ -122,21 +121,19 @@ def model_from_hists(
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
         hists["bkg_VR_xbb_2"],
         threshold=1,
-        a=100,
+        a=config.aux,
         apply="below",
     )
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
     hists["bkg_vr_protect_down"] = hists["bkg"] * bkg_vr_protect_down
 
-    relative_bkg_shape_VR = (
-        bkg_estimate_in_VR - hists["bkg_VR_xbb_2"]
-    ) / bkg_estimate_in_VR
     bkg_shape_sys_protect_up, bkg_shape_sys_protect_down = threshold_uncertainty(
-        relative_bkg_shape_VR,
+        bkg_shapesys_up,
         threshold=2,
-        a=100,
+        a=config.aux,
         apply="above",
     )
+
     hists["bkg_shape_sys_protect_up"] = hists["bkg"] * bkg_shape_sys_protect_up
     hists["bkg_shape_sys_protect_down"] = hists["bkg"] * bkg_shape_sys_protect_down
 
