@@ -79,9 +79,7 @@ def run(
     bw_decay = optax.linear_schedule(
         init_value=0.2,
         end_value=0.01,
-        transition_steps=(
-            2500 if config.lr <= 1e-4 else config.num_steps
-        ),  # int(config.num_steps / 2),
+        transition_steps=np.maximum(2500, int(config.num_steps / 2)),
     )
 
     # lr_schedule = optax.linear_onecycle_schedule(
@@ -298,6 +296,9 @@ def run(
                 "vbf_cut": metrics["vbf_cut"][-1],
                 "eta_cut": metrics["eta_cut"][-1],
             }
+        else:
+            infer_metrics_i = {}
+
         # once some bin value is nan, everything breaks unrecoverable, also
         # re-init does not work
         if any(np.isnan(bins)):
