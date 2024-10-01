@@ -79,7 +79,9 @@ def run(
     bw_decay = optax.linear_schedule(
         init_value=0.2,
         end_value=0.01,
-        transition_steps=2500 if config.lr <= 1e-4 else 250,
+        transition_steps=(
+            2500 if config.lr <= 1e-4 else config.num_steps
+        ),  # int(config.num_steps / 2),
     )
 
     # lr_schedule = optax.linear_onecycle_schedule(
@@ -318,7 +320,7 @@ def run(
             eqx.tree_serialise_leaves(config.model_path + f"epoch_{i:004d}.eqx", model)
         if i == (config.num_steps - 1):
             infer_metrics["epoch_last"] = infer_metrics_i
-        print(infer_metrics)
+
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
         logging.info("\n")

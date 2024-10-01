@@ -40,6 +40,9 @@ def get_bkg_weight(hists, config):
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
 
+    # it really does not like literally empty bins
+    CR_4b_Data += 1e-15
+    CR_2b_Data += 1e-15
     w_CR = CR_4b_Data / CR_2b_Data
     err_w_CR = w_CR * jnp.sqrt(
         jnp.square(errCR1 / CR_4b_Data) + jnp.square(errCR2 / CR_2b_Data)
@@ -59,17 +62,17 @@ def get_symmetric_up_down(nom, sys):
     return up, down
 
 
-def threshold_uncertainty(h, threshold, a):
-    # log behavior is too little and exponential is too agressive, go for
-    # somplest divergent power law, needs h^2 otherwise penalty hist is only
-    # when applied back to nominal hist --> multiply h
-    # maybe h^2 too slow at beginning
-    # penalty = jnp.where(h < threshold, -a * (h - threshold) / (h**2), 0)
-    penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
+def threshold_uncertainty(h, threshold, a, apply="below"):
+    # even though a divergent behavior at low h is desirable, power law, exp
+    # etc. were too aggressive for a stable training
+    if apply == "below":
+        penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
+    elif apply == "above":
+        penalty = jnp.where(h > threshold, -a * (h - threshold) / h, 0)
+
     up = 1 + penalty
     down = 1 - penalty
 
-    # up = jnp.where(up > 1000, 1000, up)
     down = jnp.where(down < 0, 0, down)
 
     return up, down
@@ -105,24 +108,37 @@ def model_from_hists(
     )
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
+
     # minimum counts via penalization
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
         hists["bkg"],
         threshold=1,
-        a=config.aux,
+        a=100,
+        apply="below",
     )
-
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
         hists["bkg_VR_xbb_2"],
-        threshold=2,
-        a=config.aux,
+        threshold=1,
+        a=100,
+        apply="below",
     )
-
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
     hists["bkg_vr_protect_down"] = hists["bkg"] * bkg_vr_protect_down
+
+    relative_bkg_shape_VR = (
+        bkg_estimate_in_VR - hists["bkg_VR_xbb_2"]
+    ) / bkg_estimate_in_VR
+    bkg_shape_sys_protect_up, bkg_shape_sys_protect_down = threshold_uncertainty(
+        relative_bkg_shape_VR,
+        threshold=2,
+        a=100,
+        apply="above",
+    )
+    hists["bkg_shape_sys_protect_up"] = hists["bkg"] * bkg_shape_sys_protect_up
+    hists["bkg_shape_sys_protect_down"] = hists["bkg"] * bkg_shape_sys_protect_down
 
     # signal
     ps_up, ps_down = get_symmetric_up_down(hists["NOSYS"], hists["ps"])
@@ -226,7 +242,7 @@ def model_from_hists(
             if not validate_only:
                 bkg_modifiers += (
                     {
-                        "name": "bkg_empty_bin_protect",
+                        "name": "bkg_protect",
                         "type": "histosys",
                         "data": {
                             "hi_data": hists["bkg_protect_up"],
@@ -234,11 +250,19 @@ def model_from_hists(
                         },
                     },
                     {
-                        "name": "bkg_empty_bin_protect_vr",
+                        "name": "bkg_vr_protect",
                         "type": "histosys",
                         "data": {
                             "hi_data": hists["bkg_vr_protect_up"],
                             "lo_data": hists["bkg_vr_protect_down"],
+                        },
+                    },
+                    {
+                        "name": "bkg_shape_sys_protect",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists["bkg_shape_sys_protect_up"],
+                            "lo_data": hists["bkg_shape_sys_protect_down"],
                         },
                     },
                 )

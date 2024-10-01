@@ -28,10 +28,22 @@ if __name__ == "__main__":
         # "tomatos_cls_5_5000_study_3_linear_penalty_a_0125_t_1_k_0",
         # "tomatos_cls_5_5000_study_3_linear_penalty_a_0150_t_1_k_0",
         # "tomatos_cls_5_5000_study_3_linear_penalty_a_0200_t_1_k_0",
-        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_0",
-        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_1",
-        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_2",
-        "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_3",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_0",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_1",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_2",
+        # "tomatos_cls_5_5000_study_3_linear_penalty_a_100_t_1_no_inf_hist_k_3",
+        "tomatos_cls_5_500_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_0",
+        "tomatos_cls_5_500_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_1",
+        "tomatos_cls_5_500_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_2",
+        "tomatos_cls_5_500_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_3",
+        "tomatos_cls_5_1000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_0",
+        "tomatos_cls_5_1000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_1",
+        "tomatos_cls_5_1000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_2",
+        "tomatos_cls_5_1000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_3",
+        "tomatos_cls_5_2000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_0",
+        "tomatos_cls_5_2000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_1",
+        "tomatos_cls_5_2000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_2",
+        "tomatos_cls_5_2000_study_4_lr_0p001_linear_penalty_a_100_t_1_no_inf_hist_k_3",
     ]
     ymax = 0
     for m in models:
@@ -106,8 +118,8 @@ if __name__ == "__main__":
 
                 plt.stairs(
                     edges=meta_data["config"]["bins"],
-                    # values=metrics[hist_name][i],
-                    values=metrics[hist_name + "_test"][i],
+                    values=metrics[hist_name][i],
+                    # values=metrics[hist_name + "_test"][i],
                     label=label,
                     fill=None,
                     linewidth=1,
