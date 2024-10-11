@@ -61,7 +61,7 @@ def run():
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
 
-    batch_iterator = tomatos.batching.make_iterator(train, batch_size=config.batch_size)
+    batch_iterator = tomatos.batching.make_iterator(train, batch_size=int(config.batch_size))
 
     best_params, last_params, metrics,infer_metrics = tomatos.optimization.run(
         config=config,

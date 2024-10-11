@@ -20,7 +20,14 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     models = [
-        "tomatos_cls_5_1000_study_6_lr_0p001_full_bw_decay_bkg_vr_protect_1_shape_sys_protect_2_k_2"
+        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_0100_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_0500_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_1000_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_5000_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p050_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p025_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p010_k_0",
+        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p005_k_0",
     ]
     ymax = 0
     for m in models:
@@ -40,8 +47,9 @@ if __name__ == "__main__":
         # meta_data["config"]["data_types"] += ["gen_up", "gen_down"]
         # meta_data["config"]["data_types"].remove("ps")
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
+
         for i in range(len(metrics["NOSYS"])):
-            if i % 10 != 0:
+            if i % 100 != 0:
                 continue
             # if i != 9999:
             #     continue
@@ -69,8 +77,9 @@ if __name__ == "__main__":
                     "NOSYS_stat_down",
                     "kde",
                     "test",
-                    "ps",
                     "diff",
+                    "bkg_estimate_in_VR",
+                    "bins",
                 ]
                 if any([reg in hist_name for reg in bkg_regions]):
                     continue
@@ -92,11 +101,21 @@ if __name__ == "__main__":
                     label = "Parton Shower up"
                 if "ps down" == label:
                     label = "Parton Shower down"
+                if "gen up" == label:
+                    label = "Scale Varations up"
+                if "gen down" == label:
+                    label = "Scale Varations down"
 
+                edges = (
+                    metrics["bins"][i]
+                    if meta_data["config"]["include_bins"]
+                    else meta_data["config"]["bins"]
+                )
                 plt.stairs(
-                    edges=meta_data["config"]["bins"],
+                    edges=edges,
                     values=metrics[hist_name][i],
-                    # values=metrics[hist_name + "_test"][i],
+                    # values=metrics[hist_name + "_test"][i], # does not match
+                    # with kde!
                     label=label,
                     fill=None,
                     linewidth=1,
@@ -130,14 +149,14 @@ if __name__ == "__main__":
                 )
 
             plt.stairs(
-                edges=meta_data["config"]["bins"],
+                edges=edges,
                 values=metrics["bkg"][i],
                 fill=None,
                 linewidth=2,
                 color="tab:blue",
             )
             plt.stairs(
-                edges=meta_data["config"]["bins"],
+                edges=edges,
                 values=metrics["NOSYS"][i],
                 fill=None,
                 linewidth=2,
@@ -150,7 +169,7 @@ if __name__ == "__main__":
                 prop={"size": 5}, ncols=3, loc="upper center"
             )  # prop={"size": 6})
             plt.tight_layout()
-            plt.savefig(image_path + "/" + f"{i:004d}" + ".png", dpi=200)
+            plt.savefig(image_path + "/" + f"{i:005d}" + ".png", dpi=200)
             plt.close()
 
         # gif

@@ -62,12 +62,12 @@ def get_symmetric_up_down(nom, sys):
     return up, down
 
 
-def threshold_uncertainty(h, threshold, a, apply="below"):
+def threshold_uncertainty(h, threshold, a, find="below"):
     # even though a divergent behavior at low h is desirable, power law, exp
     # etc. were too aggressive for a stable training
-    if apply == "below":
+    if find == "below":
         penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
-    elif apply == "above":
+    elif find == "above":
         penalty = jnp.where(h > threshold, a * (h - threshold) / h, 0)
     up = 1 + penalty
     down = 1 - penalty
@@ -112,8 +112,8 @@ def model_from_hists(
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
         hists["bkg"],
         threshold=1,
-        a=config.aux,
-        apply="below",
+        a=100,
+        find="below",
     )
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
@@ -121,8 +121,8 @@ def model_from_hists(
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
         hists["bkg_VR_xbb_2"],
         threshold=1,
-        a=config.aux,
-        apply="below",
+        a=100,
+        find="below",
     )
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
     hists["bkg_vr_protect_down"] = hists["bkg"] * bkg_vr_protect_down
@@ -130,8 +130,8 @@ def model_from_hists(
     bkg_shape_sys_protect_up, bkg_shape_sys_protect_down = threshold_uncertainty(
         bkg_shapesys_up,
         threshold=2,
-        a=config.aux,
-        apply="above",
+        a=100,
+        find="above",
     )
 
     hists["bkg_shape_sys_protect_up"] = hists["bkg"] * bkg_shape_sys_protect_up
@@ -218,7 +218,7 @@ def model_from_hists(
                 },
             )
 
-            bkg_modifiers += (
+            bkg_modifiers += [
                 {
                     "name": "bkg_estimate_norm",
                     "type": "histosys",
@@ -226,16 +226,39 @@ def model_from_hists(
                         "hi_data": hists["bkg"] * (1 + rel_err_w_CR),
                         "lo_data": hists["bkg"] * (1 - rel_err_w_CR),
                     },
-                },
-                {
-                    "name": "bkg_estimate_shape",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": hists["bkg_shape_sys_up"],
-                        "lo_data": hists["bkg_shape_sys_down"],
+                }
+            ]
+            if config.binned_w_CR:
+                for i in range(len(config.bins) - 1):
+                    # this .at.set makes a copy without altering the original!
+                    hists[f"bkg_shape_up_bin_{i}"] = (
+                        hists["bkg"].at[i].set(hists["bkg_protect_up"][i])
+                    )
+                    hists[f"bkg_shape_down_bin_{i}"] = (
+                        hists["bkg"].at[i].set(hists["bkg_protect_down"][i])
+                    )
+                    bkg_modifiers += (
+                        {
+                            "name": f"bkg_estimate_shape_bin_{i}",
+                            "type": "histosys",
+                            "data": {
+                                "hi_data": hists[f"bkg_shape_up_bin_{i}"],
+                                "lo_data": hists[f"bkg_shape_down_bin_{i}"],
+                            },
+                        },
+                    )
+            else:
+                bkg_modifiers += (
+                    {
+                        "name": "bkg_estimate_shape",
+                        "type": "histosys",
+                        "data": {
+                            "hi_data": hists["bkg_shape_sys_up"],
+                            "lo_data": hists["bkg_shape_sys_down"],
+                        },
                     },
-                },
-            )
+                )
+
             if not validate_only:
                 bkg_modifiers += (
                     {
@@ -292,7 +315,7 @@ def model_from_hists(
                 )
                 bkg_modifiers += (
                     {
-                        "name": "stat_err_bkg",
+                        "name": f"stat_err_bkg_{i}",
                         "type": "histosys",
                         "data": {
                             "hi_data": hists[f"bkg_stat_up_bin_{i}"],

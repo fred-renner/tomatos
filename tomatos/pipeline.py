@@ -35,10 +35,12 @@ def pipeline(
 
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
-    bins = pars["bins"] if "bins" in pars else config.bins
+    bins = config.bins
+
     if include_bins:
-        bins = bin_correction(bins)
-        pars["bins"] = bins
+        bins = jnp.array([0, *pars["bins"], 1])
+        # bins = bin_correction(bins)
+        # pars["bins"] = bins
 
     if do_m_hh:
         hists = tomatos.histograms.hists_from_mhh(
