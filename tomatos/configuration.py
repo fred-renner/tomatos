@@ -74,6 +74,10 @@ class Setup:
 
         # norm.cdf in histogramming includes 1.0
         self.bins = np.linspace(0, 1, args.bins + 1)
+        # self.bins = np.array([-0.07494,  0.35444,  0.50956,  0.62511,  0.74342,  0.90549])
+        # self.bins = np.array([0.0, 0.35444, 0.50956, 0.62511, 0.74342,
+        # 0.90549])
+        # self.bins = np.array([0, 0.3, 0.433, 0.566, 0.7, 1])
 
         if self.do_m_hh and not self.include_bins:
             self.bins = np.array(
@@ -92,7 +96,7 @@ class Setup:
             )  # rel 21 analysis
 
         # Actual batching needs a reimplementation
-        self.batch_size = int(1e6)  # int is necessary
+        self.batch_size = 1e6
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
@@ -118,7 +122,7 @@ class Setup:
         # nr of k-folds used for scaling the weights
         self.n_k_folds = 4
         # simple transfer factor or binned transferfactor
-        self.binned_w_CR = False
+        self.binned_w_CR = True
 
         # if initialize parameters of a trained model
         self.preload_model = False

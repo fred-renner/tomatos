@@ -203,15 +203,16 @@ def plot_bce(metrics, config, epoch_grid, fig_size):
         plt.close()
 
 
-def plot_Z_A(metrics, config, epoch_grid, fig_size):
+def plot_Z_A(metrics, config, epoch_grid, fig_size, ylim):
     if len(metrics["Z_A"]) > 0:
         plt.figure(figsize=fig_size)
-        plt.plot(epoch_grid, metrics["Z_A"], label="Asimov Significance")
+        plt.plot(epoch_grid, metrics["Z_A"])
 
         plt.legend()
         plt.xlabel("Epoch")
-        plt.ylabel(r"$Z_A$")
+        plt.ylabel("Asimov Significance")
         plt.tight_layout()
+        plt.ylim(ylim)
         plot_path = config["results_path"] + "Z_A.pdf"
         print(plot_path)
         plt.savefig(plot_path)
@@ -260,7 +261,7 @@ def plot_cuts(metrics, config, epoch_grid, fig_size):
         plt.close()
 
 
-def plot_rel_error(metrics, err_hist, nom_hist, config, epoch_grid, fig_size):
+def plot_rel_error(metrics, err_hist, err_hist_label, nom_hist, config, fig_size, ylim):
     if len(metrics[err_hist]) > 0:
         plt.figure(figsize=fig_size)
         err = np.array(metrics[err_hist])
@@ -271,9 +272,16 @@ def plot_rel_error(metrics, err_hist, nom_hist, config, epoch_grid, fig_size):
             plt.plot(ratio[:, i], label=f"Bin {i+1}")
 
         plt.xlabel("Epoch")
-        plt.ylabel("Relative Error (err/nominal)")
+        if "NOSYS" in nom_hist:
+            nom = "Nominal Signal"
+        else:
+            nom = "Nominal Bkg"
+        # s_err_hist=err_hist.replace("_"," ")
+        # s_err_hist=s_err_hist.replace("1up","")
+        # s_err_hist=s_err_hist.replace("up","")
+        plt.ylabel(f"({err_hist_label}) / ({nom})")
         plt.legend()
-        plt.ylim([1, 2])
+        plt.ylim(ylim)
         plt.tight_layout()
         plot_path = config["results_path"] + f"{err_hist}_rel_error.pdf"
         print(plot_path)
@@ -342,7 +350,7 @@ def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
 def plot_total_diff(metrics, config, fig_size):
     if len(metrics["signal_approximation_diff"]) > 0:
         n_bins = len(config["bins"]) - 1
-        
+
         plt.figure(figsize=fig_size)
 
         n_bins = len(metrics["signal_approximation_diff"][0])
@@ -379,17 +387,49 @@ def main(config, bins, yields, metrics):
     fig_size = (6, 5)
 
     plot_hist(config, bins, yields, metrics, fig_size)
-    plot_Z_A(metrics, config, epoch_grid, fig_size)
+    plot_Z_A(metrics, config, epoch_grid, fig_size, ylim=[3, 12])
 
-    plot_rel_error(metrics, "xbb_pt_bin_3__1up", "NOSYS", config, epoch_grid, fig_size)
-    plot_rel_error(metrics, "gen_up", "NOSYS", config, epoch_grid, fig_size)
-    plot_rel_error(metrics, "ps_up", "NOSYS", config, epoch_grid, fig_size)
-    plot_rel_error(metrics, "bkg_shape_sys_up", "bkg", config, epoch_grid, fig_size)
+    plot_rel_error(
+        metrics,
+        "xbb_pt_bin_3__1up",
+        "xbb pt bin 3 up",
+        "NOSYS",
+        config,
+        fig_size,
+        ylim=[1, 1.5],
+    )
+    plot_rel_error(
+        metrics,
+        "gen_up",
+        "Scale Variations up",
+        "NOSYS",
+        config,
+        fig_size,
+        ylim=[1.1, 1.225],
+    )
+    plot_rel_error(
+        metrics,
+        "ps_up",
+        "Parton Shower up",
+        "NOSYS",
+        config,
+        fig_size,
+        ylim=[1, 1.35],
+    )
+    plot_rel_error(
+        metrics,
+        "bkg_shape_sys_up",
+        "bkg shape up",
+        "bkg",
+        config,
+        fig_size,
+        ylim=[1, 4],
+    )
     if config["objective"] == "cls":
         plot_hists(metrics, config, epoch_grid, fig_size)
         plot_cls(metrics, config, epoch_grid, fig_size)
         plot_bw(metrics, config, epoch_grid, fig_size)
-        # plot_bins(metrics, config, epoch_grid, fig_size)
+        plot_bins(metrics, config, epoch_grid, fig_size)
         plot_cuts(metrics, config, epoch_grid, fig_size)
         plot_signal_approximation(metrics, config, epoch_grid, fig_size)
         plot_bkg_approximation(metrics, config, epoch_grid, fig_size)

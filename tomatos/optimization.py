@@ -79,7 +79,7 @@ def run(
     bw_decay = optax.linear_schedule(
         init_value=0.2,
         end_value=0.01,
-        transition_steps=np.maximum(2500, int(config.num_steps / 2)),
+        transition_steps=np.minimum(2500, int(config.num_steps / 2)),
     )
 
     # lr_schedule = optax.linear_onecycle_schedule(
@@ -145,7 +145,7 @@ def run(
             init_pars["eta_cut"] = config.cuts_init
 
             if config.include_bins:
-                init_pars["bins"] = config.bins
+                init_pars["bins"] = config.bins[1:-1]
             else:
                 init_pars.pop("bins", None)
 
@@ -215,7 +215,9 @@ def run(
         )
 
         histograms = state.aux
-        bins = np.array(params["bins"]) if "bins" in params else config.bins
+        bins = np.array([0, *params["bins"], 1]) if "bins" in params else config.bins
+
+        # bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
         if config.include_bins:
             logging.info((f"next bin edges: {bins}"))
@@ -246,7 +248,7 @@ def run(
             f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.4f}"
         )
 
-        yields, kde = get_yields(config, nn, params, train, bw, slope)
+        yields, kde = get_yields(config, nn, params, train, bw, slope, bins)
 
         # # Z_A
         z_a = asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
@@ -255,7 +257,7 @@ def run(
 
         # measure diff between true and estimated hist
         def safe_divide(a, b):
-            return jnp.where(b == 0, 0, a / b)
+            return np.where(b == 0, 0, a / b)
 
         if config.objective == "cls":
 
@@ -295,6 +297,7 @@ def run(
                 "inverted": is_inverted(histograms["NOSYS"]),
                 "vbf_cut": metrics["vbf_cut"][-1],
                 "eta_cut": metrics["eta_cut"][-1],
+                "bins": bins,
             }
         else:
             infer_metrics_i = {}
@@ -316,9 +319,10 @@ def run(
             infer_metrics["epoch_best"]["epoch"] = i
         # save every 10th model to file
         if i % 10 == 0 and i != 0:
-            infer_metrics[str(i)] = infer_metrics_i
+            epoch_name = f"epoch_{i:005d}"
+            infer_metrics[epoch_name] = infer_metrics_i
             model = eqx.combine(params["nn_pars"], nn_setup)
-            eqx.tree_serialise_leaves(config.model_path + f"epoch_{i:004d}.eqx", model)
+            eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
         if i == (config.num_steps - 1):
             infer_metrics["epoch_last"] = infer_metrics_i
 
@@ -429,33 +433,32 @@ def rescale_kde(hist, kde, bins):
     # of the original kde
 
     # find the largest bin of binned kde hist
-    max_bin_idx = jnp.argmax(hist)
+    max_bin_idx = np.argmax(hist)
     # get the indices from the fined grained kde that would fall into each
     # bin
-    splitted_kde = jnp.array_split(kde, len(bins) - 1)
+    splitted_kde = np.array_split(kde, len(bins) - 1)
     # integrate the fine grained ones
     kde_count = splitted_kde[max_bin_idx].sum()
     # areas for both bins must be same when integerated
+    # (bins have upper edge comared to hist)
     area_hist = hist[max_bin_idx] * (bins[max_bin_idx + 1] - bins[max_bin_idx])
-    kde_width = (bins[-1] - bins[0]) / len(kde)
+    kde_width = np.abs(bins[-1] - bins[0]) / len(kde)
     area_kde = kde_count * kde_width
 
     scale_factor = area_hist / area_kde
     kde *= scale_factor
-
     return kde
 
 
-def get_yields(config, nn, params, train, bw, slope):
+def get_yields(config, nn, params, train, bw, slope, bins):
     data_dct = {k: v for k, v in zip(config.data_types, train)}
     if config.do_m_hh:
         yields = tomatos.histograms.hists_from_mhh(
             data=data_dct,
             bandwidth=1e-6,
-            bins=params["bins"] if config.include_bins else config.bins,
+            bins=bins,
         )
     else:
-        bins = params["bins"] if config.include_bins else config.bins
         yields = tomatos.histograms.hists_from_nn(
             nn_pars=params["nn_pars"],
             config=config,
