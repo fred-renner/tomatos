@@ -27,16 +27,16 @@ class Setup:
             "pt_h1",
             "eta_h1",
             "phi_h1",
-            "m_h1",
+            # "m_h1",
             "pt_h2",
             "eta_h2",
             "phi_h2",
-            "m_h2",
+            # "m_h2",
             "pt_hh",
             "eta_hh",
             "phi_hh",
             "m_hh",
-            "lead_xbb_score",
+            # "lead_xbb_score",
             "m_jj",
             "eta_jj",
         ]
@@ -67,33 +67,16 @@ class Setup:
             if "1up" in sys:
                 self.systematics_raw += [sys.split("__")[0]]
 
-        if self.do_m_hh:
-            self.vars = ["m_hh"]
-
         self.n_features = len(self.vars)
 
         # norm.cdf in histogramming includes 1.0
+        # if self.do_m_hh:
+        #     self.bins = np.linspace(500e3, 2500e3, args.bins + 1)
+        # else:
         self.bins = np.linspace(0, 1, args.bins + 1)
-        # self.bins = np.array([-0.07494,  0.35444,  0.50956,  0.62511,  0.74342,  0.90549])
-        # self.bins = np.array([0.0, 0.35444, 0.50956, 0.62511, 0.74342,
-        # 0.90549])
-        # self.bins = np.array([0, 0.3, 0.433, 0.566, 0.7, 1])
 
-        if self.do_m_hh and not self.include_bins:
-            self.bins = np.array(
-                [
-                    -np.inf,
-                    500e3,
-                    900e3,
-                    1080e3,
-                    1220e3,
-                    1360e3,
-                    1540e3,
-                    1800e3,
-                    2500e3,
-                    np.inf,
-                ]
-            )  # rel 21 analysis
+        if self.do_m_hh:
+            self.bins = np.linspace(0, 0.29593600020367083, args.bins + 1)
 
         # Actual batching needs a reimplementation
         self.batch_size = 1e6
@@ -122,7 +105,7 @@ class Setup:
         # nr of k-folds used for scaling the weights
         self.n_k_folds = 4
         # simple transfer factor or binned transferfactor
-        self.binned_w_CR = True
+        self.binned_w_CR = False
 
         # if initialize parameters of a trained model
         self.preload_model = False

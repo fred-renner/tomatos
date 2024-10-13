@@ -79,21 +79,21 @@ def run(
     bw_decay = optax.linear_schedule(
         init_value=0.2,
         end_value=0.01,
-        transition_steps=np.minimum(2500, int(config.num_steps / 2)),
+        transition_steps=np.minimum(2500, int(config.num_steps * 0.5)),
     )
 
-    # lr_schedule = optax.linear_onecycle_schedule(
-    #     transition_steps=config.num_steps,
-    #     peak_value=0.002,  # Set the peak learning rate
-    #     pct_start=0.3,  # Percentage of steps to reach the peak value
-    #     div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
-    #     final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
-    #     pct_final=0.85,
-    # )
+    lr_schedule = optax.linear_onecycle_schedule(
+        transition_steps=config.num_steps,
+        peak_value=0.0005,  # Set the peak learning rate
+        pct_start=0.3,  # Percentage of steps to reach the peak value
+        div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
+        final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
+        pct_final=0.85,
+    )
 
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
-        optax.adam(config.lr),
+        optax.adam(0.01),
         # scale_cut_step,
         # optax.masked(optax.clip(max_delta=config.aux), mask_fn),
         # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
@@ -452,46 +452,40 @@ def rescale_kde(hist, kde, bins):
 
 def get_yields(config, nn, params, train, bw, slope, bins):
     data_dct = {k: v for k, v in zip(config.data_types, train)}
-    if config.do_m_hh:
-        yields = tomatos.histograms.hists_from_mhh(
-            data=data_dct,
-            bandwidth=1e-6,
-            bins=bins,
-        )
-    else:
-        yields = tomatos.histograms.hists_from_nn(
-            nn_pars=params["nn_pars"],
-            config=config,
-            vbf_cut=params["vbf_cut"],
-            eta_cut=params["eta_cut"],
-            nn=nn,
-            data=data_dct,
-            bandwidth=1e-6,
-            slope=1e6,
-            bins=bins,
-        )
-        model, yields = tomatos.workspace.model_from_hists(
-            do_m_hh=False,
-            hists=yields,
-            config=config,
-            do_systematics=config.do_systematics,
-            do_stat_error=config.do_stat_error,
-            validate_only=False,
-        )
-        # dont need them for all
-        kde_dict = dict((k, data_dct[k]) for k in ("NOSYS", "bkg"))
-        kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
-        kde = tomatos.histograms.hists_from_nn(
-            nn_pars=params["nn_pars"],
-            config=config,
-            vbf_cut=params["vbf_cut"],
-            eta_cut=params["eta_cut"],
-            nn=nn,
-            data=kde_dict,
-            bandwidth=bw,
-            slope=slope,
-            bins=kde_bins,
-        )
+
+    yields = tomatos.histograms.get_hists(
+        nn_pars=params["nn_pars"],
+        config=config,
+        vbf_cut=params["vbf_cut"],
+        eta_cut=params["eta_cut"],
+        nn=nn,
+        data=data_dct,
+        bandwidth=1e-6,
+        slope=1e6,
+        bins=bins,
+    )
+    model, yields = tomatos.workspace.model_from_hists(
+        do_m_hh=False,
+        hists=yields,
+        config=config,
+        do_systematics=config.do_systematics,
+        do_stat_error=config.do_stat_error,
+        validate_only=False,
+    )
+    # dont need them for all
+    kde_dict = dict((k, data_dct[k]) for k in ("NOSYS", "bkg"))
+    kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
+    kde = tomatos.histograms.get_hists(
+        nn_pars=params["nn_pars"],
+        config=config,
+        vbf_cut=params["vbf_cut"],
+        eta_cut=params["eta_cut"],
+        nn=nn,
+        data=kde_dict,
+        bandwidth=bw,
+        slope=slope,
+        bins=kde_bins,
+    )
 
     return yields, kde
 

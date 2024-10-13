@@ -19,35 +19,26 @@ def get_hist(config, nn, best_params, data):
         logging.info(best_params["bins"])
     else:
         bins = config.bins
-    if config.do_m_hh:
-        # use whole data set to get correct norm
-        yields = tomatos.histograms.hists_from_mhh(
-            data={k: v for k, v in zip(config.data_types, data)},
-            bandwidth=1e-8,
-            bins=bins,
-        )
-
-    else:
         # to get correct yields would also need to pass whole data
-        yields = tomatos.histograms.hists_from_nn(
-            nn_pars=best_params["nn_pars"],
-            data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
-            nn=nn,
-            config=config,
-            vbf_cut=best_params["vbf_cut"],
-            eta_cut=best_params["eta_cut"],
-            bandwidth=1e-6,
-            slope=1e6,
-            bins=best_params["bins"] if config.include_bins else config.bins,
-        )
-        model, yields = tomatos.workspace.model_from_hists(
-            do_m_hh=False,
-            hists=yields,
-            config=config,
-            do_systematics=config.do_systematics,
-            do_stat_error=config.do_stat_error,
-            validate_only=False,
-        )
+    yields = tomatos.histograms.get_hists(
+        nn_pars=best_params["nn_pars"],
+        data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
+        nn=nn,
+        config=config,
+        vbf_cut=best_params["vbf_cut"],
+        eta_cut=best_params["eta_cut"],
+        bandwidth=1e-6,
+        slope=1e6,
+        bins=best_params["bins"] if config.include_bins else config.bins,
+    )
+    model, yields = tomatos.workspace.model_from_hists(
+        do_m_hh=False,
+        hists=yields,
+        config=config,
+        do_systematics=config.do_systematics,
+        do_stat_error=config.do_stat_error,
+        validate_only=False,
+    )
     logging.info(
         (
             "Asimov Significance: ",

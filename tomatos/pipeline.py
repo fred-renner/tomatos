@@ -39,28 +39,18 @@ def pipeline(
 
     if include_bins:
         bins = jnp.array([0, *pars["bins"], 1])
-        # bins = bin_correction(bins)
-        # pars["bins"] = bins
 
-    if do_m_hh:
-        hists = tomatos.histograms.hists_from_mhh(
-            data=data_dct,
-            bins=bins,
-            bandwidth=bandwidth,
-            include_bins=include_bins,
-        )
-    else:
-        hists = tomatos.histograms.hists_from_nn(
-            nn_pars=pars["nn_pars"],
-            nn=nn,
-            config=config,
-            vbf_cut=pars["vbf_cut"],
-            eta_cut=pars["eta_cut"],
-            data=data_dct,
-            bandwidth=bandwidth,
-            slope=slope,
-            bins=bins,
-        )
+    hists = tomatos.histograms.get_hists(
+        nn_pars=pars["nn_pars"],
+        nn=nn,
+        config=config,
+        vbf_cut=pars["vbf_cut"],
+        eta_cut=pars["eta_cut"],
+        data=data_dct,
+        bandwidth=bandwidth,
+        slope=slope,
+        bins=bins,
+    )
 
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
@@ -88,23 +78,3 @@ def pipeline(
         # this means we start when drops below 0.01
         loss_value = neos.loss_from_model(model, loss=loss_type)  # + kde_error_penality
     return loss_value, hists
-
-
-# would be better to tell optimization gradient to vanish if bins gets out of bound
-def bin_correction(bins):
-    # make sure bins don't overlap and are unique, need to avoid loops and
-    # whatnot since this is a jitted function --> jnp.where
-    # find duplicates
-    is_not_duplicate = bins[1:] != bins[:-1]
-    # comparison does not include last value for condition
-    is_not_duplicate = jnp.concatenate((is_not_duplicate, jnp.array([True])))
-    # pad duplicates
-    unique_increment = jnp.arange(bins.size) * 0.001
-    # now return former values or pad if duplicate
-    bins = jnp.where(is_not_duplicate, bins, bins + unique_increment)
-    # take care of out of bound
-    # bins = jnp.where(bins > 0.001, bins, 0.1)
-    # bins = jnp.where(bins < 0.999, bins, 0.9)
-    # monotonically increase
-    bins = jnp.sort(bins)
-    return bins
