@@ -17,7 +17,6 @@ Array = jnp.ndarray
 import relaxed
 
 
-
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
 def hist(
     data: Array,
@@ -138,7 +137,7 @@ def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut, slope):
     return m_jj_cut_w * eta_cut_w
 
 
-def hists_from_nn(
+def get_hists(
     config,
     nn_pars: Array,
     data: dict[str, Array],
@@ -173,6 +172,13 @@ def hists_from_nn(
     # define our histogram-maker with some hyperparameters (bandwidth, binning)
     make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
 
+    if config.do_m_hh:
+        hists = {
+            k: make_hist(data=values[k][:, -3].ravel(), weights=weights[k])
+            for k, v in data.items()
+        }
+        return hists
+
     # apply the neural network to each data sample, and keep track of the
     # sample names in a dict
     nn_apply = partial(nn, nn_pars)
@@ -206,33 +212,5 @@ def hists_from_nn(
         hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
         hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
         hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
-
-    return hists
-
-
-def hists_from_mhh(
-    data: dict[str, Array],
-    bins: Array,
-    bandwidth: float,
-    include_bins=False,
-):
-    values = {k: data[k][:, 0, :] for k in data}
-
-    weights = {k: data[k][:, 1, 0] for k in data}
-
-    if include_bins:
-        bins = jnp.concatenate(
-            (
-                jnp.array([bins[0]]),
-                jnp.where(bins[1:] > bins[:-1], bins[1:], bins[:-1] + 1e-4),
-            ),
-            axis=0,
-        )
-
-    make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
-    hists = {
-        k: make_hist(data=values[k].ravel(), weights=weights[k])
-        for k, v in data.items()
-    }
 
     return hists

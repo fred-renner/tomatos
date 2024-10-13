@@ -20,14 +20,10 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     models = [
-        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_0100_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_0500_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_1000_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_slope_5000_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p050_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p025_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p010_k_0",
-        "tomatos_cls_5_5000_study_0_lr_0p0001_bw_0p005_k_0",
+        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_0",
+        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_1",
+        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_2",
+        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_3",
     ]
     ymax = 0
     for m in models:
@@ -49,7 +45,7 @@ if __name__ == "__main__":
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
 
         for i in range(len(metrics["NOSYS"])):
-            if i % 100 != 0:
+            if i % 10 != 0:
                 continue
             # if i != 9999:
             #     continue
@@ -80,6 +76,7 @@ if __name__ == "__main__":
                     "diff",
                     "bkg_estimate_in_VR",
                     "bins",
+                    "VR",
                 ]
                 if any([reg in hist_name for reg in bkg_regions]):
                     continue

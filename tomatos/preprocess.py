@@ -231,6 +231,8 @@ def prepare_data(config):
     test = stack_data(config, max_events, event_range=[0.9, 1.0])
 
     train, valid, test, scaler = min_max_norm(train, valid, test)
+    config.scaler_scale = scaler.scale_
+    config.scaler_min = scaler.min_
 
     config.data_types = []
     train_ = []
@@ -241,8 +243,5 @@ def prepare_data(config):
         train_ += [np.asarray(train[k])]
         valid_ += [np.asarray(valid[k])]
         test_ += [np.asarray(test[k])]
-
-    config.scaler_scale = scaler.scale_
-    config.scaler_min = scaler.min_
 
     return train_, valid_, test_

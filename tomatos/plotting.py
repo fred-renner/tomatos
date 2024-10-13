@@ -262,7 +262,7 @@ def plot_cuts(metrics, config, epoch_grid, fig_size):
 
 
 def plot_rel_error(metrics, err_hist, err_hist_label, nom_hist, config, fig_size, ylim):
-    if len(metrics[err_hist]) > 0:
+    if err_hist in metrics.keys() and len(metrics[err_hist]) > 0:
         plt.figure(figsize=fig_size)
         err = np.array(metrics[err_hist])
         nom = np.array(metrics[nom_hist])

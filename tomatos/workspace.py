@@ -112,7 +112,7 @@ def model_from_hists(
     bkg_protect_up, bkg_protect_down = threshold_uncertainty(
         hists["bkg"],
         threshold=1,
-        a=100,
+        a=config.aux,
         find="below",
     )
     hists["bkg_protect_up"] = hists["bkg"] * bkg_protect_up
@@ -121,7 +121,7 @@ def model_from_hists(
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
         hists["bkg_VR_xbb_2"],
         threshold=1,
-        a=100,
+        a=config.aux,
         find="below",
     )
     hists["bkg_vr_protect_up"] = hists["bkg"] * bkg_vr_protect_up
@@ -130,7 +130,7 @@ def model_from_hists(
     bkg_shape_sys_protect_up, bkg_shape_sys_protect_down = threshold_uncertainty(
         bkg_shapesys_up,
         threshold=2,
-        a=100,
+        a=config.aux,
         find="above",
     )
 
@@ -146,210 +146,182 @@ def model_from_hists(
     # important that this happens after the last nominal hist creations
     hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
 
-    if do_m_hh:
-        spec = {
-            "channels": [
-                {
-                    "name": "singlechannel",  # we only have one "channel" (data region)
-                    "samples": [
-                        {
-                            "name": "signal",
-                            "data": hists["NOSYS"],  # signal
-                            "modifiers": [
-                                {
-                                    "name": "mu",
-                                    "type": "normfactor",
-                                    "data": None,
-                                },  # our signal strength modifier (parameter of interest)
-                            ],
-                        },
-                        {
-                            "name": "background",
-                            "data": hists["bkg"],  # background
-                            "modifiers": [],
-                        },
-                    ],
-                },
-            ],
-        }
-
-    else:
-        signal_modifiers = []
-        bkg_modifiers = []
-        if do_systematics:
-            for sys in config.systematics_raw:
-                signal_modifiers += (
-                    {
-                        "name": sys,
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists[f"{sys}__1up"],
-                            "lo_data": hists[f"{sys}__1down"],
-                        },
-                    },
-                )
-            if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
-                signal_modifiers += (
-                    {
-                        "name": "scale_variations",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["gen_up"],
-                            "lo_data": hists["gen_down"],
-                        },
-                    },
-                )
+    signal_modifiers = []
+    bkg_modifiers = []
+    if do_systematics:
+        for sys in config.systematics_raw:
             signal_modifiers += (
                 {
-                    "name": "branching_ratio_bb",
+                    "name": sys,
                     "type": "histosys",
                     "data": {
-                        "hi_data": hists["NOSYS"] * (1 + 0.034230167215544956),
-                        "lo_data": hists["NOSYS"] * (1 - 0.03479541236132045),
+                        "hi_data": hists[f"{sys}__1up"],
+                        "lo_data": hists[f"{sys}__1down"],
                     },
                 },
+            )
+        if "GEN_MUR05_MUF05_PDF260000" in config.systematics:
+            signal_modifiers += (
                 {
-                    "name": "ps",
+                    "name": "scale_variations",
                     "type": "histosys",
                     "data": {
-                        "hi_data": hists["ps_up"],
-                        "lo_data": hists["ps_down"],
+                        "hi_data": hists["gen_up"],
+                        "lo_data": hists["gen_down"],
+                    },
+                },
+            )
+        signal_modifiers += (
+            {
+                "name": "branching_ratio_bb",
+                "type": "histosys",
+                "data": {
+                    "hi_data": hists["NOSYS"] * (1 + 0.034230167215544956),
+                    "lo_data": hists["NOSYS"] * (1 - 0.03479541236132045),
+                },
+            },
+            {
+                "name": "ps",
+                "type": "histosys",
+                "data": {
+                    "hi_data": hists["ps_up"],
+                    "lo_data": hists["ps_down"],
+                },
+            },
+        )
+
+        bkg_modifiers += [
+            {
+                "name": "bkg_estimate_norm",
+                "type": "histosys",
+                "data": {
+                    "hi_data": hists["bkg"] * (1 + rel_err_w_CR),
+                    "lo_data": hists["bkg"] * (1 - rel_err_w_CR),
+                },
+            }
+        ]
+        # if config.binned_w_CR:
+        #     for i in range(len(config.bins) - 1):
+        #         # this .at.set makes a copy without altering the original!
+        #         hists[f"bkg_shape_up_bin_{i}"] = (
+        #             hists["bkg"].at[i].set(hists["bkg_protect_up"][i])
+        #         )
+        #         hists[f"bkg_shape_down_bin_{i}"] = (
+        #             hists["bkg"].at[i].set(hists["bkg_protect_down"][i])
+        #         )
+        #         bkg_modifiers += (
+        #             {
+        #                 "name": f"bkg_estimate_shape_bin_{i}",
+        #                 "type": "histosys",
+        #                 "data": {
+        #                     "hi_data": hists[f"bkg_shape_up_bin_{i}"],
+        #                     "lo_data": hists[f"bkg_shape_down_bin_{i}"],
+        #                 },
+        #             },
+        #         )
+        # else:
+        #     bkg_modifiers += (
+        #         {
+        #             "name": "bkg_estimate_shape",
+        #             "type": "histosys",
+        #             "data": {
+        #                 "hi_data": hists["bkg_shape_sys_up"],
+        #                 "lo_data": hists["bkg_shape_sys_down"],
+        #             },
+        #         },
+        #     )
+
+        if not validate_only:
+            bkg_modifiers += (
+                {
+                    "name": "bkg_protect",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists["bkg_protect_up"],
+                        "lo_data": hists["bkg_protect_down"],
+                    },
+                },
+                # {
+                #     "name": "bkg_vr_protect",
+                #     "type": "histosys",
+                #     "data": {
+                #         "hi_data": hists["bkg_vr_protect_up"],
+                #         "lo_data": hists["bkg_vr_protect_down"],
+                #     },
+                # },
+                # {
+                #     "name": "bkg_shape_sys_protect",
+                #     "type": "histosys",
+                #     "data": {
+                #         "hi_data": hists["bkg_shape_sys_protect_up"],
+                #         "lo_data": hists["bkg_shape_sys_protect_down"],
+                #     },
+                # },
+            )
+
+    if config.do_stat_error:
+        for i in range(len(config.bins) - 1):
+            # this .at.set makes a copy without altering the original!
+            hists[f"NOSYS_stat_up_bin_{i}"] = (
+                hists["NOSYS"].at[i].set(hists["NOSYS_stat_up"][i])
+            )
+            hists[f"NOSYS_stat_down_bin_{i}"] = (
+                hists["NOSYS"].at[i].set(hists["NOSYS_stat_down"][i])
+            )
+            signal_modifiers += (
+                {
+                    "name": "stat_err_signal",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": hists[f"NOSYS_stat_up_bin_{i}"],
+                        "lo_data": hists[f"NOSYS_stat_down_bin_{i}"],
                     },
                 },
             )
 
-            bkg_modifiers += [
+            hists[f"bkg_stat_up_bin_{i}"] = (
+                hists["bkg"].at[i].set(hists["bkg_stat_up"][i])
+            )
+            hists[f"bkg_stat_down_bin_{i}"] = (
+                hists["bkg"].at[i].set(hists["bkg_stat_down"][i])
+            )
+            bkg_modifiers += (
                 {
-                    "name": "bkg_estimate_norm",
+                    "name": f"stat_err_bkg_{i}",
                     "type": "histosys",
                     "data": {
-                        "hi_data": hists["bkg"] * (1 + rel_err_w_CR),
-                        "lo_data": hists["bkg"] * (1 - rel_err_w_CR),
+                        "hi_data": hists[f"bkg_stat_up_bin_{i}"],
+                        "lo_data": hists[f"bkg_stat_down_bin_{i}"],
                     },
-                }
-            ]
-            if config.binned_w_CR:
-                for i in range(len(config.bins) - 1):
-                    # this .at.set makes a copy without altering the original!
-                    hists[f"bkg_shape_up_bin_{i}"] = (
-                        hists["bkg"].at[i].set(hists["bkg_protect_up"][i])
-                    )
-                    hists[f"bkg_shape_down_bin_{i}"] = (
-                        hists["bkg"].at[i].set(hists["bkg_protect_down"][i])
-                    )
-                    bkg_modifiers += (
-                        {
-                            "name": f"bkg_estimate_shape_bin_{i}",
-                            "type": "histosys",
-                            "data": {
-                                "hi_data": hists[f"bkg_shape_up_bin_{i}"],
-                                "lo_data": hists[f"bkg_shape_down_bin_{i}"],
-                            },
-                        },
-                    )
-            else:
-                bkg_modifiers += (
-                    {
-                        "name": "bkg_estimate_shape",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["bkg_shape_sys_up"],
-                            "lo_data": hists["bkg_shape_sys_down"],
-                        },
-                    },
-                )
-
-            if not validate_only:
-                bkg_modifiers += (
-                    {
-                        "name": "bkg_protect",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["bkg_protect_up"],
-                            "lo_data": hists["bkg_protect_down"],
-                        },
-                    },
-                    {
-                        "name": "bkg_vr_protect",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["bkg_vr_protect_up"],
-                            "lo_data": hists["bkg_vr_protect_down"],
-                        },
-                    },
-                    {
-                        "name": "bkg_shape_sys_protect",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["bkg_shape_sys_protect_up"],
-                            "lo_data": hists["bkg_shape_sys_protect_down"],
-                        },
-                    },
-                )
-
-        if config.do_stat_error:
-            for i in range(len(config.bins) - 1):
-                # this .at.set makes a copy without altering the original!
-                hists[f"NOSYS_stat_up_bin_{i}"] = (
-                    hists["NOSYS"].at[i].set(hists["NOSYS_stat_up"][i])
-                )
-                hists[f"NOSYS_stat_down_bin_{i}"] = (
-                    hists["NOSYS"].at[i].set(hists["NOSYS_stat_down"][i])
-                )
-                signal_modifiers += (
-                    {
-                        "name": "stat_err_signal",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists[f"NOSYS_stat_up_bin_{i}"],
-                            "lo_data": hists[f"NOSYS_stat_down_bin_{i}"],
-                        },
-                    },
-                )
-
-                hists[f"bkg_stat_up_bin_{i}"] = (
-                    hists["bkg"].at[i].set(hists["bkg_stat_up"][i])
-                )
-                hists[f"bkg_stat_down_bin_{i}"] = (
-                    hists["bkg"].at[i].set(hists["bkg_stat_down"][i])
-                )
-                bkg_modifiers += (
-                    {
-                        "name": f"stat_err_bkg_{i}",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists[f"bkg_stat_up_bin_{i}"],
-                            "lo_data": hists[f"bkg_stat_down_bin_{i}"],
-                        },
-                    },
-                )
-        spec = {
-            "channels": [
-                {
-                    "name": "singlechannel",  # we only have one "channel" (data region)
-                    "samples": [
-                        {
-                            "name": "signal",
-                            "data": hists["NOSYS"],  # signal
-                            "modifiers": [
-                                {
-                                    "name": "mu",
-                                    "type": "normfactor",
-                                    "data": None,
-                                },  # our signal strength modifier (parameter of interest)
-                                *signal_modifiers,
-                            ],
-                        },
-                        {
-                            "name": "background",
-                            "data": hists["bkg"],  # background
-                            "modifiers": [
-                                *bkg_modifiers,
-                            ],
-                        },
-                    ],
                 },
-            ],
-        }
+            )
+    spec = {
+        "channels": [
+            {
+                "name": "singlechannel",  # we only have one "channel" (data region)
+                "samples": [
+                    {
+                        "name": "signal",
+                        "data": hists["NOSYS"],  # signal
+                        "modifiers": [
+                            {
+                                "name": "mu",
+                                "type": "normfactor",
+                                "data": None,
+                            },  # our signal strength modifier (parameter of interest)
+                            *signal_modifiers,
+                        ],
+                    },
+                    {
+                        "name": "background",
+                        "data": hists["bkg"],  # background
+                        "modifiers": [
+                            *bkg_modifiers,
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
 
     return pyhf.Model(spec, validate=False), hists
