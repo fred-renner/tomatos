@@ -38,7 +38,11 @@ def pipeline(
     bins = config.bins
 
     if include_bins:
-        bins = jnp.array([0, *pars["bins"], 1])
+        # this is the min max range until 2500e3
+        if config.do_m_hh:
+            bins = jnp.array([0, *pars["bins"], 0.29593600020367083])
+        else:
+            bins = jnp.array([0, *pars["bins"], 1])
 
     hists = tomatos.histograms.get_hists(
         nn_pars=pars["nn_pars"],
@@ -61,9 +65,8 @@ def pipeline(
         do_stat_error,
         validate_only,
     )
-
     # if you want s/b discrimination, no need to do anything complex!
-    if loss_type.lower() in ["bce", "binary cross-entropy"]:
+    if loss_type == "bce":
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
 
     if validate_only:
