@@ -20,10 +20,7 @@ if __name__ == "__main__":
     plt.rcParams.update({"font.size": 14})
 
     models = [
-        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_0",
-        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_1",
-        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_2",
-        "tomatos_cls_5_500_study_1_linear_one_cycle_0p0005_no_gn2x_no_mh1_mh_2_no_shape_uncertainty_a_10_bw_decay_0p3_k_3",
+        "tomatos_debug",
     ]
     ymax = 0
     for m in models:
@@ -45,7 +42,7 @@ if __name__ == "__main__":
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
 
         for i in range(len(metrics["NOSYS"])):
-            if i % 10 != 0:
+            if i % 1 != 0:
                 continue
             # if i != 9999:
             #     continue

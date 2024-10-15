@@ -14,6 +14,7 @@ from jaxopt import OptaxSolver
 import tomatos.histograms
 import tomatos.workspace
 import tomatos.pipeline
+import tomatos.initialize
 import equinox as eqx
 
 Array = jnp.ndarray
@@ -43,6 +44,10 @@ def run(
     nn_setup,
     args,
 ) -> tuple[Array, dict[str, list]]:
+
+    if config.run_bkg_init:
+        init_pars = make_flat_bkg(config, batch_iterator, init_pars, nn)
+
     # even though config is passed, need to keep redundant args here as this
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
@@ -77,7 +82,7 @@ def run(
     #     alpha=0.01 / 0.15,
     # )
     bw_decay = optax.linear_schedule(
-        init_value=0.2,
+        init_value=0.01,
         end_value=0.01,
         transition_steps=np.minimum(2500, int(config.num_steps * 0.5)),
     )
@@ -91,9 +96,19 @@ def run(
         pct_final=0.85,
     )
 
+    # # Define two different schedules
+    # linear_decay_schedule = optax.linear_schedule(init_value=0.1, end_value=0.01, transition_steps=1000)
+    # constant_schedule = optax.constant_schedule(0.01)
+
+    # # Define the boundaries (after how many steps to switch schedules)
+    # boundaries = [250]
+
+    # # Combine the two schedules
+    # schedule = optax.join_schedules(schedules=[linear_decay_schedule, constant_schedule], boundaries=boundaries)
+
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
-        optax.adam(0.01),
+        optax.adam(config.lr),
         # scale_cut_step,
         # optax.masked(optax.clip(max_delta=config.aux), mask_fn),
         # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
@@ -107,7 +122,6 @@ def run(
     best_params = init_pars
     best_valid_loss = 999
 
-    print(config.data_types)
     metrics = {
         k: []
         for k in [
@@ -134,12 +148,12 @@ def run(
         ]
     }
     infer_metrics = {}
+
     # one step is one batch (not necessarily epoch)
     for i in range(config.num_steps):
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
         train, batch_num, num_batches = next(batch_iterator)
-        # initialize with or without binning
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
@@ -161,13 +175,6 @@ def run(
                 metrics[k] = []
                 metrics[k + "_test"] = []
 
-        # warm reset doesn't seem to work
-        # if i % 20 == 0:
-        #     state = solver.init_state(
-        #         params,
-        #         data=train,
-        #     )
-
         # since the optaxsolver holds the value from training, however it is
         # always step i-1 and evaluation is expensive --> evaluate valid and
         # test before update
@@ -183,7 +190,7 @@ def run(
         bw = bw_decay(i)
 
         valid_result, valid_hists = loss(
-            params.copy(),  # let's be sure we are not influencing the training
+            params,
             data=valid,
             loss_type=config.objective,
             bandwidth=1e-6,
@@ -191,7 +198,7 @@ def run(
             validate_only=True,
         )
         test_result, test_hists = loss(
-            params.copy(),  # let's be sure we are not influencing the training
+            params,
             data=test,
             loss_type=config.objective,
             bandwidth=1e-6,
@@ -333,6 +340,44 @@ def run(
         clear_caches()  # otherwise memore explodes
 
     return best_params, params, metrics, infer_metrics
+
+
+def make_flat_bkg(config, batch_iterator, init_pars, nn):
+    logging.info("Initializing Background")
+    init_loss = partial(
+        tomatos.initialize.pipeline,
+        nn=nn,
+        bandwidth=0.2,
+        sample_names=config.data_types,
+        config=config,
+        bins=config.bins,
+    )
+    init_solver = OptaxSolver(init_loss, opt=optax.adam(0.01), has_aux=True, jit=True)
+    train, batch_num, num_batches = next(batch_iterator)
+
+    state = init_solver.init_state(
+        init_pars,
+        data=train,
+    )
+    params = init_pars
+    loss_value = jnp.inf
+    i = 0
+    while loss_value > 0.001:
+        train, batch_num, num_batches = next(batch_iterator)
+        bw = 0.2
+        params, state = init_solver.update(
+            params,
+            state,
+            bandwidth=bw,
+            data=train,
+        )
+        if i % 10 == 0:
+            histograms = state.aux
+            hist_norm = histograms["bkg"] / np.mean(histograms["bkg"])
+            logging.info(f"Normalized Background Hist: {hist_norm}")
+        loss_value = state.value
+        i += 1
+    return params
 
 
 def update_slope(config, i):

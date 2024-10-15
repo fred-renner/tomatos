@@ -11,6 +11,8 @@ class Setup:
             "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-run2.h5",
             "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-ps.h5",
         }
+        
+        self.run_bkg_init = True
 
         self.do_m_hh = False
         self.include_bins = False
