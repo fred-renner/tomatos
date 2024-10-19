@@ -3,7 +3,7 @@ import logging
 import sys
 from functools import partial
 from time import perf_counter
-
+import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -52,6 +52,9 @@ def run(
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
     aux_info = {"kde_error": 0.0}
+    bw_init = 0.2
+    slope_init = 5000
+
     loss = partial(
         tomatos.pipeline.pipeline,
         nn=nn,
@@ -60,8 +63,8 @@ def run(
         do_m_hh=config.do_m_hh,
         loss_type=config.objective,
         config=config,
-        bandwidth=0.2,
-        slope=1000,
+        bandwidth=bw_init,
+        slope=slope_init,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
@@ -70,48 +73,111 @@ def run(
     config.aux = args.aux
 
     # Define a mask function that selectively scales only 'vbf_cut' and 'eta_cut'
-    def mask_fn(params):
+    def cut_mask(params):
         # Return True for 'vbf_cut' and 'eta_cut', False otherwise
         return {key: key in ["vbf_cut", "eta_cut"] for key in params}
 
-    # increase cut steps
-    scale_cut_step = optax.masked(optax.scale(config.cuts_factor), mask_fn)
-    # bw_decay = optax.cosine_decay_schedule(
-    #     init_value=0.15,
-    #     decay_steps=2000,
-    #     alpha=0.01 / 0.15,
-    # )
-    bw_decay = optax.linear_schedule(
-        init_value=0.01,
-        end_value=0.01,
-        transition_steps=np.minimum(2500, int(config.num_steps * 0.5)),
-    )
+    def bw_mask(params):
+        # Return True only for 'bw', False for all other parameters
+        return {key: key == "bw" for key in params}
 
     lr_schedule = optax.linear_onecycle_schedule(
         transition_steps=config.num_steps,
-        peak_value=0.0005,  # Set the peak learning rate
-        pct_start=0.3,  # Percentage of steps to reach the peak value
-        div_factor=25,  # Factor by which to divide the peak value for the initial learning rate
-        final_div_factor=10000,  # Factor by which to divide the peak value for the final learning rate
+        peak_value=0.001,
+        pct_start=0.3,
+        div_factor=25,
+        final_div_factor=10000,
         pct_final=0.85,
     )
 
-    # # Define two different schedules
-    # linear_decay_schedule = optax.linear_schedule(init_value=0.1, end_value=0.01, transition_steps=1000)
-    # constant_schedule = optax.constant_schedule(0.01)
+    # Defining the learning rate schedule
+    # lr_schedule = optax.piecewise_interpolate_schedule(
+    #     interpolate_type="linear",
+    #     init_value=0.0001,
+    #     boundaries_and_scales={
+    #         0.2 * config.num_steps: 10,
+    #         0.4 * config.num_steps: 0.5,
+    #         0.8 * config.num_steps: 1,
+    #         1.0 * config.num_steps: 0.2,
+    #     },
+    # )
+    # Defining the learning rate schedule
+    # lr_schedule = optax.piecewise_interpolate_schedule(
+    #     interpolate_type="cosine",
+    #     init_value=0.001,
+    #     boundaries_and_scales={
+    #         0.1 * config.num_steps: 5,
+    #         0.3 * config.num_steps: 0.2,
+    #         0.5 * config.num_steps: 1,
+    #         0.55 * config.num_steps: 5,
+    #         0.6 * config.num_steps: 0.2,
+    #         0.7 * config.num_steps: 1,
+    #         0.9 * config.num_steps: 0.1,
+    #     },
+    # )
 
-    # # Define the boundaries (after how many steps to switch schedules)
-    # boundaries = [250]
+    # kick in two spikes
+    # Defining the learning rate schedule
+    # lr_schedule = optax.piecewise_interpolate_schedule(
+    #     interpolate_type="cosine",
+    #     init_value=0.01,
+    #     boundaries_and_scales={
+    #         0.05 * config.num_steps: 0.1,
+    #         0.3 * config.num_steps: 1,
+    #         0.325 * config.num_steps: 5,
+    #         0.35 * config.num_steps: 0.2,
+    #         0.5 * config.num_steps: 1,
+    #         0.525 * config.num_steps: 5,
+    #         0.55 * config.num_steps: 0.2,
+    #         0.7 * config.num_steps: 1,
+    #         0.9 * config.num_steps: 0.1,
+    #     },
+    # )
 
-    # # Combine the two schedules
-    # schedule = optax.join_schedules(schedules=[linear_decay_schedule, constant_schedule], boundaries=boundaries)
+    # Defining the learning rate schedule
+    # lr_schedule = optax.piecewise_interpolate_schedule(
+    #     interpolate_type="linear",
+    #     init_value=0.01,
+    #     boundaries_and_scales={
+    #         0.3 * config.num_steps: 1,
+    #         0.5 * config.num_steps: 0.05,
+    #         0.8 * config.num_steps: 1,
+    #         1.0 * config.num_steps: 0.2,
+    #     },
+    # )
+    # if config.debug:
+    #     lr_schedule = optax.constant_schedule(config.lr)
+
+    lr_schedule = optax.constant_schedule(config.lr)
+
+    # # Defining the learning rate schedule
+    # lr_schedule = optax.piecewise_interpolate_schedule(
+    #     interpolate_type="linear",
+    #     init_value=0.01,
+    #     boundaries_and_scales={
+    #         0.1 * config.num_steps: 0.05,
+    #         1.0 * config.num_steps: 0.2,
+    #     },
+    # )
+
+    learning_rates = [lr_schedule(i) for i in range(config.num_steps)]
+
+    plt.figure(figsize=(6, 5))
+    plt.plot(learning_rates)
+    # plt.yscale("log")
+    plt.xlabel("Epoch")
+    plt.ylabel("Learning Rate")
+    plt.tight_layout()
+    plt.savefig(config.results_path + "/lr_schedule.pdf")
+    plt.close()
+    if config.debug:
+        lr_schedule = config.lr
 
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
-        optax.adam(config.lr),
-        # scale_cut_step,
-        # optax.masked(optax.clip(max_delta=config.aux), mask_fn),
-        # optax.clip_by_global_norm(1.0),  # protect against learning spikes, however this is figthing against cosine_onecycle_schedule
+        optax.adam(lr_schedule),
+        optax.masked(optax.clip(max_delta=0.001), bw_mask),
+        optax.masked(optax.clip(max_delta=0.0001), cut_mask),  # 2 GeV mjj steps
     )
 
     solver = OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)
@@ -147,6 +213,7 @@ def run(
             "best_epoch",
         ]
     }
+    config.lr_schedule = learning_rates
     infer_metrics = {}
 
     # one step is one batch (not necessarily epoch)
@@ -157,6 +224,7 @@ def run(
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
+            init_pars["bw"] = bw_init
 
             if config.include_bins:
                 init_pars["bins"] = config.bins[1:-1]
@@ -186,8 +254,8 @@ def run(
         # Evaluate losses.
         # small bandwidth + large slope for true hists
 
-        slope = 1000
-        bw = bw_decay(i)
+        slope = slope_init
+        # bw = bw_decay(i)
 
         valid_result, valid_hists = loss(
             params,
@@ -216,13 +284,22 @@ def run(
         params, state = solver.update(
             params,
             state,
-            bandwidth=bw,
             data=train,
             slope=slope,
         )
-
+        # a large step can gow below 0 which breaks opt since
+        # the cdf (and not the pdf) used for histogram calculation is flipped
+        params["bw"] = np.maximum(0.005, np.abs(params["bw"]))
+        bw = params["bw"]
         histograms = state.aux
-        bins = np.array([0, *params["bins"], 1]) if "bins" in params else config.bins
+
+        if "bins" in params:
+            bins = np.array([0, *params["bins"], 1])
+            if config.do_m_hh:
+                bins = np.array([0, *params["bins"], config.m_hh_upper_bin])
+                bins = unscale_value(config, bins, -3)
+        else:
+            bins = config.bins
 
         # bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
@@ -232,7 +309,6 @@ def run(
         logging.info((f"bKDE hist sig: {histograms['NOSYS']}"))
         logging.info((f"bKDE hist bkg: {histograms['bkg']}"))
 
-        logging.info((f"valid VR xbb 2: {valid_hists['bkg_VR_xbb_2']}"))
 
         logging.info(
             (f"valid ratio hist sig: {valid_hists['NOSYS']/histograms['NOSYS']}")
@@ -268,13 +344,8 @@ def run(
 
         if config.objective == "cls":
 
-            def unscale_value(value, idx):
-                value -= config.scaler_min[idx]
-                value /= config.scaler_scale[idx]
-                return value
-
-            optimized_m_jj = unscale_value(params["vbf_cut"], -2)
-            optimized_eta_jj = unscale_value(params["eta_cut"], -1)
+            optimized_m_jj = unscale_value(config, params["vbf_cut"], -2)
+            optimized_eta_jj = unscale_value(config, params["eta_cut"], -1)
 
             logging.info(f"vbf cut: {optimized_m_jj}")
             logging.info(f"eta cut: {optimized_eta_jj}")
@@ -342,8 +413,26 @@ def run(
     return best_params, params, metrics, infer_metrics
 
 
+def unscale_value(config, value, idx):
+    value -= config.scaler_min[idx]
+    value /= config.scaler_scale[idx]
+    return value
+
+
 def make_flat_bkg(config, batch_iterator, init_pars, nn):
     logging.info("Initializing Background")
+
+    def mask_bw(params):
+        # Return True only for 'bw', False for all other parameters
+        return {key: key == "bw" for key in params}
+
+    init_optimizer = optax.chain(
+        # optax.zero_nans(),  # avoid NaNs in optimization
+        optax.adam(0.01),  # Adam optimizer
+        optax.masked(optax.clip(max_delta=0.001), mask_bw),
+        # clipped_bw_optimizer,  # Clip gradients for bw
+    )
+
     init_loss = partial(
         tomatos.initialize.pipeline,
         nn=nn,
@@ -352,31 +441,39 @@ def make_flat_bkg(config, batch_iterator, init_pars, nn):
         config=config,
         bins=config.bins,
     )
-    init_solver = OptaxSolver(init_loss, opt=optax.adam(0.01), has_aux=True, jit=True)
+    init_solver = OptaxSolver(init_loss, opt=init_optimizer, has_aux=True, jit=True)
     train, batch_num, num_batches = next(batch_iterator)
 
+    init_pars["bw"] = 0.13
     state = init_solver.init_state(
         init_pars,
         data=train,
     )
     params = init_pars
+
     loss_value = jnp.inf
     i = 0
-    while loss_value > 0.001:
+    previous_bw = 100
+    bw_diff = []
+    while np.abs(previous_bw - params["bw"]) > 0.000000001:
         train, batch_num, num_batches = next(batch_iterator)
-        bw = 0.2
+        previous_bw = params["bw"]
         params, state = init_solver.update(
             params,
             state,
-            bandwidth=bw,
             data=train,
         )
-        if i % 10 == 0:
-            histograms = state.aux
-            hist_norm = histograms["bkg"] / np.mean(histograms["bkg"])
-            logging.info(f"Normalized Background Hist: {hist_norm}")
+        # print(np.abs(previous_bw - params["bw"]))
+        bw_diff += [np.abs(previous_bw - params["bw"])]
+        if i % 1 == 0:
+            logging.info(f"Background Hist: {state.aux['bkg']}")
+            # logging.info(f"Signal     Hist: {state.aux['NOSYS']}")
+            # print(state.value)
+
         loss_value = state.value
         i += 1
+    # print(repr(bw_diff))
+
     return params
 
 

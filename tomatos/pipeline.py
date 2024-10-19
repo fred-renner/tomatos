@@ -40,7 +40,7 @@ def pipeline(
     if include_bins:
         # this is the min max range until 2500e3
         if config.do_m_hh:
-            bins = jnp.array([0, *pars["bins"], 0.29593600020367083])
+            bins = jnp.array([0, *pars["bins"], config.m_hh_upper_bin])
         else:
             bins = jnp.array([0, *pars["bins"], 1])
 
@@ -51,7 +51,7 @@ def pipeline(
         vbf_cut=pars["vbf_cut"],
         eta_cut=pars["eta_cut"],
         data=data_dct,
-        bandwidth=bandwidth,
+        bandwidth=pars["bw"],
         slope=slope,
         bins=bins,
     )
@@ -65,6 +65,25 @@ def pipeline(
         do_stat_error,
         validate_only,
     )
+
+    # minimum counts via penalization
+    bkg_protect_up, bkg_protect_down = tomatos.workspace.threshold_uncertainty(
+        hists["bkg"],
+        threshold=1,
+        a=1,
+        find="below",
+    )
+    bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.01
+
+
+    bkg_vr_protect_up, bkg_vr_protect_down = tomatos.workspace.threshold_uncertainty(
+        hists["bkg_VR_xbb_2_NW"],
+        threshold=1,
+        a=1,
+        find="below",
+    )
+    vr_penalty = jnp.sum(bkg_vr_protect_up - 1) * 0.01
+
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type == "bce":
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
@@ -72,12 +91,6 @@ def pipeline(
     if validate_only:
         loss_value = neos.loss_from_model(model, loss=loss_type)
     else:
-        # cant get sharp evaluation of hists here as hists with e.g. bw=1e-6
-        # loses gradient, --> send in
-        # start at 2
-        kde_error_penality = jnp.minimum(aux_info["kde_error"], 2)
-        # scale to sth comparable as cls
-        kde_error_penality *= 0.01
-        # this means we start when drops below 0.01
-        loss_value = neos.loss_from_model(model, loss=loss_type)  # + kde_error_penality
+        loss_value = neos.loss_from_model(model, loss=loss_type) + bkg_penalty + vr_penalty
+
     return loss_value, hists

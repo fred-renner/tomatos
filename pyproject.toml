@@ -24,6 +24,7 @@ dependencies = [
     "neos==0.3.0",
     "jupyter",
     "h5py",
+    "imageio-ffmpeg",
 ]
 
 [tool.setuptools.packages]

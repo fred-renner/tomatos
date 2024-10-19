@@ -182,8 +182,8 @@ def stack_data(config, max_events, event_range):
     estimate_regions = [
         "CR_xbb_1",
         "CR_xbb_2",
-        "VR_xbb_1",
-        "VR_xbb_2",
+        "VR_xbb_1_NW",
+        "VR_xbb_2_NW",
     ]
     for reg in estimate_regions:
         data["bkg_" + reg] = stack_inputs(
@@ -211,8 +211,8 @@ def get_max_events(config):
     regions = [
         "CR_xbb_1",
         "CR_xbb_2",
-        "VR_xbb_1",
-        "VR_xbb_2",
+        "VR_xbb_1_NW",
+        "VR_xbb_2_NW",
         "SR_xbb_1",
     ]
     for reg in regions:

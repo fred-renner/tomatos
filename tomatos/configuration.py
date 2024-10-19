@@ -7,14 +7,21 @@ class Setup:
     def __init__(self, args):
 
         self.files = {
-            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-run2.h5",
-            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_k_{args.k_fold}/dump-ps.h5",
+            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-run2.h5",
+            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
         }
-        
-        self.run_bkg_init = True
+
+        self.run_bkg_init = False
 
         self.do_m_hh = False
+        if self.do_m_hh:
+            self.files = {
+                "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
+                "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-run2.h5",
+                "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-ps.h5",
+            }
+
         self.include_bins = False
         self.debug = args.debug
         self.vars = [
@@ -71,14 +78,11 @@ class Setup:
 
         self.n_features = len(self.vars)
 
-        # norm.cdf in histogramming includes 1.0
-        # if self.do_m_hh:
-        #     self.bins = np.linspace(500e3, 2500e3, args.bins + 1)
-        # else:
         self.bins = np.linspace(0, 1, args.bins + 1)
 
         if self.do_m_hh:
-            self.bins = np.linspace(0, 0.29593600020367083, args.bins + 1)
+            self.m_hh_upper_bin = 2500e3 * 1.5715344198843736e-07 - 0.09694760476742253
+            self.bins = np.linspace(0, self.m_hh_upper_bin, args.bins + 1)
 
         # Actual batching needs a reimplementation
         self.batch_size = 1e6
@@ -128,6 +132,7 @@ class Setup:
         results_folder = results_folder.replace(".", "p")
         if self.debug:
             results_folder = "tomatos_debug/"
+        self.model = results_folder.split("/")[0]
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
         if not os.path.isdir(self.results_path):

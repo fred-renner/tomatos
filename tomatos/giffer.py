@@ -7,21 +7,24 @@ import glob
 import os
 
 
-def create_gif_from_folder(folder_path, output_filename, duration=0.5):
-    images = []
-    for file_name in sorted(os.listdir(folder_path)):
-        if file_name.endswith(".png") or file_name.endswith(".jpg"):
-            file_path = os.path.join(folder_path, file_name)
-            images.append(imageio.imread(file_path))
-    imageio.mimsave(output_filename, images, duration=duration)
+# def create_gif_from_folder(folder_path, output_filename, duration=0.5):
+#     images = []
+#     for file_name in sorted(os.listdir(folder_path)):
+#         if file_name.endswith(".png") or file_name.endswith(".jpg"):
+#             file_path = os.path.join(folder_path, file_name)
+#             images.append(imageio.imread(file_path))
+#     imageio.mimsave(output_filename, images, duration=duration)
 
 
-if __name__ == "__main__":
+def run(model=None):
     plt.rcParams.update({"font.size": 14})
 
-    models = [
-        "tomatos_debug",
-    ]
+    if model:
+        models = [model]
+    else:
+        models = [
+            "tomatos_cls_5_1000_study_9_simple_lr_decay_0p01_0p0005_0p0001_k_0",
+        ]
     ymax = 0
     for m in models:
         model_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/" + m + "/"
@@ -163,7 +166,7 @@ if __name__ == "__main__":
                 prop={"size": 5}, ncols=3, loc="upper center"
             )  # prop={"size": 6})
             plt.tight_layout()
-            plt.savefig(image_path + "/" + f"{i:005d}" + ".png", dpi=200)
+            plt.savefig(image_path + "/" + f"{i:005d}" + ".png", dpi=192)
             plt.close()
 
         # gif
@@ -171,9 +174,13 @@ if __name__ == "__main__":
         # print(model_path + m + ".gif")
 
         # movie
-        writer = imageio.get_writer(model_path + m + ".mp4", fps=18)
+
+        writer = imageio.get_writer(model_path + m + ".mp4", fps=20)
         for file in sorted(glob.glob(os.path.join(image_path, f"*.png"))):
             im = imageio.imread(file)
             writer.append_data(im)
-        writer.close()
         print(model_path + m + ".mp4")
+
+
+if __name__ == "__main__":
+    run()
