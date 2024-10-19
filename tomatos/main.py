@@ -10,13 +10,14 @@ import tomatos.optimization
 import tomatos.plotting
 import tomatos.preprocess
 import tomatos.utils
+import tomatos.giffer
 import json
 import numpy as np
 import pprint
 
 JAX_CHECK_TRACER_LEAKS = True
 jax.config.update("jax_enable_x64", True)
-
+# jax.config.update("jax_platforms", "cpu")
 # some debugging options
 jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 # jax.numpy.set_printoptions(suppress=True)
@@ -61,9 +62,11 @@ def run():
     logging.info(f"valid size: {valid[0].shape[0]}")
     logging.info(f"test size: {test[0].shape[0]}")
 
-    batch_iterator = tomatos.batching.make_iterator(train, batch_size=int(config.batch_size))
+    batch_iterator = tomatos.batching.make_iterator(
+        train, batch_size=int(config.batch_size)
+    )
 
-    best_params, last_params, metrics,infer_metrics = tomatos.optimization.run(
+    best_params, last_params, metrics, infer_metrics = tomatos.optimization.run(
         config=config,
         valid=valid,
         test=test,
@@ -110,6 +113,7 @@ def run():
         logging.info(config.metadata_file_path)
 
     plot()
+    tomatos.giffer.run(config.model)
 
 
 def plot():

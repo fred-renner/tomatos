@@ -95,7 +95,7 @@ def model_from_hists(
         hists["bkg_stat_up"] *= w_CR
         hists["bkg_stat_down"] *= w_CR
 
-    hists["bkg_estimate_in_VR"] = hists["bkg_VR_xbb_1"] * w_CR
+    hists["bkg_estimate_in_VR"] = hists["bkg_VR_xbb_1_NW"] * w_CR
 
     # need to protect several times
     hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
@@ -103,7 +103,7 @@ def model_from_hists(
 
     bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
         hists["bkg_estimate_in_VR"],
-        hists["bkg_VR_xbb_2"],
+        hists["bkg_VR_xbb_2_NW"],
     )
     hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
     hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
@@ -119,7 +119,7 @@ def model_from_hists(
     hists["bkg_protect_down"] = hists["bkg"] * bkg_protect_down
 
     bkg_vr_protect_up, bkg_vr_protect_down = threshold_uncertainty(
-        hists["bkg_VR_xbb_2"],
+        hists["bkg_VR_xbb_2_NW"],
         threshold=1,
         a=config.aux,
         find="below",
@@ -200,65 +200,76 @@ def model_from_hists(
                 },
             }
         ]
-        if validate_only:
-            if config.binned_w_CR:
-                for i in range(len(config.bins) - 1):
-                    # this .at.set makes a copy without altering the original!
-                    hists[f"bkg_shape_up_bin_{i}"] = (
-                        hists["bkg"].at[i].set(hists["bkg_protect_up"][i])
-                    )
-                    hists[f"bkg_shape_down_bin_{i}"] = (
-                        hists["bkg"].at[i].set(hists["bkg_protect_down"][i])
-                    )
-                    bkg_modifiers += (
-                        {
-                            "name": f"bkg_estimate_shape_bin_{i}",
-                            "type": "histosys",
-                            "data": {
-                                "hi_data": hists[f"bkg_shape_up_bin_{i}"],
-                                "lo_data": hists[f"bkg_shape_down_bin_{i}"],
-                            },
-                        },
-                    )
-            else:
-                bkg_modifiers += (
-                    {
-                        "name": "bkg_estimate_shape",
-                        "type": "histosys",
-                        "data": {
-                            "hi_data": hists["bkg_shape_sys_up"],
-                            "lo_data": hists["bkg_shape_sys_down"],
-                        },
-                    },
-                )
-
-        if not validate_only:
-            bkg_modifiers += (
-                {
-                    "name": "bkg_protect",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": hists["bkg_protect_up"],
-                        "lo_data": hists["bkg_protect_down"],
-                    },
+        # if validate_only:
+        #     if config.binned_w_CR:
+        #         for i in range(len(config.bins) - 1):
+        #             # this .at.set makes a copy without altering the original!
+        #             hists[f"bkg_shape_up_bin_{i}"] = (
+        #                 hists["bkg"].at[i].set(hists["bkg_protect_up"][i])
+        #             )
+        #             hists[f"bkg_shape_down_bin_{i}"] = (
+        #                 hists["bkg"].at[i].set(hists["bkg_protect_down"][i])
+        #             )
+        #             bkg_modifiers += (
+        #                 {
+        #                     "name": f"bkg_estimate_shape_bin_{i}",
+        #                     "type": "histosys",
+        #                     "data": {
+        #                         "hi_data": hists[f"bkg_shape_up_bin_{i}"],
+        #                         "lo_data": hists[f"bkg_shape_down_bin_{i}"],
+        #                     },
+        #                 },
+        #             )
+        #     else:
+        #         bkg_modifiers += (
+        #             {
+        #                 "name": "bkg_estimate_shape",
+        #                 "type": "histosys",
+        #                 "data": {
+        #                     "hi_data": hists["bkg_shape_sys_up"],
+        #                     "lo_data": hists["bkg_shape_sys_down"],
+        #                 },
+        #             },
+        #         )
+        
+        bkg_modifiers += (
+            {
+                "name": "bkg_estimate_shape",
+                "type": "histosys",
+                "data": {
+                    "hi_data": hists["bkg_shape_sys_up"],
+                    "lo_data": hists["bkg_shape_sys_down"],
                 },
-                # {
-                #     "name": "bkg_vr_protect",
-                #     "type": "histosys",
-                #     "data": {
-                #         "hi_data": hists["bkg_vr_protect_up"],
-                #         "lo_data": hists["bkg_vr_protect_down"],
-                #     },
-                # },
-                # {
-                #     "name": "bkg_shape_sys_protect",
-                #     "type": "histosys",
-                #     "data": {
-                #         "hi_data": hists["bkg_shape_sys_protect_up"],
-                #         "lo_data": hists["bkg_shape_sys_protect_down"],
-                #     },
-                # },
-            )
+            },
+        )
+
+        # if not validate_only:
+        #     bkg_modifiers += (
+        #         {
+        #             "name": "bkg_protect",
+        #             "type": "histosys",
+        #             "data": {
+        #                 "hi_data": hists["bkg_protect_up"],
+        #                 "lo_data": hists["bkg_protect_down"],
+        #             },
+        #         },
+        #         # {
+        #         #     "name": "bkg_vr_protect",
+        #         #     "type": "histosys",
+        #         #     "data": {
+        #         #         "hi_data": hists["bkg_vr_protect_up"],
+        #         #         "lo_data": hists["bkg_vr_protect_down"],
+        #         #     },
+        #         # },
+        #         # {
+        #         #     "name": "bkg_shape_sys_protect",
+        #         #     "type": "histosys",
+        #         #     "data": {
+        #         #         "hi_data": hists["bkg_shape_sys_protect_up"],
+        #         #         "lo_data": hists["bkg_shape_sys_protect_down"],
+        #         #     },
+        #         # },
+        #     )
 
     if config.do_stat_error:
         for i in range(len(config.bins) - 1):
