@@ -38,11 +38,7 @@ def pipeline(
     bins = config.bins
 
     if include_bins:
-        # this is the min max range until 2500e3
-        if config.do_m_hh:
-            bins = jnp.array([0, *pars["bins"], config.m_hh_upper_bin])
-        else:
-            bins = jnp.array([0, *pars["bins"], 1])
+        bins = jnp.array([0, *pars["bins"], 1])
 
     hists = tomatos.histograms.get_hists(
         nn_pars=pars["nn_pars"],
@@ -51,7 +47,7 @@ def pipeline(
         vbf_cut=pars["vbf_cut"],
         eta_cut=pars["eta_cut"],
         data=data_dct,
-        bandwidth=pars["bw"],
+        bandwidth=config.bw_init if config.do_m_hh else pars["bw"],
         slope=slope,
         bins=bins,
     )
@@ -66,31 +62,38 @@ def pipeline(
         validate_only,
     )
 
-    # minimum counts via penalization
-    bkg_protect_up, bkg_protect_down = tomatos.workspace.threshold_uncertainty(
-        hists["bkg"],
-        threshold=1,
-        a=1,
-        find="below",
-    )
-    bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.01
-
-
-    bkg_vr_protect_up, bkg_vr_protect_down = tomatos.workspace.threshold_uncertainty(
-        hists["bkg_VR_xbb_2_NW"],
-        threshold=1,
-        a=1,
-        find="below",
-    )
-    vr_penalty = jnp.sum(bkg_vr_protect_up - 1) * 0.01
-
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type == "bce":
         return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
 
-    if validate_only:
+    if loss_type == "cls":
         loss_value = neos.loss_from_model(model, loss=loss_type)
-    else:
-        loss_value = neos.loss_from_model(model, loss=loss_type) + bkg_penalty + vr_penalty
 
-    return loss_value, hists
+        if not validate_only:
+            # minimum counts via penalization
+            bkg_protect_up, bkg_protect_down = tomatos.workspace.threshold_uncertainty(
+                hists["bkg"],
+                threshold=1,
+                a=1,
+                find="below",
+            )
+            bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.01
+            loss_value += bkg_penalty
+
+            # bkg_vr_protect_up, bkg_vr_protect_down = tomatos.workspace.threshold_uncertainty(
+            #     hists["bkg_VR_xbb_2_NW"],
+            #     threshold=1,
+            #     a=1,
+            #     find="below",
+            # )
+            # vr_penalty = jnp.sum(bkg_vr_protect_up - 1) * 0.01
+            # loss_value += vr_penalty
+
+            # bkg_shape_sys_protect_up, bkg_shape_sys_protect_down = threshold_uncertainty(
+            #     bkg_shapesys_up,
+            #     threshold=2,
+            #     a=config.aux,
+            #     find="above",
+            # )
+
+        return loss_value, hists

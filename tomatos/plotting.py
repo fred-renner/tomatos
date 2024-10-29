@@ -365,8 +365,8 @@ def plot_total_diff(metrics, config, fig_size):
         plt.plot(total_bkg_diff / n_bins, label="Background Estimate")
 
         plt.xlabel("Epoch")
-        plt.ylabel("Relative Bin Average Binned KDE/Yield")
-        plt.ylim([0, 0.2])
+        plt.ylabel("Average Bin Deviation")
+        plt.ylim([0, 0.1])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "summed_diff.pdf"
@@ -396,7 +396,7 @@ def main(config, bins, yields, metrics):
         "NOSYS",
         config,
         fig_size,
-        ylim=[1, 1.5],
+        ylim=[1, 2.0],
     )
     plot_rel_error(
         metrics,

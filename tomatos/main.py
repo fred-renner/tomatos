@@ -40,7 +40,7 @@ args = parser.parse_args()
 
 
 def run():
-    config = tomatos.configuration.Setup(args)
+    config = tomatos.configuration.Setup(args, init=True)
 
     logging.basicConfig(
         filename=config.results_path + "log.txt",
@@ -76,11 +76,6 @@ def run():
         nn_setup=nn_setup,
         args=args,
     )
-
-    # # save best epoch
-    # with open(config.best_epoch_results_path, "w") as file:
-    #     json.dump(tomatos.utils.to_python_lists(metrics["best_results"]), file)
-    #     logging.info(config.best_epoch_results_path)
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 

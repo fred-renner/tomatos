@@ -4,9 +4,12 @@ import numpy as np
 
 
 class Setup:
-    def __init__(self, args):
+    def __init__(self, args, init=False):
 
         self.files = {
+            # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+            "signal":
+            f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1p5cv1.h5",
             "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
             "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-run2.h5",
             "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
@@ -17,7 +20,7 @@ class Setup:
         self.do_m_hh = False
         if self.do_m_hh:
             self.files = {
-                "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
+                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
                 "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-run2.h5",
                 "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-ps.h5",
             }
@@ -80,9 +83,15 @@ class Setup:
 
         self.bins = np.linspace(0, 1, args.bins + 1)
 
+        # if starting to low, it will only increase at the beginning if you
+        # have minimum requirements on bins
+
         if self.do_m_hh:
-            self.m_hh_upper_bin = 2500e3 * 1.5715344198843736e-07 - 0.09694760476742253
-            self.bins = np.linspace(0, self.m_hh_upper_bin, args.bins + 1)
+            self.bw_init = 0.001
+            self.bw_min = 0.001
+        else:
+            self.bw_init = 0.2
+            self.bw_min = 0.005
 
         # Actual batching needs a reimplementation
         self.batch_size = 1e6
@@ -135,9 +144,13 @@ class Setup:
         self.model = results_folder.split("/")[0]
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
-        if not os.path.isdir(self.results_path):
-            os.makedirs(self.results_path)
-            os.makedirs(self.model_path)
+        if init:
+            if os.path.isdir(self.results_path):
+                if not self.debug:
+                    raise FileExistsError(f"Error: {self.results_path} already exists")
+            else:
+                os.makedirs(self.results_path)
+                os.makedirs(self.model_path)
 
         self.metadata_file_path = self.results_path + "metadata.json"
         self.metrics_file_path = self.results_path + "metrics.json"

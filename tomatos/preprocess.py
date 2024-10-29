@@ -162,7 +162,7 @@ def stack_data(config, max_events, event_range):
 
     for sys in config.systematics:
         data[sys] = stack_inputs(
-            config.files["k2v0"],
+            config.files["signal"],
             config,
             region="SR_xbb_2",
             n_events=max_events,
@@ -179,11 +179,20 @@ def stack_data(config, max_events, event_range):
         event_range=event_range,
     )
 
+    data["k2v0"] = stack_inputs(
+        config.files["k2v0"],
+        config,
+        region="SR_xbb_2",
+        n_events=max_events,
+        sys="NOSYS",
+        event_range=event_range,
+    )
+
     estimate_regions = [
         "CR_xbb_1",
         "CR_xbb_2",
-        "VR_xbb_1_NW",
-        "VR_xbb_2_NW",
+        "VR_xbb_1",
+        "VR_xbb_2",
     ]
     for reg in estimate_regions:
         data["bkg_" + reg] = stack_inputs(
@@ -204,15 +213,21 @@ def get_max_events(config):
         # signal
         for sys in config.systematics:
             var_sys = var + "_" + sys + ".SR_xbb_2"
-            n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
+            n = get_n_events(filepath=config.files["signal"], var=var_sys)
             if n > max_events:
                 max_events = n
+        # k2v0
+        var_sys = var + "_" + "NOSYS" + ".SR_xbb_2"
+        n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
+        if n > max_events:
+            max_events = n
+
     # run 2
     regions = [
         "CR_xbb_1",
         "CR_xbb_2",
-        "VR_xbb_1_NW",
-        "VR_xbb_2_NW",
+        "VR_xbb_1",
+        "VR_xbb_2",
         "SR_xbb_1",
     ]
     for reg in regions:
@@ -220,6 +235,7 @@ def get_max_events(config):
         n = get_n_events(filepath=config.files["run2"], var=var_sys)
         if n > max_events:
             max_events = n
+
     return max_events
 
 

@@ -23,7 +23,11 @@ def run(model=None):
         models = [model]
     else:
         models = [
-            "tomatos_cls_5_1000_study_9_simple_lr_decay_0p01_0p0005_0p0001_k_0",
+            # "tomatos_debug",
+            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_0",
+            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_1",
+            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_2",
+            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_3",
         ]
     ymax = 0
     for m in models:
@@ -65,29 +69,29 @@ def run(model=None):
                     "bkg_VR_xbb_2",
                     "bkg_VR_xbb_1_NW",
                     "bkg_VR_xbb_2_NW",
-                    "bkg_stat_up",
-                    "bkg_stat_down",
-                    "bkg_stat_up",
-                    "bkg_stat_down",
-                    "NOSYS_stat_up",
-                    "NOSYS_stat_down",
+                    # "bkg_stat_up",
+                    # "bkg_stat_down",
+                    # "NOSYS_stat_up",
+                    # "NOSYS_stat_down",
                     "kde",
                     "test",
                     "diff",
                     "bkg_estimate_in_VR",
                     "bins",
                     "VR",
+                    "NW",
                 ]
+
                 if any([reg in hist_name for reg in bkg_regions]):
                     continue
 
                 if "GEN" in hist_name:
                     continue
-                # if "protect" in hist_name:
-                #     continue
+                if "protect" in hist_name:
+                    continue
 
-                # if "xbb" in hist_name:
-                #     continue
+                if "xbb" in hist_name:
+                    continue
                 label = hist_name.replace("_", " ")
 
                 if "bkg" == label:
@@ -121,8 +125,10 @@ def run(model=None):
 
                 ax = plt.gca()
                 ylim = ax.get_ylim()
-                if ylim[1] > ymax:
-                    ymax = ylim[1] * 1.3
+
+                current_max = np.max(ylim)
+                if current_max > ymax:
+                    ymax = current_max
 
                 ax.set_ylim([0, ymax])
 
@@ -133,13 +139,15 @@ def run(model=None):
 
             if meta_data["config"]["objective"] == "cls":
                 plt.plot(
-                    np.linspace(0, 1, len(metrics["kde_signal"][0]))[1:-1],
+                    np.linspace(edges[0], edges[-1], len(metrics["kde_signal"][0]))[
+                        1:-1
+                    ],
                     metrics["kde_signal"][i][1:-1],
                     label="kde signal",
                     color="tab:orange",
                 )
                 plt.plot(
-                    np.linspace(0, 1, len(metrics["kde_bkg"][0]))[1:-1],
+                    np.linspace(edges[0], edges[-1], len(metrics["kde_bkg"][0]))[1:-1],
                     metrics["kde_bkg"][i][1:-1],
                     label="kde bkg",
                     color="tab:blue",
@@ -166,7 +174,10 @@ def run(model=None):
                 prop={"size": 5}, ncols=3, loc="upper center"
             )  # prop={"size": 6})
             plt.tight_layout()
-            plt.savefig(image_path + "/" + f"{i:005d}" + ".png", dpi=192)
+            plt.savefig(
+                image_path + "/" + f"{i:005d}" + ".png",
+                dpi=208,  # divisable by 16
+            )
             plt.close()
 
         # gif
