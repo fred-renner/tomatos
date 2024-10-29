@@ -52,8 +52,7 @@ def run(
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
     aux_info = {"kde_error": 0.0}
-    bw_init = 0.2
-    slope_init = 5000
+    slope_init = 20000
 
     loss = partial(
         tomatos.pipeline.pipeline,
@@ -63,7 +62,7 @@ def run(
         do_m_hh=config.do_m_hh,
         loss_type=config.objective,
         config=config,
-        bandwidth=bw_init,
+        bandwidth=config.bw_init,
         slope=slope_init,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
@@ -224,10 +223,16 @@ def run(
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
-            init_pars["bw"] = bw_init
-
+            init_pars["bw"] = config.bw_init
             if config.include_bins:
                 init_pars["bins"] = config.bins[1:-1]
+                if config.do_m_hh:
+                    # start with equal background distribution
+                    bkg_idx = config.data_types.index("bkg")
+                    quantiles = np.linspace(0, 1, len(config.bins)) * 0.4
+                    bins = np.quantile(train[bkg_idx][-3], quantiles)
+                    init_pars["bins"] = bins[1:-1]
+
             else:
                 init_pars.pop("bins", None)
 
@@ -289,26 +294,24 @@ def run(
         )
         # a large step can gow below 0 which breaks opt since
         # the cdf (and not the pdf) used for histogram calculation is flipped
-        params["bw"] = np.maximum(0.005, np.abs(params["bw"]))
+
+        params["bw"] = np.maximum(config.bw_min, np.abs(params["bw"]))
         bw = params["bw"]
         histograms = state.aux
 
-        if "bins" in params:
-            bins = np.array([0, *params["bins"], 1])
-            if config.do_m_hh:
-                bins = np.array([0, *params["bins"], config.m_hh_upper_bin])
-                bins = unscale_value(config, bins, -3)
-        else:
-            bins = config.bins
+        bins = np.array([0, *params["bins"], 1]) if "bins" in params else config.bins
 
         # bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
         if config.include_bins:
-            logging.info((f"next bin edges: {bins}"))
-            metrics["bins"].append(bins)
+            actual_bins = (
+                unscale_value(config, np.copy(bins), -3) if config.do_m_hh else bins
+            )
+            logging.info((f"next bin edges: {actual_bins}"))
+            metrics["bins"].append(actual_bins)
+
         logging.info((f"bKDE hist sig: {histograms['NOSYS']}"))
         logging.info((f"bKDE hist bkg: {histograms['bkg']}"))
-
 
         logging.info(
             (f"valid ratio hist sig: {valid_hists['NOSYS']/histograms['NOSYS']}")
@@ -467,7 +470,7 @@ def make_flat_bkg(config, batch_iterator, init_pars, nn):
         bw_diff += [np.abs(previous_bw - params["bw"])]
         if i % 1 == 0:
             logging.info(f"Background Hist: {state.aux['bkg']}")
-            # logging.info(f"Signal     Hist: {state.aux['NOSYS']}")
+            logging.info(f"Signal     Hist: {state.aux['NOSYS']}")
             # print(state.value)
 
         loss_value = state.value
@@ -475,52 +478,6 @@ def make_flat_bkg(config, batch_iterator, init_pars, nn):
     # print(repr(bw_diff))
 
     return params
-
-
-def update_slope(config, i):
-
-    # init slope
-    m_0 = 50
-    # final_slope, if too large can loose gradient
-    m_n = 1_000
-    i *= 1 / config.decay_quantile
-    # the gradient scales linear with m
-    m = (m_n - m_0) / config.num_steps
-    slope = m * i + m_0
-
-    # sigmoid slope m scales as 1/x with the cut uncertainty of the slope
-    # however this is very steep at the training end
-    # the gradient scales with m^2
-    # to decrase unc linearly stepwise over the desired range
-    # m_{i+1}=(1/m_i - unc)^{-1} = 1/m_0 - i*unc)^{-1}
-    # unc = ((1 / m_0) - (1 / m_n) ) / n
-    # delta_x = ((1 / m_0) - (1 / m_n)) / config.num_steps
-    # slope = ((1 / m_0) - (i + 1) * delta_x) ** (-1)
-
-    # truncate to largest value because want limited decay
-
-    # if i > int(0.75 * config.num_steps):
-    #     # the gradient scales linear with m
-    #     m = (1000 - 100) / int(0.25 * config.num_steps)
-    #     slope = m * i + 100
-    # else:
-    #     slope = 100
-
-    if slope > m_n:
-        return m_n
-
-    return slope
-
-
-def update_bw(config, i):
-    bw_0 = 0.15
-    # scale with lr
-    if config.lr > 1e-4:
-        m = -bw_0 / 500
-    else:
-        m = -bw_0 / 2500
-    y = m * i + bw_0
-    return np.maximum(y, 0.01)
 
 
 def additional_logging(config, params, histograms):

@@ -167,14 +167,3 @@ def bce(data, nn, pars):
 
 #     return bins
 
-
-def delete_aux_data(config):
-    # I know its bad to write data on config, but for now..., delete the data
-    # from config for metadata writeout
-    aux_data = []
-    for k in config.__dict__.keys():
-        if "bkg_estimate" in k:
-            aux_data += [k]
-    for k in aux_data:
-        delattr(config, k)
-    return config
