@@ -30,6 +30,7 @@ def get_hist(config, nn, best_params, data):
         bandwidth=1e-6,
         slope=1e6,
         bins=best_params["bins"] if config.include_bins else config.bins,
+        scale=1,
     )
     model, yields = tomatos.workspace.model_from_hists(
         do_m_hh=False,
@@ -166,4 +167,3 @@ def bce(data, nn, pars):
 #     bins = jnp.sort(bins)
 
 #     return bins
-

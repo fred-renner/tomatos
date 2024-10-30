@@ -219,7 +219,7 @@ def run(
     for i in range(config.num_steps):
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
-        train, batch_num, num_batches = next(batch_iterator)
+        train, batch_num, num_batches, event_fraction = next(batch_iterator)
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
@@ -240,6 +240,7 @@ def run(
             state = solver.init_state(
                 init_pars,
                 data=train,
+                scale=1 / event_fraction,
             )
 
             histograms = state.aux
@@ -286,10 +287,12 @@ def run(
         )
 
         # update
+        print(1 / event_fraction)
         params, state = solver.update(
             params,
             state,
             data=train,
+            scale=1 / event_fraction,
             slope=slope,
         )
         # a large step can gow below 0 which breaks opt since
@@ -334,7 +337,16 @@ def run(
             f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.4f}"
         )
 
-        yields, kde = get_yields(config, nn, params, train, bw, slope, bins)
+        yields, kde = get_yields(
+            config,
+            nn,
+            params,
+            train,
+            bw,
+            slope,
+            bins,
+            scale=1 / event_fraction,
+        )
 
         # # Z_A
         z_a = asimov_sig(s=yields["NOSYS"], b=yields["bkg"])
@@ -531,25 +543,30 @@ def rescale_kde(hist, kde, bins):
     # results in much less entries per bin, to the actual bKDE to get a view
     # of the original kde
 
-    # find the largest bin of binned kde hist
+    # use the largest bin of a binned kde hist
     max_bin_idx = np.argmax(hist)
-    # get the indices from the fined grained kde that would fall into each
-    # bin
-    splitted_kde = np.array_split(kde, len(bins) - 1)
-    # integrate the fine grained ones
-    kde_count = splitted_kde[max_bin_idx].sum()
+    max_bin_edges = np.array([bins[max_bin_idx], bins[max_bin_idx + 1]])
+    # integrate histogram for this bin
+    hist_x_width = np.diff(max_bin_edges)
+    hist_height = hist[max_bin_idx]
+    area_hist = hist_x_width * hist_height
+
+    # integrate kde for this bin
+    # adjust 1000 if kde sampling changes
+    kde_indices = (max_bin_edges * 1000).astype(int)
+    kde_heights = kde[kde_indices[0] : kde_indices[1]]
+    kde_dx = 1 / 1000
     # areas for both bins must be same when integerated
     # (bins have upper edge comared to hist)
-    area_hist = hist[max_bin_idx] * (bins[max_bin_idx + 1] - bins[max_bin_idx])
-    kde_width = np.abs(bins[-1] - bins[0]) / len(kde)
-    area_kde = kde_count * kde_width
+    area_kde = np.sum(kde_dx * kde_heights)
 
     scale_factor = area_hist / area_kde
-    kde *= scale_factor
-    return kde
+    kde_scaled = kde * scale_factor
+
+    return kde_scaled
 
 
-def get_yields(config, nn, params, train, bw, slope, bins):
+def get_yields(config, nn, params, train, bw, slope, bins, scale):
     data_dct = {k: v for k, v in zip(config.data_types, train)}
 
     yields = tomatos.histograms.get_hists(
@@ -562,6 +579,7 @@ def get_yields(config, nn, params, train, bw, slope, bins):
         bandwidth=1e-6,
         slope=1e6,
         bins=bins,
+        scale=scale,
     )
     model, yields = tomatos.workspace.model_from_hists(
         do_m_hh=False,
@@ -573,6 +591,7 @@ def get_yields(config, nn, params, train, bw, slope, bins):
     )
     # dont need them for all
     kde_dict = dict((k, data_dct[k]) for k in ("NOSYS", "bkg"))
+    # sample kde with 1000 bins
     kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
     kde = tomatos.histograms.get_hists(
         nn_pars=params["nn_pars"],
@@ -584,6 +603,7 @@ def get_yields(config, nn, params, train, bw, slope, bins):
         bandwidth=bw,
         slope=slope,
         bins=kde_bins,
+        scale=scale,
     )
 
     return yields, kde
