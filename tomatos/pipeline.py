@@ -28,6 +28,7 @@ def pipeline(
     do_systematics=False,
     do_stat_error=False,
     validate_only=False,
+    scale=1,
 ) -> float:
 
     # zip up our data arrays with the corresponding sample names
@@ -50,6 +51,7 @@ def pipeline(
         bandwidth=config.bw_init if config.do_m_hh else pars["bw"],
         slope=slope,
         bins=bins,
+        scale=scale,
     )
 
     # build our statistical model, and calculate the loss!

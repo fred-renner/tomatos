@@ -29,8 +29,12 @@ def make_iterator(train, batch_size):
                 perm = rng.permutation(num_train)
                 for i in range(num_batches):
                     batch_idx = perm[i * batch_size : (i + 1) * batch_size]
+                    batch_data = [points[batch_idx] for points in train]
 
-                    yield [points[batch_idx] for points in train], i, num_batches
+                    # Calculate the fraction of total for the current yield
+                    fraction_of_total = len(batch_idx) / num_train
+
+                    yield batch_data, i, num_batches, fraction_of_total
 
         return data_stream()
 

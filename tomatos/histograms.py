@@ -147,6 +147,7 @@ def get_hists(
     bins: Array,
     vbf_cut: Array,
     eta_cut: Array,
+    scale: float,
 ) -> dict[str, Array]:
     """Function that takes in data + analysis config parameters, and constructs
     yields."""
@@ -154,7 +155,7 @@ def get_hists(
     # indexing is horrible I know
     # k index is sample index
     values = {k: data[k][:, 0, :] for k in data}
-    weights = {k: data[k][:, 1, 0] for k in data}
+    weights = {k: data[k][:, 1, 0] * scale for k in data}
 
     # apply cuts to weights
     if config.objective == "cls":
