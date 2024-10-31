@@ -133,7 +133,7 @@ def run(model=None):
                 ax.set_ylim([0, ymax])
 
             if meta_data["config"]["do_m_hh"]:
-                plt.xlabel("m$_{hh}$ (MeV)")
+                plt.xlabel("m$_{HH}$ (MeV)")
             else:
                 plt.xlabel("NN score")
 
