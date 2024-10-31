@@ -354,19 +354,21 @@ def plot_total_diff(metrics, config, fig_size):
         plt.figure(figsize=fig_size)
 
         n_bins = len(metrics["signal_approximation_diff"][0])
-        total_sig_diff = np.sum(
-            np.abs(np.array(metrics["signal_approximation_diff"]) - 1), axis=1
+        total_sig_diff = (
+            np.max(np.abs(np.array(metrics["signal_approximation_diff"]) - 1), axis=1)
+            * 100
         )
-        total_bkg_diff = np.sum(
-            np.abs(np.array(metrics["bkg_approximation_diff"]) - 1), axis=1
+        total_bkg_diff = (
+            np.max(np.abs(np.array(metrics["bkg_approximation_diff"]) - 1), axis=1)
+            * 100
         )
 
         plt.plot(total_sig_diff / n_bins, label=r"$\kappa_\mathrm{2V}=0$ signal")
         plt.plot(total_bkg_diff / n_bins, label="Background Estimate")
 
         plt.xlabel("Epoch")
-        plt.ylabel("Average Bin Deviation")
-        plt.ylim([0, 0.1])
+        plt.ylabel("Largest Bin Deviation (%)")
+        plt.ylim([0, 10])
         plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "summed_diff.pdf"

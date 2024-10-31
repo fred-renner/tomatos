@@ -40,7 +40,7 @@ args = parser.parse_args()
 
 
 def run():
-    config = tomatos.configuration.Setup(args, init=True)
+    config = tomatos.configuration.Setup(args)
 
     logging.basicConfig(
         filename=config.results_path + "log.txt",

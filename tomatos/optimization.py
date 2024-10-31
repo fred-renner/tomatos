@@ -220,6 +220,8 @@ def run(
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
         train, batch_num, num_batches, event_fraction = next(batch_iterator)
+        # invoke tomatos write out only when num_batch==0 might be nice to keep
+        # the epoch writeout/plotting scheme
         if i == 0:
             init_pars["vbf_cut"] = config.cuts_init
             init_pars["eta_cut"] = config.cuts_init
@@ -287,7 +289,6 @@ def run(
         )
 
         # update
-        print(1 / event_fraction)
         params, state = solver.update(
             params,
             state,
@@ -539,9 +540,10 @@ def asimov_sig(s, b) -> float:
 
 
 def rescale_kde(hist, kde, bins):
-    # need to upscale very fine binned version of the histogram,
-    # results in much less entries per bin, to the actual bKDE to get a view
-    # of the original kde
+    # need to upscale sampled kde hist as it is a very fine binned version of
+    # the histogram,
+    # note that this is still an approximation, only working fully properly for
+    # the largest bin
 
     # use the largest bin of a binned kde hist
     max_bin_idx = np.argmax(hist)
@@ -552,12 +554,10 @@ def rescale_kde(hist, kde, bins):
     area_hist = hist_x_width * hist_height
 
     # integrate kde for this bin
-    # adjust 1000 if kde sampling changes
-    kde_indices = (max_bin_edges * 1000).astype(int)
+    kde_sampling = 1000
+    kde_indices = (max_bin_edges * kde_sampling).astype(int)
     kde_heights = kde[kde_indices[0] : kde_indices[1]]
-    kde_dx = 1 / 1000
-    # areas for both bins must be same when integerated
-    # (bins have upper edge comared to hist)
+    kde_dx = 1 / kde_sampling
     area_kde = np.sum(kde_dx * kde_heights)
 
     scale_factor = area_hist / area_kde
