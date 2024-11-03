@@ -52,7 +52,7 @@ def run(
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
     aux_info = {"kde_error": 0.0}
-    slope_init = 20000
+    slope_init = config.slope
 
     loss = partial(
         tomatos.pipeline.pipeline,
@@ -185,7 +185,7 @@ def run(
 
     params = init_pars
     best_params = init_pars
-    best_valid_loss = 999
+    best_test_loss = 999
 
     metrics = {
         k: []
@@ -231,9 +231,11 @@ def run(
                 if config.do_m_hh:
                     # start with equal background distribution
                     bkg_idx = config.data_types.index("bkg")
-                    quantiles = np.linspace(0, 1, len(config.bins)) * 0.4
-                    bins = np.quantile(train[bkg_idx][-3], quantiles)
-                    init_pars["bins"] = bins[1:-1]
+                    quantiles = np.linspace(0, 1, len(config.bins))
+                    m_hh_qunatiled_bins = np.quantile(
+                        train[bkg_idx][:, 0, -3], quantiles
+                    )
+                    init_pars["bins"] = m_hh_qunatiled_bins[1:-1]
 
             else:
                 init_pars.pop("bins", None)
@@ -404,10 +406,10 @@ def run(
             )
 
         # pick best training from valid.
-        objective = config.objective + "_valid"
-        if metrics[objective][-1] < best_valid_loss:
+        objective = config.objective + "_test"
+        if metrics[objective][-1] < best_test_loss:
             best_params = params
-            best_valid_loss = metrics[objective][-1]
+            best_test_loss = metrics[objective][-1]
             metrics["epoch_best"] = i
             infer_metrics["epoch_best"] = infer_metrics_i
             infer_metrics["epoch_best"]["epoch"] = i

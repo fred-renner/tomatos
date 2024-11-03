@@ -207,8 +207,6 @@ def plot_Z_A(metrics, config, epoch_grid, fig_size, ylim):
     if len(metrics["Z_A"]) > 0:
         plt.figure(figsize=fig_size)
         plt.plot(epoch_grid, metrics["Z_A"])
-
-        plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Asimov Significance")
         plt.tight_layout()
@@ -312,15 +310,15 @@ def plot_hists(metrics, config, epoch_grid, fig_size):
 
 def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
     if len(metrics["signal_approximation_diff"]) > 0:
-        plt.figure(figsize=fig_size)
+        plt.figure(figsize=(8, 4))
         diff = np.array(metrics["signal_approximation_diff"])
         for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.75)
+            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.5)
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
-        plt.ylim([0.75, 2])
-        plt.legend()
+        plt.ylim([0.9, 1.1])
+        plt.legend(loc="upper left")
         plt.tight_layout()
         plot_path = config["results_path"] + "signal_approximation_diff.pdf"
         print(plot_path)
@@ -330,16 +328,16 @@ def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
 
 def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
     if len(metrics["bkg_approximation_diff"]) > 0:
-        plt.figure(figsize=fig_size)
+        plt.figure(figsize=(8, 4))
         diff = np.array(metrics["bkg_approximation_diff"])
 
-        for i in range(len(metrics["NOSYS"][0])):
-            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.75)
+        for i in reversed(range(len(metrics["NOSYS"][0]))):
+            plt.plot(diff[:, i], label=f"Bin {i+1}", alpha=0.5)
 
         plt.xlabel("Epoch")
         plt.ylabel("Binned KDE/Nominal")
-        plt.ylim([0.75, 2])
-        plt.legend()
+        plt.ylim([0.9, 1.1])
+        plt.legend(loc="upper left")
         plt.tight_layout()
         plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
         print(plot_path)
