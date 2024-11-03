@@ -6,29 +6,30 @@ import numpy as np
 class Setup:
     def __init__(self, args):
 
-        self.files = {
-            "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-            # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1cv1.h5",
-            # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1p5cv1.h5",
-            "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-            "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-run2.h5",
-            "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
-        }
-
         self.run_bkg_init = False
 
         self.do_m_hh = False
+        self.include_bins = False
+
         if self.do_m_hh:
             self.files = {
-                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
+                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
                 # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv1cv1.h5",
-                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv1p5cv1.h5",
+                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv1p5cv1.h5",
                 "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
                 "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-run2.h5",
                 "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-ps.h5",
             }
+        else: 
+            self.files = {
+                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1cv1.h5",
+                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1p5cv1.h5",
+                "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
+                "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-run2.h5",
+                "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
+            }
 
-        self.include_bins = False
         self.debug = args.debug
         self.vars = [
             "pt_j1",
@@ -94,7 +95,10 @@ class Setup:
             self.bw_min = 0.001
         else:
             self.bw_init = 0.2
-            self.bw_min = 0.005
+            self.bw_min = 0.001
+        
+        # self.slope = args.aux
+        self.slope = 20_000
 
         # k2v 1p5
         # total: 113251

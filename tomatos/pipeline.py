@@ -79,7 +79,7 @@ def pipeline(
                 a=1,
                 find="below",
             )
-            bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.01
+            bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.001
             loss_value += bkg_penalty
 
             # bkg_vr_protect_up, bkg_vr_protect_down = tomatos.workspace.threshold_uncertainty(

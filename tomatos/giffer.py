@@ -24,10 +24,10 @@ def run(model=None):
     else:
         models = [
             # "tomatos_debug",
-            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_0",
-            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_1",
-            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_2",
-            "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_3",
+            "tomatos_cls_5_500_m_hh_neos_study_1_lr_0p0005_bw_min_0p001_full_range_k_0",
+            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_1",
+            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_2",
+            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_3",
         ]
     ymax = 0
     for m in models:
@@ -57,12 +57,13 @@ def run(model=None):
             # loop over hists
             # plt.figure(figsize=(10, 8))
             plt.figure(figsize=(5, 5))
+            # plt.figure(figsize=(3, 3))
             for hist_name, hist in metrics.items():
                 hist = np.array(hist)
                 if hist.ndim != 2:
                     continue
 
-                bkg_regions = [
+                skip_pattern = [
                     "bkg_CR_xbb_1",
                     "bkg_CR_xbb_2",
                     "bkg_VR_xbb_1",
@@ -80,22 +81,35 @@ def run(model=None):
                     "bins",
                     "VR",
                     "NW",
+                    "ps",
+                    "GEN",
+                    "protect",
+                    # "xbb_pt_bin_0__1up",
+                    # "xbb_pt_bin_0__1down",
+                    # "xbb_pt_bin_1__1up",
+                    # "xbb_pt_bin_1__1down",
+                    # "xbb_pt_bin_2__1up",
+                    # "xbb_pt_bin_2__1down",
+                    # "xbb_pt_bin_3__1up",
+                    # "xbb_pt_bin_3__1down",
+                    "shape",
+                    "k2v0",
                 ]
 
-                if any([reg in hist_name for reg in bkg_regions]):
+                if any([reg in hist_name for reg in skip_pattern]):
                     continue
 
-                if "GEN" in hist_name:
-                    continue
-                if "protect" in hist_name:
-                    continue
+                # if "NOSYS" == hist_name:
+                #     pass
+                # elif "bkg" == hist_name:
+                #     pass
+                # else:
+                #     continue
 
-                if "xbb" in hist_name:
-                    continue
                 label = hist_name.replace("_", " ")
 
                 if "bkg" == label:
-                    label = "Background Estimate"
+                    label = "Background"
                 if "NOSYS" == label:
                     label = r"$\kappa_\mathrm{2V}=0$ signal"
                 if "ps up" == label:
@@ -123,14 +137,14 @@ def run(model=None):
                     # align="edge",
                 )
 
-                ax = plt.gca()
-                ylim = ax.get_ylim()
+            ax = plt.gca()
+            ylim = ax.get_ylim()
 
-                current_max = np.max(ylim)
-                if current_max > ymax:
-                    ymax = current_max
+            current_max = np.max(ylim) * 1.1
+            if current_max > ymax:
+                ymax = current_max
 
-                ax.set_ylim([0, ymax])
+            ax.set_ylim([0, ymax])
 
             if meta_data["config"]["do_m_hh"]:
                 plt.xlabel("m$_{HH}$ (MeV)")
@@ -172,11 +186,12 @@ def run(model=None):
             plt.ylabel("Events")
             plt.legend(
                 prop={"size": 5}, ncols=3, loc="upper center"
-            )  # prop={"size": 6})
+                #  loc="center left"
+            )
             plt.tight_layout()
             plt.savefig(
                 image_path + "/" + f"{i:005d}" + ".png",
-                dpi=208,  # divisable by 16
+                dpi=208,  # divisable by 16 for imageio
             )
             plt.close()
 
