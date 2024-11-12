@@ -228,14 +228,31 @@ def run(
             init_pars["bw"] = config.bw_init
             if config.include_bins:
                 init_pars["bins"] = config.bins[1:-1]
-                if config.do_m_hh:
-                    # start with equal background distribution
-                    bkg_idx = config.data_types.index("bkg")
-                    quantiles = np.linspace(0, 1, len(config.bins))
-                    m_hh_qunatiled_bins = np.quantile(
-                        train[bkg_idx][:, 0, -3], quantiles
-                    )
-                    init_pars["bins"] = m_hh_qunatiled_bins[1:-1]
+                # if config.do_m_hh:
+                #     # init bins for better convergence
+                #     bkg_idx = config.data_types.index("bkg")
+                #     skew_intensity = 4
+                #     # Generate an array with increased spacing toward the end
+                #     quantiles = 1 - np.logspace(
+                #         0, -skew_intensity, len(config.bins)
+                #     )  # Invert and shift to start near 0 and increase
+                #     quantiles = quantiles / quantiles.max()  # Normalize to range [0, 1]
+                #     # print(train[bkg_idx][:, 0, -3])
+                #     m_hh_quantiled_bins = np.quantile(
+                #         train[bkg_idx][:, 0, -3], quantiles
+                #     )
+                #     init_pars["bins"] = m_hh_quantiled_bins[1:-1]
+
+                #     peak_edge = np.quantile(train[bkg_idx][:, 0, -3], 0.5)
+                #     print(peak_edge)
+                #     init_pars["bins"] = np.linspace(0, 1, len(config.bins))[1:-1] * 0.25
+                #     init_pars["bins"] = initialize_bins_v3(
+                #         train[config.data_types.index("NOSYS")][:, 0, -3],
+                #         train[bkg_idx][:, 0, -3],
+                #         5,
+                #     )[1:-1]
+
+                # init_pars["bins"] = np.array([0.01935, 0.06065, 0.12970, 0.23222])
 
             else:
                 init_pars.pop("bins", None)
@@ -287,7 +304,7 @@ def run(
         metrics[f"{config.objective}_valid"].append(valid_result)
         metrics[f"{config.objective}_test"].append(test_result)
         logging.info(
-            f"{config.objective} valid: {metrics[f'{config.objective}_valid'][-1]:.4f}"
+            f"{config.objective} test: {metrics[f'{config.objective}_test'][-1]:.4f}"
         )
 
         # update
@@ -305,7 +322,12 @@ def run(
         bw = params["bw"]
         histograms = state.aux
 
-        bins = np.array([0, *params["bins"], 1]) if "bins" in params else config.bins
+        if "bins" in params:
+            # uniqueness through gradient updates
+            params["bins"] = np.clip(np.sort(np.abs(params["bins"])), 1e-6, 1 - 1e-6)
+            bins = np.array([0, *params["bins"], 1])
+        else:
+            bins = config.bins
 
         # bins = np.array(params["bins"]) if "bins" in params else config.bins
         # save current bins
@@ -405,7 +427,7 @@ def run(
                 "\n\033[0;31m" + f"ERROR: I tried bad bins: {metrics['bins'][i-1]}"
             )
 
-        # pick best training from valid.
+        # pick best training
         objective = config.objective + "_test"
         if metrics[objective][-1] < best_test_loss:
             best_params = params

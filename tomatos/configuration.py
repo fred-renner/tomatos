@@ -8,8 +8,8 @@ class Setup:
 
         self.run_bkg_init = False
 
-        self.do_m_hh = False
-        self.include_bins = False
+        self.do_m_hh = True
+        self.include_bins = True
 
         if self.do_m_hh:
             self.files = {
@@ -20,7 +20,7 @@ class Setup:
                 "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-run2.h5",
                 "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-ps.h5",
             }
-        else: 
+        else:
             self.files = {
                 "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
                 # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1cv1.h5",
@@ -86,25 +86,27 @@ class Setup:
         self.n_features = len(self.vars)
 
         self.bins = np.linspace(0, 1, args.bins + 1)
-
-        # if starting to low, it will only increase at the beginning if you
-        # have minimum requirements on bins
-
-        if self.do_m_hh:
-            self.bw_init = 0.001
-            self.bw_min = 0.001
-        else:
-            self.bw_init = 0.2
-            self.bw_min = 0.001
         
-        # self.slope = args.aux
-        self.slope = 20_000
-
         # k2v 1p5
         # total: 113251
         # k2v0
         # total: 84776
         self.batch_size = 1e6
+
+        if self.do_m_hh:
+            self.bw_init = 0.25
+            self.bw_min = 1e-100
+            self.batch_size = 5000
+        elif args.loss=="bce":
+            self.bw_init = 1e-100
+            self.bw_min = 1e-100
+        else:
+            self.bw_init = 0.2
+            self.bw_min = 0.001
+
+        # self.slope = args.aux
+        self.slope = 20_000
+
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
