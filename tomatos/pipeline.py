@@ -40,7 +40,6 @@ def pipeline(
 
     if include_bins:
         bins = jnp.array([0, *pars["bins"], 1])
-
     hists = tomatos.histograms.get_hists(
         nn_pars=pars["nn_pars"],
         nn=nn,
@@ -48,7 +47,7 @@ def pipeline(
         vbf_cut=pars["vbf_cut"],
         eta_cut=pars["eta_cut"],
         data=data_dct,
-        bandwidth=config.bw_init if config.do_m_hh else pars["bw"],
+        bandwidth=pars["bw"],
         slope=slope,
         bins=bins,
         scale=scale,
@@ -79,7 +78,7 @@ def pipeline(
                 a=1,
                 find="below",
             )
-            bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.001
+            bkg_penalty = jnp.sum(bkg_protect_up - 1) * 0.01
             loss_value += bkg_penalty
 
             # bkg_vr_protect_up, bkg_vr_protect_down = tomatos.workspace.threshold_uncertainty(

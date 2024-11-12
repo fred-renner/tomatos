@@ -24,10 +24,7 @@ def run(model=None):
     else:
         models = [
             # "tomatos_debug",
-            "tomatos_cls_5_500_m_hh_neos_study_1_lr_0p0005_bw_min_0p001_full_range_k_0",
-            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_1",
-            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_2",
-            # "tomatos_cls_5_2000_study_1_lr_0p0005_bw_min_0p005_slope_20000_k_3",
+            "tomatos_bce_20_10000_lr_0p0005_k_3",
         ]
     ymax = 0
     for m in models:
@@ -48,9 +45,20 @@ def run(model=None):
         # meta_data["config"]["data_types"].remove("ps")
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
 
-        for i in range(len(metrics["NOSYS"])):
-            if i % 1 != 0:
-                continue
+        i = 0
+        linear_threshold = 1
+        while i < len(metrics["NOSYS"]) - 1:
+            # Your processing code goes here, using `i` as the index
+
+            if i < linear_threshold:
+                i += 1
+            else:
+                i *= 2
+
+            if i >= len(metrics["NOSYS"]) - 1:
+                break
+            # if i != 10:
+            #     continue
             # if i != 9999:
             #     continue
             print(i)
@@ -99,12 +107,13 @@ def run(model=None):
                 if any([reg in hist_name for reg in skip_pattern]):
                     continue
 
-                # if "NOSYS" == hist_name:
-                #     pass
-                # elif "bkg" == hist_name:
-                #     pass
-                # else:
-                #     continue
+                if meta_data["config"]["objective"] == "bce":
+                    if "NOSYS" == hist_name:
+                        pass
+                    elif "bkg" == hist_name:
+                        pass
+                    else:
+                        continue
 
                 label = hist_name.replace("_", " ")
 
@@ -129,7 +138,7 @@ def run(model=None):
                 plt.stairs(
                     edges=edges,
                     values=metrics[hist_name][i],
-                    # values=metrics[hist_name + "_test"][i], # does not match
+                    # values=metrics[hist_name + "_test"][i], 
                     # with kde!
                     label=label,
                     fill=None,
@@ -140,9 +149,11 @@ def run(model=None):
             ax = plt.gca()
             ylim = ax.get_ylim()
 
-            current_max = np.max(ylim) * 1.1
-            if current_max > ymax:
-                ymax = current_max
+            current_max_up = np.max(ylim) * 1.3
+            if current_max_up > ymax:
+                ymax = current_max_up
+            elif current_max_up < ymax:
+                ymax = current_max_up
 
             ax.set_ylim([0, ymax])
 
@@ -184,10 +195,16 @@ def run(model=None):
 
             plt.title(f"Epoch {i}")
             plt.ylabel("Events")
-            plt.legend(
-                prop={"size": 5}, ncols=3, loc="upper center"
-                #  loc="center left"
-            )
+
+            if meta_data["config"]["objective"] == "bce":
+                plt.legend(loc="upper right")
+            else:
+                plt.legend(
+                    prop={"size": 5},
+                    ncols=3,
+                    loc="upper center",
+                    #  loc="center left"
+                )
             plt.tight_layout()
             plt.savefig(
                 image_path + "/" + f"{i:005d}" + ".png",
