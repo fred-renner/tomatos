@@ -220,16 +220,21 @@ def plot_Z_A(metrics, config, epoch_grid, fig_size, ylim):
 def plot_bins(metrics, config, epoch_grid, fig_size):
     if len(metrics["bins"]) > 0:
         plt.figure(figsize=fig_size)
-        for i, bins in enumerate(metrics["bins"]):
+        bins = np.array(metrics["bins"])
+        for i in range(len(metrics["bins"][0])):
+            plt.plot(bins[:, i], np.arange(len(bins[:, i])), label=f"Bin Edge {i+1}")
+            # for i, bins in enumerate(metrics["bins"]):
             if config["do_m_hh"] and config["include_bins"]:
-                bins = (np.array(bins) - config["scaler_min"][0]) / config[
-                    "scaler_scale"
-                ][0]
+                # bins = (np.array(bins) - config["scaler_min"][-3]) / config[
+                #     "scaler_scale"
+                # ][-3]
                 plt.xlabel("m$_{hh}$ (MeV)")
             else:
                 plt.xlabel("NN score")
-            plt.vlines(x=bins, ymin=i, ymax=i + 1)
-            plt.ylabel("epoch")
+            # plt.vlines(x=bins, ymin=i, ymax=i + 1)
+            # plt.scatter(x=bins, y=i)
+            plt.ylabel("Epoch")
+        plt.legend()
         plt.tight_layout()
         plot_path = config["results_path"] + "bins.pdf"
         print(plot_path)
@@ -299,7 +304,14 @@ def plot_hists(metrics, config, epoch_grid, fig_size):
                 plt.plot(m[:, i], label=f"Bin {i+1}")
 
             plt.xlabel("Epoch")
-            plt.ylabel(k.replace("_", " "))
+            if "NOSYS" in k:
+                y_label = r"$\kappa_\mathrm{2V}=0$ signal"
+            elif "bkg" in k:
+                y_label = "Background"
+            else:
+                y_label = k.replace("_", " ")
+
+            plt.ylabel(y_label)
             plt.legend()
             plt.tight_layout()
             plot_path = config["results_path"] + f"hists/{k}.pdf"

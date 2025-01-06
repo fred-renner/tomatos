@@ -24,7 +24,10 @@ def run(model=None):
     else:
         models = [
             # "tomatos_debug",
-            "tomatos_bce_20_10000_lr_0p0005_k_3",
+            "tomatos_cls_5_2000_m_hh_neos_study_8_lr_0p005_linspace_bw_opt_bw_min_1e_m100_batching_5000_k_0"
+            # "tomatos_cls_5_10000_study_8_lr_0p0005_bw_min_0p001_slope_20000_k_3"
+            # "tomatos_cls_5_2000_study_6_lr_0p0005_bw_min_0p001_slope_20000_k_3"
+            # "tomatos_bce_20_10000_lr_0p0005_k_3",
         ]
     ymax = 0
     for m in models:
@@ -45,26 +48,27 @@ def run(model=None):
         # meta_data["config"]["data_types"].remove("ps")
         # # meta_data["config"]["data_types"] = ["NOSYS","bkg"]
 
-        i = 0
-        linear_threshold = 1
-        while i < len(metrics["NOSYS"]) - 1:
-            # Your processing code goes here, using `i` as the index
+        # to also include epoch 0
+        i = -1
+        n_epochs = len(metrics["NOSYS"]) - 1
+        while i < n_epochs:
+            # if i < 700:
+            #     i += 1
+            # else:
+            #     i = int(i * 1.25)
 
-            if i < linear_threshold:
-                i += 1
-            else:
-                i *= 2
+            i += 1
+            # if i != 0:
+            #     continue
 
-            if i >= len(metrics["NOSYS"]) - 1:
+            if i > n_epochs:
                 break
-            # if i != 10:
-            #     continue
-            # if i != 9999:
-            #     continue
+
             print(i)
             # loop over hists
             # plt.figure(figsize=(10, 8))
             plt.figure(figsize=(5, 5))
+            # plt.figure(figsize=(7, 7))
             # plt.figure(figsize=(3, 3))
             for hist_name, hist in metrics.items():
                 hist = np.array(hist)
@@ -138,7 +142,7 @@ def run(model=None):
                 plt.stairs(
                     edges=edges,
                     values=metrics[hist_name][i],
-                    # values=metrics[hist_name + "_test"][i], 
+                    # values=metrics[hist_name + "_test"][i],
                     # with kde!
                     label=label,
                     fill=None,
@@ -152,8 +156,8 @@ def run(model=None):
             current_max_up = np.max(ylim) * 1.3
             if current_max_up > ymax:
                 ymax = current_max_up
-            elif current_max_up < ymax:
-                ymax = current_max_up
+            # elif current_max_up < ymax:
+            #     ymax = current_max_up
 
             ax.set_ylim([0, ymax])
 
@@ -200,7 +204,7 @@ def run(model=None):
                 plt.legend(loc="upper right")
             else:
                 plt.legend(
-                    prop={"size": 5},
+                    prop={"size": 6.4},
                     ncols=3,
                     loc="upper center",
                     #  loc="center left"

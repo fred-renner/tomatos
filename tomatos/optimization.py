@@ -167,7 +167,7 @@ def run(
     plt.xlabel("Epoch")
     plt.ylabel("Learning Rate")
     plt.tight_layout()
-    plt.savefig(config.results_path + "/lr_schedule.pdf")
+    plt.savefig(config.results_path + "lr_schedule.pdf")
     plt.close()
     if config.debug:
         lr_schedule = config.lr
@@ -228,31 +228,6 @@ def run(
             init_pars["bw"] = config.bw_init
             if config.include_bins:
                 init_pars["bins"] = config.bins[1:-1]
-                # if config.do_m_hh:
-                #     # init bins for better convergence
-                #     bkg_idx = config.data_types.index("bkg")
-                #     skew_intensity = 4
-                #     # Generate an array with increased spacing toward the end
-                #     quantiles = 1 - np.logspace(
-                #         0, -skew_intensity, len(config.bins)
-                #     )  # Invert and shift to start near 0 and increase
-                #     quantiles = quantiles / quantiles.max()  # Normalize to range [0, 1]
-                #     # print(train[bkg_idx][:, 0, -3])
-                #     m_hh_quantiled_bins = np.quantile(
-                #         train[bkg_idx][:, 0, -3], quantiles
-                #     )
-                #     init_pars["bins"] = m_hh_quantiled_bins[1:-1]
-
-                #     peak_edge = np.quantile(train[bkg_idx][:, 0, -3], 0.5)
-                #     print(peak_edge)
-                #     init_pars["bins"] = np.linspace(0, 1, len(config.bins))[1:-1] * 0.25
-                #     init_pars["bins"] = initialize_bins_v3(
-                #         train[config.data_types.index("NOSYS")][:, 0, -3],
-                #         train[bkg_idx][:, 0, -3],
-                #         5,
-                #     )[1:-1]
-
-                # init_pars["bins"] = np.array([0.01935, 0.06065, 0.12970, 0.23222])
 
             else:
                 init_pars.pop("bins", None)
@@ -288,16 +263,16 @@ def run(
             params,
             data=valid,
             loss_type=config.objective,
-            bandwidth=1e-6,
-            slope=1e6,
+            bandwidth=1e-20,
+            slope=1e20,
             validate_only=True,
         )
         test_result, test_hists = loss(
             params,
             data=test,
             loss_type=config.objective,
-            bandwidth=1e-6,
-            slope=1e6,
+            bandwidth=1e-20,
+            slope=1e20,
             validate_only=True,
         )
 
@@ -600,8 +575,8 @@ def get_yields(config, nn, params, train, bw, slope, bins, scale):
         eta_cut=params["eta_cut"],
         nn=nn,
         data=data_dct,
-        bandwidth=1e-6,
-        slope=1e6,
+        bandwidth=1e-100,
+        slope=1e100,
         bins=bins,
         scale=scale,
     )
