@@ -8,8 +8,8 @@ class Setup:
 
         self.run_bkg_init = False
 
-        self.do_m_hh = True
-        self.include_bins = True
+        self.do_m_hh = False
+        self.include_bins = False
 
         if self.do_m_hh:
             self.files = {
@@ -96,7 +96,7 @@ class Setup:
         if self.do_m_hh:
             self.bw_init = 0.25
             self.bw_min = 1e-100
-            self.batch_size = 5000
+            self.batch_size = 10000
         elif args.loss=="bce":
             self.bw_init = 1e-100
             self.bw_min = 1e-100
