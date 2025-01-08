@@ -8,3 +8,5 @@ python_install
 *.DS_Store
 .vscode/*
 .pytest_cache
+tests/files/mc20*.root
+tests/files/jetjet*.root

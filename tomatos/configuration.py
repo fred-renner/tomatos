@@ -32,25 +32,25 @@ class Setup:
 
         self.debug = args.debug
         self.vars = [
-            "pt_j1",
-            "eta_j1",
-            "phi_j1",
-            "E_j1",
-            "pt_j2",
-            "eta_j2",
-            "phi_j2",
-            "E_j2",
-            "pt_h1",
-            "eta_h1",
-            "phi_h1",
+            # "pt_j1",
+            # "eta_j1",
+            # "phi_j1",
+            # "E_j1",
+            # "pt_j2",
+            # "eta_j2",
+            # "phi_j2",
+            # "E_j2",
+            # "pt_h1",
+            # "eta_h1",
+            # "phi_h1",
             # "m_h1",
-            "pt_h2",
-            "eta_h2",
-            "phi_h2",
+            # "pt_h2",
+            # "eta_h2",
+            # "phi_h2",
             # "m_h2",
-            "pt_hh",
-            "eta_hh",
-            "phi_hh",
+            # "pt_hh",
+            # "eta_hh",
+            # "phi_hh",
             "m_hh",
             # "lead_xbb_score",
             "m_jj",
@@ -78,7 +78,7 @@ class Setup:
 
         self.systematics_raw = []
         self.do_stat_error = False
-        self.do_systematics = True
+        self.do_systematics = False
         for sys in self.systematics:
             if "1up" in sys:
                 self.systematics_raw += [sys.split("__")[0]]

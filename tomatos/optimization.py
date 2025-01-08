@@ -175,7 +175,7 @@ def run(
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
         optax.adam(lr_schedule),
-        optax.masked(optax.clip(max_delta=0.001), bw_mask),
+        optax.masked(optax.clip(max_delta=0.001), bw_mask), # make this configurable?
         optax.masked(optax.clip(max_delta=0.0001), cut_mask),  # 2 GeV mjj steps
     )
 
@@ -298,7 +298,8 @@ def run(
         histograms = state.aux
 
         if "bins" in params:
-            # uniqueness through gradient updates
+            # gradient updates basically guarantee that they are unique, so
+            # sort is enough
             params["bins"] = np.clip(np.sort(np.abs(params["bins"])), 1e-6, 1 - 1e-6)
             bins = np.array([0, *params["bins"], 1])
         else:
