@@ -30,32 +30,39 @@ class Setup:
                 "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
             }
 
+        self.sample_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_samples/"
+
+        # collect input files
+        self.samples = os.listdir(self.sample_path)
+        # put nominal samples first
+        self.samples.sort(key=lambda x: ("NOSYS" not in x))
+
+        self.files = {}
+        for file in self.samples:
+            if file.endswith(".root"):
+                sample_name = file.split(".root")[0]
+                self.files[sample_name] = self.sample_path + file
+
+        self.plot_inputs = True
         self.debug = args.debug
-        self.vars = [
-            # "pt_j1",
-            # "eta_j1",
-            # "phi_j1",
-            # "E_j1",
-            # "pt_j2",
-            # "eta_j2",
-            # "phi_j2",
-            # "E_j2",
-            # "pt_h1",
-            # "eta_h1",
-            # "phi_h1",
-            # "m_h1",
-            # "pt_h2",
-            # "eta_h2",
-            # "phi_h2",
-            # "m_h2",
-            # "pt_hh",
-            # "eta_hh",
-            # "phi_hh",
-            "m_hh",
-            # "lead_xbb_score",
-            "m_jj",
-            "eta_jj",
-        ]
+        self.tree_name = "AnalysisMiniTree"
+        self.vars = (
+            "j1_pt",
+            "j1_eta",
+            "j1_phi",
+            "j1_m",
+            "j2_pt",
+            "j2_eta",
+            "j2_phi",
+            "j2_m",
+            "h_pt",
+            "h_eta",
+            "h_phi",
+            "h_m",
+            "weights",
+            "weights_sf_unc__1up",
+            "weights_sf_unc__1down",
+        )
 
         self.systematics = [
             "NOSYS",
@@ -86,7 +93,7 @@ class Setup:
         self.n_features = len(self.vars)
 
         self.bins = np.linspace(0, 1, args.bins + 1)
-        
+
         # k2v 1p5
         # total: 113251
         # k2v0
@@ -97,7 +104,7 @@ class Setup:
             self.bw_init = 0.25
             self.bw_min = 1e-100
             self.batch_size = 10000
-        elif args.loss=="bce":
+        elif args.loss == "bce":
             self.bw_init = 1e-100
             self.bw_min = 1e-100
         else:
@@ -106,7 +113,6 @@ class Setup:
 
         # self.slope = args.aux
         self.slope = 20_000
-
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
@@ -130,7 +136,8 @@ class Setup:
         self.aux = float(args.aux)
 
         # nr of k-folds used for scaling the weights
-        self.n_k_folds = 4
+        # if not 1 -> somewhere
+        self.n_k_folds = 2
         # simple transfer factor or binned transferfactor
         self.binned_w_CR = False
 

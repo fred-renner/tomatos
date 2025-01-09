@@ -8,6 +8,87 @@ import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 import logging
+import uproot
+
+import os
+import numpy as np
+import uproot
+import matplotlib.pyplot as plt
+import math
+
+
+def plot_inputs(config):
+    """
+    Create individual plots for each variable and a combined grid of all plots.
+
+    Args:
+        config: Configuration object containing variables, file paths, and tree name.
+    """
+    plot_path = config.results_path + "input_plots"
+    if not os.path.isdir(plot_path):
+        os.makedirs(plot_path)
+
+    # Determine grid size for combined plot
+    n_vars = len(config.vars)
+    cols = math.ceil(math.sqrt(n_vars))
+    rows = math.ceil(n_vars / cols)
+
+    # Create combined grid plot
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 4))
+    axes = axes.flatten() if isinstance(axes, np.ndarray) else [axes]
+
+    for i, var in enumerate(config.vars):
+        ax = axes[i]
+        # Individual plot setup
+        plt.figure(figsize=(6, 4))
+        for sample, path in config.files.items():
+            tree = uproot.open(path)[config.tree_name]
+            data = tree[var].array(library="np")
+
+            # Calculate mean and standard deviation
+            mean = np.mean(data)
+            std = np.std(data)
+
+            # Filter data within 5 standard deviations
+            filtered_data = data[(data > mean - 5 * std) & (data < mean + 5 * std)]
+
+            # Plot histogram
+            ax.hist(
+                filtered_data,
+                bins=30,
+                density=True,
+                histtype="step",
+                label=sample,
+            )
+            plt.hist(
+                filtered_data,
+                bins=30,
+                density=True,
+                histtype="step",
+                label=sample,
+            )
+        ax.set_xlabel(var)
+        ax.set_ylabel("Event Density")
+        ax.legend()
+
+        # Save individual plot
+        plt.xlabel(var)
+        plt.ylabel("Event Density")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f"{plot_path}/{var}.pdf")
+        plt.close()
+
+    # Turn off any unused axes
+    for ax in axes[n_vars:]:
+        ax.axis("off")
+
+    plt.tight_layout()
+    logging.info(f"Combined input plots here: {plot_path}/combined_input_plots.pdf")
+    plt.savefig(f"{plot_path}/combined_input_plots.pdf")
+    plt.close()
+
+    s
 
 
 def interpolate_gaps(values, limit=None):

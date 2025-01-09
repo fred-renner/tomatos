@@ -33,7 +33,7 @@ def pipeline(
 
     # zip up our data arrays with the corresponding sample names
     data_dct = {k: v for k, v in zip(sample_names, data)}
-
+    print(type(data_dct["NOSYS"]))
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
     bins = config.bins

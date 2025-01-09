@@ -54,6 +54,9 @@ def run():
     logging.getLogger("relaxed").setLevel(logging.WARNING)
     pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
 
+    if config.plot_inputs:
+        tomatos.plotting.plot_inputs(config)
+
     train, valid, test = tomatos.preprocess.prepare_data(config)
     logging.info(f"datasets: {len(train)}")
     init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
