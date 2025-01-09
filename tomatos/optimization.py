@@ -220,6 +220,7 @@ def run(
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
         train, batch_num, num_batches, event_fraction = next(batch_iterator)
+
         # invoke tomatos write out only when num_batch==0 might be nice to keep
         # the epoch writeout/plotting scheme
         if i == 0:

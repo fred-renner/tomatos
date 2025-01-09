@@ -10,9 +10,10 @@ dependencies = [
     "sklearn",
     "scikit-learn==1.1.1",
     "chex==0.1.3",
-    # "jax==0.3.14",
-    # "jaxlib @ https://storage.googleapis.com/jax-releases/nocuda/jaxlib-0.3.14-cp39-none-manylinux2014_x86_64.whl",
-    # cuda
+    # # cpu
+    "jax==0.3.14",
+    "jaxlib @ https://storage.googleapis.com/jax-releases/nocuda/jaxlib-0.3.14-cp39-none-manylinux2014_x86_64.whl",
+    # # cuda
     # "jaxlib @ https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.3.14+cuda11.cudnn82-cp39-none-manylinux2014_x86_64.whl",
     # "scipy==1.9.2",
     # 
@@ -25,6 +26,7 @@ dependencies = [
     "jupyter",
     "h5py",
     "imageio-ffmpeg",
+    "uproot",
 ]
 
 [tool.setuptools.packages]

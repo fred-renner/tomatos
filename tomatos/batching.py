@@ -39,3 +39,5 @@ def make_iterator(train, batch_size):
         return data_stream()
 
     return batches(train, batch_size)
+
+# buffered shuffling of sequentially loaded indices might also be interesting
