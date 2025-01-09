@@ -41,7 +41,7 @@ def plot_inputs(config):
         ax = axes[i]
         # Individual plot setup
         plt.figure(figsize=(6, 4))
-        for sample, path in config.files.items():
+        for sample, path in zip(config.sample_names, config.input_paths):
             tree = uproot.open(path)[config.tree_name]
             data = tree[var].array(library="np")
 
@@ -87,8 +87,6 @@ def plot_inputs(config):
     logging.info(f"Combined input plots here: {plot_path}/combined_input_plots.pdf")
     plt.savefig(f"{plot_path}/combined_input_plots.pdf")
     plt.close()
-
-    s
 
 
 def interpolate_gaps(values, limit=None):

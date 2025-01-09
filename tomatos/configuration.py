@@ -1,6 +1,6 @@
 import os
-
 import numpy as np
+import pathlib
 
 
 class Setup:
@@ -30,22 +30,27 @@ class Setup:
                 "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
             }
 
-        self.sample_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_samples/"
+        self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
+        self.tree_name = "AnalysisMiniTree"
 
         # collect input files
-        self.samples = os.listdir(self.sample_path)
-        # put nominal samples first
-        self.samples.sort(key=lambda x: ("NOSYS" not in x))
+        self.input_paths = [
+            str(file)
+            for file in pathlib.Path(self.input_path).rglob("*.root")
+            if file.is_file()
+        ]
+        # put nominal samples first, not strictly necessary but useful for a couple of reasons
+        self.input_paths.sort(key=lambda x: ("NOSYS" not in x))
 
-        self.files = {}
-        for file in self.samples:
-            if file.endswith(".root"):
-                sample_name = file.split(".root")[0]
-                self.files[sample_name] = self.sample_path + file
+        # expected structure: self.sample_path/SAMPLE/SYSTEMATIC.root
+        self.sample_names = []
+        for p in self.input_paths:
+            sample_name = p.removesuffix(".root")
+            sample_name = sample_name.split("/")
+            self.sample_names += [sample_name[-2] + "_" + sample_name[-1]]
 
         self.plot_inputs = True
         self.debug = args.debug
-        self.tree_name = "AnalysisMiniTree"
         self.vars = (
             "j1_pt",
             "j1_eta",
