@@ -32,25 +32,43 @@ class Setup:
 
         self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
         self.tree_name = "AnalysisMiniTree"
-
         # collect input files
         self.input_paths = [
             str(file)
             for file in pathlib.Path(self.input_path).rglob("*.root")
             if file.is_file()
         ]
-        # put nominal samples first, not strictly necessary but useful for a couple of reasons
+        # put nominal samples first, not strictly necessary but e.g. useful for plotting
         self.input_paths.sort(key=lambda x: ("NOSYS" not in x))
 
         # expected structure: self.sample_path/SAMPLE/SYSTEMATIC.root
-        self.sample_names = []
+        # sample_sys will be the list of SAMPLE_SYSTEMATIC
+        self.sample_sys = []
         for p in self.input_paths:
             sample_name = p.removesuffix(".root")
             sample_name = sample_name.split("/")
-            self.sample_names += [sample_name[-2] + "_" + sample_name[-1]]
+            self.sample_sys += [sample_name[-2] + "_" + sample_name[-1]]
+        self.sample_files_dict = {
+            k: v for k, v in zip(self.sample_sys, self.input_paths)
+        }
+
+        # slows down I/O, but saves disk memory
+        self.compress_input_files = False
+        # need to add up to one
+        self.split_ratio = {
+            "train": 0.8,
+            "valid": 0.1,
+            "test": 0.1,
+        }
 
         self.plot_inputs = True
         self.debug = args.debug
+
+        # jax likes predefined arrays. self.vars defines the main data array of
+        # dimension (n_events, self.vars). Need to keep event correspondence
+        # for weights, preprocessing, batching, hists,...
+        # keeping them all together simplifies the program workflow a lot even
+        # though it has to be setup with care. order matters, see below
         self.vars = (
             "j1_pt",
             "j1_eta",
@@ -68,6 +86,12 @@ class Setup:
             "weights_sf_unc__1up",
             "weights_sf_unc__1down",
         )
+        # the last nn variable, in that order defines the nn inputs
+        # sliced array access is a huge speed up when slicing
+        # array[:, :nn_inputs_idx] much faster than array[:, np.arange(nn_inputs_idx)]
+        self.nn_inputs_idx = self.vars.index("h_m") + 1
+        # nominal event weight
+        self.weight_idx = self.vars.index("weights")
 
         self.systematics = [
             "NOSYS",
@@ -95,15 +119,12 @@ class Setup:
             if "1up" in sys:
                 self.systematics_raw += [sys.split("__")[0]]
 
-        self.n_features = len(self.vars)
+        self.n_features = self.nn_inputs_idx + 1
 
         self.bins = np.linspace(0, 1, args.bins + 1)
 
-        # k2v 1p5
-        # total: 113251
-        # k2v0
-        # total: 84776
-        self.batch_size = 1e6
+        # change this to splitting number
+        self.batch_size = 10_000
 
         if self.do_m_hh:
             self.bw_init = 0.25
@@ -141,8 +162,11 @@ class Setup:
         self.aux = float(args.aux)
 
         # nr of k-folds used for scaling the weights
-        # if not 1 -> somewhere
-        self.n_k_folds = 2
+        self.n_k_folds = 1
+        self.k_fold_sf = (
+            self.n_k_folds / (self.n_k_folds - 1) if self.n_k_folds > 1 else 1
+        )
+
         # simple transfer factor or binned transferfactor
         self.binned_w_CR = False
 
@@ -169,6 +193,9 @@ class Setup:
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
 
+        self.preprocess_path = self.results_path + "preprocessed/"
+        if not os.path.isdir(self.preprocess_path):
+            os.makedirs(self.preprocess_path)
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
             os.makedirs(self.model_path)
