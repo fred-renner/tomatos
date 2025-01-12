@@ -1,264 +1,157 @@
 import h5py
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils import shuffle
+import logging
+import uproot
+from sklearn.model_selection import train_test_split
+from sklearn.utils import resample
+
+
+def init_2d_data(config):
+    with h5py.File(config.preprocess_path + "data.h5", "w") as f:
+        for sample_sys in config.sample_sys:
+            f.create_dataset(
+                name=sample_sys,
+                shape=(0, len(config.vars)),
+                maxshape=(
+                    None,  # allows resize, makes appending easy, instead of idx tracking
+                    len(config.vars),
+                ),
+                compression="gzip" if config.compress_input_files else None,
+                dtype="f4",
+                chunks=True,  # autochunking because of maxshape None, however makes good performance choices
+            )
+
+
+def fill_2d_data(config, scaler):
+    for sample_sys, path in config.sample_files_dict.items():
+        with uproot.open(path) as file:
+            tree = file[config.tree_name]
+            for data in tree.iterate(step_size=config.batch_size, library="np"):
+                #######
+                # preselection could be here
+                #######
+                stack_inputs(config, sample_sys, data, scaler)
 
 
 def stack_inputs(
-    filepath,
     config,
-    region,
-    n_events=0,
-    sys="NOSYS",
-    event_range=[0.0, 0.8],
+    sample_sys,
+    data,
+    scaler,
 ):
-    """make array of input variables and attach desired weights to keep the
-    weights during shuffling, so it gets the shape:
+    # transform dict data into 2d array of dimension (events, vars)
+    data_2d = np.array([data[var] for var in config.vars]).T
+    # iteratively update min max for scaling of train vars
+    scaler.partial_fit(data_2d[:, : config.nn_inputs_idx])
+    with h5py.File(config.preprocess_path + "data.h5", "r+") as f:
+        ds = f[sample_sys]
+        old_shape = ds.shape
+        new_shape = (old_shape[0] + data_2d.shape[0], old_shape[1])
+        # resize array on disk
+        ds.resize(new_shape)
+        # append on disk
+        ds[old_shape[0] :] = data_2d
 
-    (n_events, 2, n_vars,)
-
-    so we get sth like e.g. with 3 features
-        val = np.array(
-            [
-                [0, 1, 2],
-                [3, 4, 5],
-                [6, 7, 8],
-            ]
-        )
-
-    with wights
-        w = np.array(
-            [
-                [90, 90, 90],
-                [91, 91, 91],
-                [92, 92, 92],
-            ]
-        )
-
-    put together like
-        data = np.array(
-            [
-                [
-                    [[0, 1, 2], [90, 90, 90]],
-                    [[3, 4, 5], [91, 91, 91]],
-                    [[6, 7, 8], [92, 92, 92]],
-                ]
-            ]
-        )
-
-
-    Parameters
-    ----------
-    filepath : str
-        path to file
-    config : tomatos.configuration.Setup
-        config object
-    filepath : sys
-        systematic
-
-    Returns
-    -------
-    out : ndarray
-        array holding per event pairs of feature values and weights
-
-    """
-
-    if "run2" in filepath:
-        is_mc = False
-    else:
-        is_mc = True
-
-    with h5py.File(filepath, "r") as f:
-        # nr of events desired for n_events
-        ranged_n_events = int(np.abs(event_range[1] - event_range[0]) * n_events)
-        # init array
-        arr = np.zeros((ranged_n_events, 2, config.n_features))
-        # fill per var
-
-        shufled_indices_table = {
-            # (n_var_events, idx_0, idx_1): [1, 3, 4,...],
-        }
-
-        for i, var in enumerate(config.vars):
-            var_name = var + "_" + sys + "." + region
-            w_name = "weights_" + sys + "." + region
-
-            # select the range from available events as n_var_events not
-            # necessarily n_events
-            n_var_events = f[var_name].shape[0]
-            idx_0 = int(np.floor(event_range[0] * n_var_events))
-            idx_1 = int(np.floor(event_range[1] * n_var_events))
-
-            # want shuffled indices
-            if (n_var_events, idx_0, idx_1) not in shufled_indices_table:
-                # Set a seed for reproducibility
-                np.random.seed(42)
-                shuffled_indices = np.arange(n_var_events)
-                np.random.shuffle(shuffled_indices)
-                indices = shuffled_indices[idx_0:idx_1]
-                # h5py requires increasing ordered indices
-                shufled_indices_table[(n_var_events, idx_0, idx_1)] = np.sort(indices)
-
-            indices = shufled_indices_table[(n_var_events, idx_0, idx_1)]
-
-            # up (or down) scale
-            # load the whole array and select then because its much faster as
-            # h5py is really slow with single idx access. however this will run
-            # into trouble of course when datasets become too large
-            arr[:, 0, i] = np.resize(f[var_name][:][indices], (ranged_n_events))
-
-            # same for weights
-            if is_mc:
-                arr[:, 1, i] = np.resize(f[w_name][:][indices], (ranged_n_events))
-            else:
-                arr[:, 1, i] = np.ones(ranged_n_events)
-
-            # scale weights
-            # upscale to total event yield from ranged_n_events
-            selected_sf = n_events / ranged_n_events
-            # amount for actual up/down scaling of values
-            rescale_sf = len(indices) / ranged_n_events
-            # amount for k-fold splits
-            k_fold_sf = config.n_k_folds / (config.n_k_folds - 1)
-
-            arr[:, 1, i] *= selected_sf * rescale_sf * k_fold_sf
-        return arr
-
-
-def min_max_norm(
-    train,
-    valid,
-    test,
-):
-    scaler = MinMaxScaler()
-
-    # find the min max by going over all samples
-    # train, valid, test
-    for data in [train, valid, test]:
-        for key in data.keys():
-            scaler.partial_fit(data[key][:, 0, :])
-
-    # apply scaling to train, valid, test
-    for data in [train, valid, test]:
-        for key in data.keys():
-            data[key][:, 0, :] = scaler.transform(data[key][:, 0, :])
-
-    return train, valid, test, scaler
-
-
-def get_n_events(filepath, var):
-    with h5py.File(filepath, "r") as f:
-        return f[var].shape[0]
-
-
-def stack_data(config, max_events, event_range):
-    data = {}
-    data["bkg"] = stack_inputs(
-        config.files["run2"],
-        config,
-        region="SR_xbb_1",
-        n_events=max_events,
-        event_range=event_range,
-    )
-
-    for sys in config.systematics:
-        data[sys] = stack_inputs(
-            config.files["signal"],
-            config,
-            region="SR_xbb_2",
-            n_events=max_events,
-            sys=sys,
-            event_range=event_range,
-        )
-
-    data["ps"] = stack_inputs(
-        config.files["ps"],
-        config,
-        region="SR_xbb_2",
-        n_events=max_events,
-        sys="NOSYS",
-        event_range=event_range,
-    )
-
-    data["k2v0"] = stack_inputs(
-        config.files["k2v0"],
-        config,
-        region="SR_xbb_2",
-        n_events=max_events,
-        sys="NOSYS",
-        event_range=event_range,
-    )
-
-    estimate_regions = [
-        "CR_xbb_1",
-        "CR_xbb_2",
-        "VR_xbb_1",
-        "VR_xbb_2",
-    ]
-    for reg in estimate_regions:
-        data["bkg_" + reg] = stack_inputs(
-            config.files["run2"],
-            config,
-            region=reg,
-            n_events=max_events,
-            sys="NOSYS",
-            event_range=event_range,
-        )
-
-    return data
+    return
 
 
 def get_max_events(config):
     max_events = 0
-    for var in config.vars:
-        # signal
-        for sys in config.systematics:
-            var_sys = var + "_" + sys + ".SR_xbb_2"
-            n = get_n_events(filepath=config.files["signal"], var=var_sys)
+    with h5py.File(config.preprocess_path + "data.h5", "r") as f:
+        for sample_sys in config.sample_sys:
+            n = f[sample_sys].shape[0]
             if n > max_events:
                 max_events = n
-        # k2v0
-        var_sys = var + "_" + "NOSYS" + ".SR_xbb_2"
-        n = get_n_events(filepath=config.files["k2v0"], var=var_sys)
-        if n > max_events:
-            max_events = n
-
-    # run 2
-    regions = [
-        "CR_xbb_1",
-        "CR_xbb_2",
-        "VR_xbb_1",
-        "VR_xbb_2",
-        "SR_xbb_1",
-    ]
-    for reg in regions:
-        var_sys = "m_hh_NOSYS." + reg
-        n = get_n_events(filepath=config.files["run2"], var=var_sys)
-        if n > max_events:
-            max_events = n
-
     return max_events
 
 
+def init_splits(config, idx_bounds):
+    for split in ["train", "valid", "test"]:
+        out_file = config.preprocess_path + split + ".h5"
+        n_events = idx_bounds[split][1] - idx_bounds[split][0]
+        logging.info(f"{split} events: {n_events}")
+        with h5py.File(out_file, "w") as f_split:
+            for sample_sys in config.sample_sys:
+                f_split.create_dataset(
+                    name=sample_sys,
+                    shape=(n_events, len(config.vars)),
+                    compression="gzip" if config.compress_input_files else None,
+                    dtype="f4",
+                    chunks=True,  # autochunks makes good performance choices
+                )
+
+
+def fill_splits(config, max_events, idx_bounds, scaler):
+
+    # upsampling is straightforward and intuitive to avoid a class imbalance
+    # makes particular sense for jax as it likes predefined array sizes,
+    # also simplifies batching.
+
+    # these are just file handles
+    with (
+        h5py.File(config.preprocess_path + "data.h5", "r") as f_data,
+        h5py.File(config.preprocess_path + "train.h5", "r+") as f_train,
+        h5py.File(config.preprocess_path + "valid.h5", "r+") as f_valid,
+        h5py.File(config.preprocess_path + "test.h5", "r+") as f_test,
+    ):
+        np.random.seed(1)
+        file = {
+            "data": f_data,
+            "train": f_train,
+            "valid": f_valid,
+            "test": f_test,
+        }
+
+        # upsampling, shuffling, scaling nn inputs, scaling event weights
+        # having it compact here avoids multiple IO
+        for sample_sys in config.sample_sys:
+            # quick and cheap for now, avoid IO heavy random idx
+            # reading, should be fine since this is after preselection and
+            # requires less than e.g.
+            # ds=(max_events=1e7, config.vars=20) ~ 1.6 GB for float32
+            ds = file["data"][sample_sys][:]
+            upsample_sf = ds.shape[0] / max_events
+            # suffle events in place
+            np.random.shuffle(ds)
+            # this replicates from the beginning, i prefer this to random
+            # resampling as duplication only happens if necessary
+            ds = np.resize(ds, (max_events, len(config.vars)))
+            # shuffle again to remove periodicity
+            np.random.shuffle(ds)
+            # min max scale nn input vars
+            ds[:, : config.nn_inputs_idx] = scaler.transform(
+                ds[:, : config.nn_inputs_idx]
+            )
+            # write
+            for split in ["train", "valid", "test"]:
+                out = ds[idx_bounds[split][0] : idx_bounds[split][1]]  # (this a view)
+                split_sf = 1 / config.split_ratio[split]
+                # account for resampling, splitting, and k-folding, such that
+                # except for stats the hist yields in each split are the same
+                out[:, config.weight_idx] *= upsample_sf * split_sf * config.k_fold_sf
+                file[split][sample_sys][:] = out
+
+
 def prepare_data(config):
+    # create data.h5 with 2d data structure (n_events, config.vars)
+    init_2d_data(config)
+    # scaler for nn inputs
+    scaler = MinMaxScaler()
+    # fill data.h5 from trees
+    fill_2d_data(config, scaler)
+    # scale to sample with most events
     max_events = get_max_events(config)
-
-    train = stack_data(config, max_events, event_range=[0.0, 0.8])
-    valid = stack_data(config, max_events, event_range=[0.8, 0.9])
-    test = stack_data(config, max_events, event_range=[0.9, 1.0])
-
-    train, valid, test, scaler = min_max_norm(train, valid, test)
-    config.scaler_scale = scaler.scale_
-    config.scaler_min = scaler.min_
-
-    config.data_types = []
-    train_ = []
-    valid_ = []
-    test_ = []
-    for k in train.keys():
-        config.data_types += [k]
-        train_ += [np.asarray(train[k])]
-        valid_ += [np.asarray(valid[k])]
-        test_ += [np.asarray(test[k])]
-
-    return train_, valid_, test_
-
+    # train valid test indices, can go in order since they are shuffled
+    train_end = round(max_events * config.split_ratio["train"])
+    valid_end = train_end + round(max_events * config.split_ratio["valid"])
+    idx_bounds = {
+        "train": [0, train_end],
+        "valid": [train_end, valid_end],
+        "test": [valid_end, max_events],
+    }
+    # create train.h5, valid.h5, test.h5 with according event_sizes
+    init_splits(config, idx_bounds)
+    fill_splits(config, max_events, idx_bounds, scaler)
+    config.scaler = scaler

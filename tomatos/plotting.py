@@ -24,7 +24,7 @@ def plot_inputs(config):
     Args:
         config: Configuration object containing variables, file paths, and tree name.
     """
-    plot_path = config.results_path + "input_plots"
+    plot_path = config.results_path + "input_plots/"
     if not os.path.isdir(plot_path):
         os.makedirs(plot_path)
 
@@ -41,7 +41,7 @@ def plot_inputs(config):
         ax = axes[i]
         # Individual plot setup
         plt.figure(figsize=(6, 4))
-        for sample, path in zip(config.sample_names, config.input_paths):
+        for sample, path in config.sample_files_dict.items():
             tree = uproot.open(path)[config.tree_name]
             data = tree[var].array(library="np")
 
@@ -84,8 +84,8 @@ def plot_inputs(config):
         ax.axis("off")
 
     plt.tight_layout()
-    logging.info(f"Combined input plots here: {plot_path}/combined_input_plots.pdf")
-    plt.savefig(f"{plot_path}/combined_input_plots.pdf")
+    logging.info("Combined input plots here: " + plot_path + "combined_input_plots.pdf")
+    plt.savefig(plot_path + "combined_input_plots.pdf")
     plt.close()
 
 

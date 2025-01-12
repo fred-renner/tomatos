@@ -57,13 +57,8 @@ def run():
     if config.plot_inputs:
         tomatos.plotting.plot_inputs(config)
 
-    train, valid, test = tomatos.preprocess.prepare_data(config)
-    logging.info(f"datasets: {len(train)}")
+    tomatos.preprocess.prepare_data(config)
     init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
-
-    logging.info(f"train size: {train[0].shape[0]}")
-    logging.info(f"valid size: {valid[0].shape[0]}")
-    logging.info(f"test size: {test[0].shape[0]}")
 
     batch_iterator = tomatos.batching.make_iterator(
         train, batch_size=int(config.batch_size)

@@ -361,6 +361,7 @@ def run(
 
         if config.objective == "cls":
 
+            # much nicer if we could the scaler transform i guess
             optimized_m_jj = unscale_value(config, params["vbf_cut"], -2)
             optimized_eta_jj = unscale_value(config, params["eta_cut"], -1)
 
