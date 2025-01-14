@@ -26,7 +26,8 @@ def setup_logger(config):
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
     pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
-    
+
+
 def get_hist(config, nn, best_params, data):
     if config.include_bins:
         bins = best_params["bins"]

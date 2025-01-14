@@ -1,39 +1,33 @@
 from typing import Callable, Iterable
 
 import jax.numpy as jnp
+import jax
 import neos
 import pyhf
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 
-pyhf.set_backend("jax")
+from functools import partial
 
 
-Array = jnp.ndarray
-
-
-def pipeline(
-    pars: dict[str, Array],
-    data: tuple[Array, ...],
+# this fixes the compilation of static args at compile time
+# bottom line, better performance
+@partial(jax.jit, static_argnames=["config", "nn"])
+def loss_fun(
+    pars: dict[str, jnp.ndarray],
+    data: tuple[jnp.ndarray, ...],
+    config: object,
     nn: Callable,
-    loss_type: str,
     bandwidth: float,
     slope: float,
-    sample_names: Iterable[str],  # we're using a list of dict keys for bookkeeping!
-    config: object,
-    aux_info: dict,
-    include_bins=True,
-    do_m_hh=False,
-    do_systematics=False,
-    do_stat_error=False,
     validate_only=False,
     scale=1,
-) -> float:
+):
 
     # zip up our data arrays with the corresponding sample names
-    data_dct = {k: v for k, v in zip(sample_names, data)}
-    print(type(data_dct["NOSYS"]))
+    data_dct = {k: v for k, v in zip(config.sample_names, data)}
+
     # use a neural network + differentiable histograms [bKDEs] to get the
     # yields
     bins = config.bins
