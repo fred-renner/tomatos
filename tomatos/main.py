@@ -3,9 +3,8 @@ import argparse
 import logging
 import equinox as eqx
 import jax
-import tomatos.batching
 import tomatos.configuration
-import tomatos.nn_setup
+import tomatos.nn_builder
 import tomatos.optimization
 import tomatos.plotting
 import tomatos.preprocess
@@ -13,7 +12,6 @@ import tomatos.utils
 import tomatos.giffer
 import json
 import numpy as np
-import pprint
 
 JAX_CHECK_TRACER_LEAKS = True
 jax.config.update("jax_enable_x64", True)
@@ -41,47 +39,29 @@ args = parser.parse_args()
 
 def run():
     config = tomatos.configuration.Setup(args)
-
-    logging.basicConfig(
-        filename=config.results_path + "log.txt",
-        filemode="w",
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    logging.getLogger().addHandler(logging.StreamHandler())
-    logging.getLogger("pyhf").setLevel(logging.WARNING)
-    logging.getLogger("relaxed").setLevel(logging.WARNING)
-    pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
-
+    tomatos.utils.setup_logger(config)
     if config.plot_inputs:
         tomatos.plotting.plot_inputs(config)
 
-    tomatos.preprocess.prepare_data(config)
-    init_pars, nn, nn_setup = tomatos.nn_setup.init(config)
+    tomatos.preprocess.run(config)
 
-    batch_iterator = tomatos.batching.make_iterator(
-        train, batch_size=int(config.batch_size)
-    )
+    init_pars, nn, nn_arch = tomatos.nn_builder.init(config)
 
     best_params, last_params, metrics, infer_metrics = tomatos.optimization.run(
         config=config,
-        valid=valid,
-        test=test,
-        batch_iterator=batch_iterator,
         init_pars=init_pars,
         nn=nn,
-        nn_setup=nn_setup,
+        nn_arch=nn_arch,
         args=args,
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 
     # save model to file
-    model = eqx.combine(best_params["nn_pars"], nn_setup)
+    model = eqx.combine(best_params["nn_pars"], nn_arch)
     eqx.tree_serialise_leaves(config.model_path + "epoch_best.eqx", model)
 
-    model = eqx.combine(last_params["nn_pars"], nn_setup)
+    model = eqx.combine(last_params["nn_pars"], nn_arch)
     eqx.tree_serialise_leaves(config.model_path + "epoch_last.eqx", model)
 
     # save metrics

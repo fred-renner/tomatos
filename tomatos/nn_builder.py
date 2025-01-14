@@ -1,6 +1,10 @@
 import equinox as eqx
 import jax
 
+# the choice for equinox is ease of use with jax, by a core jax developer
+# https://www.reddit.com/r/MachineLearning/comments/u34oh2/d_what_jax_nn_library_to_use/
+# https://docs.kidger.site/equinox/
+
 
 class NeuralNetwork(eqx.Module):
     layers: list
@@ -45,7 +49,7 @@ def make_nn(config):
 
 
 def init(config):
-    init_random_params, nn, nn_setup = make_nn(config)
+    init_random_params, nn, nn_arch = make_nn(config)
     init_pars = dict(nn_pars=init_random_params())
 
-    return init_pars, nn, nn_setup
+    return init_pars, nn, nn_arch

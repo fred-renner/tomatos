@@ -16,6 +16,7 @@ import tomatos.workspace
 import tomatos.pipeline
 import tomatos.initialize
 import equinox as eqx
+import tomatos.batcher
 
 Array = jnp.ndarray
 
@@ -36,24 +37,21 @@ def clear_caches():
 
 def run(
     config,
-    valid,
-    test,
-    batch_iterator,
     init_pars,
     nn,
-    nn_setup,
+    nn_arch,
     args,
 ) -> tuple[Array, dict[str, list]]:
-
-    if config.run_bkg_init:
-        init_pars = make_flat_bkg(config, batch_iterator, init_pars, nn)
 
     # even though config is passed, need to keep redundant args here as this
     # function is jitted and used elsewhere, such that args need to be known at
     # compile time
-    aux_info = {"kde_error": 0.0}
-    slope_init = config.slope
 
+    batch = {}
+    for split in ["train", "valid", "test"]:
+        batch[split] = tomatos.batcher.get_iterator(config, split)
+
+    s
     loss = partial(
         tomatos.pipeline.pipeline,
         nn=nn,
@@ -63,7 +61,7 @@ def run(
         loss_type=config.objective,
         config=config,
         bandwidth=config.bw_init,
-        slope=slope_init,
+        slope=config.slope,
         do_systematics=config.do_systematics,
         do_stat_error=config.do_stat_error,
         validate_only=False,
@@ -175,7 +173,7 @@ def run(
     optimizer = optax.chain(
         optax.zero_nans(),  # otherwise optimization can break entirely
         optax.adam(lr_schedule),
-        optax.masked(optax.clip(max_delta=0.001), bw_mask), # make this configurable?
+        optax.masked(optax.clip(max_delta=0.001), bw_mask),  # make this configurable?
         optax.masked(optax.clip(max_delta=0.0001), cut_mask),  # 2 GeV mjj steps
     )
 
@@ -216,6 +214,10 @@ def run(
     infer_metrics = {}
 
     # one step is one batch (not necessarily epoch)
+    # gradient_accumulation interesting for more stable generalization in the
+    # future as it reduces noise in the gradient updates
+    # https://optax.readthedocs.io/en/latest/_collections/examples/gradient_accumulation.html
+
     for i in range(config.num_steps):
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
@@ -256,9 +258,6 @@ def run(
 
         # Evaluate losses.
         # small bandwidth + large slope for true hists
-
-        slope = slope_init
-        # bw = bw_decay(i)
 
         valid_result, valid_hists = loss(
             params,
@@ -417,7 +416,7 @@ def run(
         if i % 10 == 0 and i != 0:
             epoch_name = f"epoch_{i:005d}"
             infer_metrics[epoch_name] = infer_metrics_i
-            model = eqx.combine(params["nn_pars"], nn_setup)
+            model = eqx.combine(params["nn_pars"], nn_arch)
             eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
         if i == (config.num_steps - 1):
             infer_metrics["epoch_last"] = infer_metrics_i
@@ -513,7 +512,8 @@ def additional_logging(config, params, histograms):
 
 
 def asimov_sig(s, b) -> float:
-    """Median expected significance for a counting experiment, valid in the asymptotic regime.
+    """
+    Median expected significance for a counting experiment, valid in the asymptotic regime.
     Also valid for the multi-bin case.
 
     Parameters

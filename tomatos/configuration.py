@@ -51,7 +51,10 @@ class Setup:
         self.sample_files_dict = {
             k: v for k, v in zip(self.sample_sys, self.input_paths)
         }
-
+        # total events that are batched in training from all samplesys combined
+        self.batch_size = 100_0000
+        # memory layout on disk per sample_sys, no yaml
+        self.chunk_size = int(self.batch_size / len(self.sample_sys) / 2)
         # slows down I/O, but saves disk memory
         self.compress_input_files = False
         # need to add up to one
@@ -61,7 +64,7 @@ class Setup:
             "test": 0.1,
         }
 
-        self.plot_inputs = True
+        self.plot_inputs = False
         self.debug = args.debug
 
         # jax likes predefined arrays. self.vars defines the main data array of
@@ -69,6 +72,11 @@ class Setup:
         # for weights, preprocessing, batching, hists,...
         # keeping them all together simplifies the program workflow a lot even
         # though it has to be setup with care. order matters, see below
+        # it also means that currently, except for histogram transformations,
+        # vars created after the prepare step would be a bit tricky to
+        # scale and the nn input setup here would need to be changed. However I
+        # can't think of an optimization calculation that couldn't be done
+        # before opt.
         self.vars = (
             "j1_pt",
             "j1_eta",
@@ -122,9 +130,6 @@ class Setup:
         self.n_features = self.nn_inputs_idx + 1
 
         self.bins = np.linspace(0, 1, args.bins + 1)
-
-        # change this to splitting number
-        self.batch_size = 10_000
 
         if self.do_m_hh:
             self.bw_init = 0.25
@@ -194,6 +199,12 @@ class Setup:
         self.model_path = self.results_path + "models/"
 
         self.preprocess_path = self.results_path + "preprocessed/"
+        self.preprocess_files = {
+            "data": self.preprocess_path + "data.h5",
+            "train": self.preprocess_path + "train.h5",
+            "valid": self.preprocess_path + "valid.h5",
+            "test": self.preprocess_path + "test.h5",
+        }
         if not os.path.isdir(self.preprocess_path):
             os.makedirs(self.preprocess_path)
         if not os.path.isdir(self.results_path):
