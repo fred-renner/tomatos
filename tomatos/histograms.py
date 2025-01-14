@@ -131,7 +131,6 @@ def get_w2sum(
 
 
 def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut, slope):
-    # check a sigmoid plot for values between 0,1
     m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=slope, keep="above")
     eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=slope, keep="above")
     return m_jj_cut_w * eta_cut_w

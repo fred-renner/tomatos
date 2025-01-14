@@ -29,6 +29,8 @@ class NeuralNetwork(eqx.Module):
         return x
 
 
+# this is basically a compatibility relict, however it works, and only looks
+# funny here
 # https://docs.kidger.site/equinox/examples/init_apply/
 def make_nn(config):
     model = NeuralNetwork(config.n_features)
@@ -50,6 +52,5 @@ def make_nn(config):
 
 def init(config):
     init_random_params, nn, nn_arch = make_nn(config)
-    init_pars = dict(nn_pars=init_random_params())
 
-    return init_pars, nn, nn_arch
+    return init_random_params(), nn, nn_arch

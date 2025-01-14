@@ -7,13 +7,13 @@ import matplotlib.pyplot as plt
 import jax.numpy as jnp
 import numpy as np
 import optax
-import pyhf
 import jax
 from jaxopt import OptaxSolver
 
 import tomatos.histograms
 import tomatos.workspace
 import tomatos.pipeline
+import tomatos.solver
 import tomatos.initialize
 import equinox as eqx
 import tomatos.batcher
@@ -51,136 +51,17 @@ def run(
     for split in ["train", "valid", "test"]:
         batch[split] = tomatos.batcher.get_iterator(config, split)
 
-    s
-    loss = partial(
-        tomatos.pipeline.pipeline,
-        nn=nn,
-        sample_names=config.data_types,
-        include_bins=config.include_bins,
-        do_m_hh=config.do_m_hh,
-        loss_type=config.objective,
-        config=config,
-        bandwidth=config.bw_init,
-        slope=config.slope,
-        do_systematics=config.do_systematics,
-        do_stat_error=config.do_stat_error,
-        validate_only=False,
-        aux_info=aux_info,
-    )
-    config.aux = args.aux
-
-    # Define a mask function that selectively scales only 'vbf_cut' and 'eta_cut'
-    def cut_mask(params):
-        # Return True for 'vbf_cut' and 'eta_cut', False otherwise
-        return {key: key in ["vbf_cut", "eta_cut"] for key in params}
-
-    def bw_mask(params):
-        # Return True only for 'bw', False for all other parameters
-        return {key: key == "bw" for key in params}
-
-    lr_schedule = optax.linear_onecycle_schedule(
-        transition_steps=config.num_steps,
-        peak_value=0.001,
-        pct_start=0.3,
-        div_factor=25,
-        final_div_factor=10000,
-        pct_final=0.85,
-    )
-
-    # Defining the learning rate schedule
-    # lr_schedule = optax.piecewise_interpolate_schedule(
-    #     interpolate_type="linear",
-    #     init_value=0.0001,
-    #     boundaries_and_scales={
-    #         0.2 * config.num_steps: 10,
-    #         0.4 * config.num_steps: 0.5,
-    #         0.8 * config.num_steps: 1,
-    #         1.0 * config.num_steps: 0.2,
-    #     },
+    # this static non-optimizable vars on the loss function, need this as the
+    # optimizer expects a function call loss(f(parameter),)
+    # loss_fun = partial(
+    #     tomatos.pipeline.data_to_loss,
+    #     config=config,
+    #     nn=nn,
     # )
-    # Defining the learning rate schedule
-    # lr_schedule = optax.piecewise_interpolate_schedule(
-    #     interpolate_type="cosine",
-    #     init_value=0.001,
-    #     boundaries_and_scales={
-    #         0.1 * config.num_steps: 5,
-    #         0.3 * config.num_steps: 0.2,
-    #         0.5 * config.num_steps: 1,
-    #         0.55 * config.num_steps: 5,
-    #         0.6 * config.num_steps: 0.2,
-    #         0.7 * config.num_steps: 1,
-    #         0.9 * config.num_steps: 0.1,
-    #     },
-    # )
+    # solver = tomatos.solver.get(config, loss_fun)
+    solver = tomatos.solver.get(config, tomatos.pipeline.loss_fun, init_pars)
 
-    # kick in two spikes
-    # Defining the learning rate schedule
-    # lr_schedule = optax.piecewise_interpolate_schedule(
-    #     interpolate_type="cosine",
-    #     init_value=0.01,
-    #     boundaries_and_scales={
-    #         0.05 * config.num_steps: 0.1,
-    #         0.3 * config.num_steps: 1,
-    #         0.325 * config.num_steps: 5,
-    #         0.35 * config.num_steps: 0.2,
-    #         0.5 * config.num_steps: 1,
-    #         0.525 * config.num_steps: 5,
-    #         0.55 * config.num_steps: 0.2,
-    #         0.7 * config.num_steps: 1,
-    #         0.9 * config.num_steps: 0.1,
-    #     },
-    # )
-
-    # Defining the learning rate schedule
-    # lr_schedule = optax.piecewise_interpolate_schedule(
-    #     interpolate_type="linear",
-    #     init_value=0.01,
-    #     boundaries_and_scales={
-    #         0.3 * config.num_steps: 1,
-    #         0.5 * config.num_steps: 0.05,
-    #         0.8 * config.num_steps: 1,
-    #         1.0 * config.num_steps: 0.2,
-    #     },
-    # )
-    # if config.debug:
-    #     lr_schedule = optax.constant_schedule(config.lr)
-
-    lr_schedule = optax.constant_schedule(config.lr)
-
-    # # Defining the learning rate schedule
-    # lr_schedule = optax.piecewise_interpolate_schedule(
-    #     interpolate_type="linear",
-    #     init_value=0.01,
-    #     boundaries_and_scales={
-    #         0.1 * config.num_steps: 0.05,
-    #         1.0 * config.num_steps: 0.2,
-    #     },
-    # )
-
-    learning_rates = [lr_schedule(i) for i in range(config.num_steps)]
-
-    plt.figure(figsize=(6, 5))
-    plt.plot(learning_rates)
-    # plt.yscale("log")
-    plt.xlabel("Epoch")
-    plt.ylabel("Learning Rate")
-    plt.tight_layout()
-    plt.savefig(config.results_path + "lr_schedule.pdf")
-    plt.close()
-    if config.debug:
-        lr_schedule = config.lr
-
-    optimizer = optax.chain(
-        optax.zero_nans(),  # otherwise optimization can break entirely
-        optax.adam(lr_schedule),
-        optax.masked(optax.clip(max_delta=0.001), bw_mask),  # make this configurable?
-        optax.masked(optax.clip(max_delta=0.0001), cut_mask),  # 2 GeV mjj steps
-    )
-
-    solver = OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)
-
-    pyhf.set_backend("jax", default=True, precision="64b")
-
+    init_pars = init_pars
     params = init_pars
     best_params = init_pars
     best_test_loss = 999
@@ -210,7 +91,6 @@ def run(
             "best_epoch",
         ]
     }
-    config.lr_schedule = learning_rates
     infer_metrics = {}
 
     # one step is one batch (not necessarily epoch)
@@ -221,25 +101,16 @@ def run(
     for i in range(config.num_steps):
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
-        train, batch_num, num_batches, event_fraction = next(batch_iterator)
+        train, train_sf = next(batch["train"])
+        print(train_sf)
 
-        # invoke tomatos write out only when num_batch==0 might be nice to keep
-        # the epoch writeout/plotting scheme
         if i == 0:
-            init_pars["vbf_cut"] = config.cuts_init
-            init_pars["eta_cut"] = config.cuts_init
-            init_pars["bw"] = config.bw_init
-            if config.include_bins:
-                init_pars["bins"] = config.bins[1:-1]
-
-            else:
-                init_pars.pop("bins", None)
-
-            logging.info(init_pars)
             state = solver.init_state(
                 init_pars,
                 data=train,
-                scale=1 / event_fraction,
+                config=config,
+                nn=nn,
+                scale=train_sf,
             )
 
             histograms = state.aux
@@ -253,13 +124,14 @@ def run(
         # test before update
         #
         # results can be checked with:
-        # train_results = loss(params, data=train, loss_type=config.objective)
+        # train_results = loss_fun(params, data=train, loss_type=config.objective)
         # print(train_results[0])
 
         # Evaluate losses.
         # small bandwidth + large slope for true hists
 
-        valid_result, valid_hists = loss(
+        valid, valid_sf = next(batch["valid"])
+        valid_loss, valid_hists = loss_fun(
             params,
             data=valid,
             loss_type=config.objective,
@@ -267,7 +139,9 @@ def run(
             slope=1e20,
             validate_only=True,
         )
-        test_result, test_hists = loss(
+
+        test, test_sf = next(batch["test"])
+        test_loss, test_hists = loss_fun(
             params,
             data=test,
             loss_type=config.objective,
@@ -276,8 +150,8 @@ def run(
             validate_only=True,
         )
 
-        metrics[f"{config.objective}_valid"].append(valid_result)
-        metrics[f"{config.objective}_test"].append(test_result)
+        metrics[f"{config.objective}_valid"].append(valid_loss)
+        metrics[f"{config.objective}_test"].append(test_loss)
         logging.info(
             f"{config.objective} test: {metrics[f'{config.objective}_test'][-1]:.4f}"
         )
@@ -287,8 +161,8 @@ def run(
             params,
             state,
             data=train,
-            scale=1 / event_fraction,
-            slope=slope,
+            scale=1 / batch_frac,
+            slope=config.slope,
         )
         # a large step can gow below 0 which breaks opt since
         # the cdf (and not the pdf) used for histogram calculation is flipped
@@ -346,7 +220,7 @@ def run(
             bw,
             slope,
             bins,
-            scale=1 / event_fraction,
+            scale=1 / batch_frac,
         )
 
         # # Z_A

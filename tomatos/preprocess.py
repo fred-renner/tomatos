@@ -21,7 +21,7 @@ def init_2d_data(config):
             )
 
 
-def stack_inputs(
+def fill(
     config,
     sample_sys,
     data,
@@ -52,7 +52,7 @@ def fill_2d_data(config, scaler):
                 # preselection could be here
                 # ...transfer generate test files code
                 #######
-                stack_inputs(config, sample_sys, data, scaler)
+                fill(config, sample_sys, data, scaler)
 
 
 def get_max_events(config):
@@ -66,9 +66,11 @@ def get_max_events(config):
 
 
 def init_splits(config, idx_bounds):
+    config.split_events = {}
     for split in ["train", "valid", "test"]:
         n_events = idx_bounds[split][1] - idx_bounds[split][0]
         logging.info(f"{split} events: {n_events}")
+        config.split_events[split] = n_events
         with h5py.File(config.preprocess_files[split], "w") as f_split:
             f_split.create_dataset(
                 name="stack",
@@ -112,7 +114,7 @@ def fill_splits(config, max_events, idx_bounds, scaler):
             # in particular avoids IO heavy random indexing read/write
             ds = file["data"][sample_sys][:]
             upsample_sf = ds.shape[0] / max_events
-            # suffle events in place
+            # suffle possibly ordered event correlations (in place)
             np.random.shuffle(ds)
             # this replicates from the beginning, i prefer this to random
             # resampling as duplication only happens if necessary
@@ -153,4 +155,5 @@ def run(config):
     # create train.h5, valid.h5, test.h5 with according event_sizes
     init_splits(config, idx_bounds)
     fill_splits(config, max_events, idx_bounds, scaler)
+    # save scaler
     config.scaler = scaler

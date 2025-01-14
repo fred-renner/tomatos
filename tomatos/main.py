@@ -45,12 +45,24 @@ def run():
 
     tomatos.preprocess.run(config)
 
-    init_pars, nn, nn_arch = tomatos.nn_builder.init(config)
+    nn_pars, nn, nn_arch = tomatos.nn_builder.init(config)
+
+    # add vars to optimization
+    init_pars = {}
+    init_pars["nn_pars"] = nn_pars
+    for var in config.opt_cuts:
+        init_pars[var + "_cut"] = config.opt_cuts[var]["init"]
+    init_pars["bw"] = config.bw_init
+    if config.include_bins:
+        # exclude boundaries
+        init_pars["bins"] = config.bins[1:-1]
+
+    logging.info(init_pars)
 
     best_params, last_params, metrics, infer_metrics = tomatos.optimization.run(
         config=config,
-        init_pars=init_pars,
         nn=nn,
+        init_pars=init_pars,
         nn_arch=nn_arch,
         args=args,
     )

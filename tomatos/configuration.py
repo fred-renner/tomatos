@@ -2,6 +2,10 @@ import os
 import numpy as np
 import pathlib
 
+import pyhf
+
+pyhf.set_backend("jax", default=True, precision="32b")
+
 
 class Setup:
     def __init__(self, args):
@@ -67,13 +71,14 @@ class Setup:
         self.plot_inputs = False
         self.debug = args.debug
 
-        # jax likes predefined arrays. self.vars defines the main data array of
-        # dimension (n_events, self.vars). Need to keep event correspondence
-        # for weights, preprocessing, batching, hists,...
+        # jax likes predefined arrays.
+        # self.vars defines the main data array ofdimension (n_events, self.vars).
+        # Need to keep event correspondence for weights, preprocessing,
+        # batching, hists,...
         # keeping them all together simplifies the program workflow a lot even
-        # though it has to be setup with care. order matters, see below
+        # though it has to be setup with care. order matters, see below.
         # it also means that currently, except for histogram transformations,
-        # vars created after the prepare step would be a bit tricky to
+        # vars created after the prepare step would be a bit tricky to input
         # scale and the nn input setup here would need to be changed. However I
         # can't think of an optimization calculation that couldn't be done
         # before opt.
@@ -101,6 +106,12 @@ class Setup:
         # nominal event weight
         self.weight_idx = self.vars.index("weights")
 
+        # cuts on vars to be optimized, keep variables either "above", "below"
+        # or below, start somewhere where the cut actually does something
+        self.opt_cuts = {
+            "j1_pt": {"keep": "above", "init": 100},  # (MeV)
+            "j2_pt": {"keep": "above", "init": 100},
+        }
         self.systematics = [
             "NOSYS",
             "xbb_pt_bin_0__1up",
@@ -142,7 +153,6 @@ class Setup:
             self.bw_init = 0.2
             self.bw_min = 0.001
 
-        # self.slope = args.aux
         self.slope = 20_000
 
         # with all systs 0.001 seems too small
