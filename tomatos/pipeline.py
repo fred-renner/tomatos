@@ -12,40 +12,19 @@ from functools import partial
 
 
 # this fixes the compilation of static args at compile time
-# bottom line, better performance
-@partial(jax.jit, static_argnames=["config", "nn"])
-def loss_fun(
-    pars: dict[str, jnp.ndarray],
-    data: tuple[jnp.ndarray, ...],
-    config: object,
-    nn: Callable,
-    bandwidth: float,
-    slope: float,
+# basically the more you hints you give what is fixed more code can be
+# optimized for hardware accelaration
+@partial(jax.jit, static_argnames=["config"])
+def loss_fn(
+    pars,
+    data,
+    config,
+    bandwidth,
+    slope,
     validate_only=False,
-    scale=1,
 ):
 
-    # zip up our data arrays with the corresponding sample names
-    data_dct = {k: v for k, v in zip(config.sample_names, data)}
-
-    # use a neural network + differentiable histograms [bKDEs] to get the
-    # yields
-    bins = config.bins
-
-    if include_bins:
-        bins = jnp.array([0, *pars["bins"], 1])
-    hists = tomatos.histograms.get_hists(
-        nn_pars=pars["nn_pars"],
-        nn=nn,
-        config=config,
-        vbf_cut=pars["vbf_cut"],
-        eta_cut=pars["eta_cut"],
-        data=data_dct,
-        bandwidth=pars["bw"],
-        slope=slope,
-        bins=bins,
-        scale=scale,
-    )
+    hists = tomatos.histograms.get_hists(pars, data, config)
 
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
@@ -59,7 +38,7 @@ def loss_fun(
 
     # if you want s/b discrimination, no need to do anything complex!
     if loss_type == "bce":
-        return tomatos.utils.bce(data=data_dct, pars=pars["nn_pars"], nn=nn), hists
+        return tomatos.utils.bce(data=data_dct, pars=pars["nn"], nn=nn), hists
 
     if loss_type == "cls":
         loss_value = neos.loss_from_model(model, loss=loss_type)

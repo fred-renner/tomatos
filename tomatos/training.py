@@ -13,7 +13,7 @@ from jaxopt import OptaxSolver
 import tomatos.histograms
 import tomatos.workspace
 import tomatos.pipeline
-import tomatos.solver
+import tomatos.optimizer
 import tomatos.initialize
 import equinox as eqx
 import tomatos.batcher
@@ -37,9 +37,7 @@ def clear_caches():
 
 def run(
     config,
-    init_pars,
-    nn,
-    nn_arch,
+    opt_pars,
     args,
 ) -> tuple[Array, dict[str, list]]:
 
@@ -49,21 +47,19 @@ def run(
 
     batch = {}
     for split in ["train", "valid", "test"]:
-        batch[split] = tomatos.batcher.get_iterator(config, split)
+        batch[split] = tomatos.batcher.get_generator(config, split)
 
     # this static non-optimizable vars on the loss function, need this as the
     # optimizer expects a function call loss(f(parameter),)
-    # loss_fun = partial(
+    # loss_fn = partial(
     #     tomatos.pipeline.data_to_loss,
     #     config=config,
     #     nn=nn,
     # )
-    # solver = tomatos.solver.get(config, loss_fun)
-    solver = tomatos.solver.get(config, tomatos.pipeline.loss_fun, init_pars)
+    # solver = tomatos.solver.get(config, loss_fn)
+    optimizer = tomatos.optimizer.get(config, tomatos.pipeline.loss_fn, opt_pars)
 
-    init_pars = init_pars
-    params = init_pars
-    best_params = init_pars
+    best_opt_pars = opt_pars
     best_test_loss = 999
 
     metrics = {
@@ -101,16 +97,14 @@ def run(
     for i in range(config.num_steps):
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
-        train, train_sf = next(batch["train"])
-        print(train_sf)
 
         if i == 0:
-            state = solver.init_state(
-                init_pars,
-                data=train,
+            state = optimizer.init_state(
+                opt_pars,
+                data=next(batch["train"]),
                 config=config,
-                nn=nn,
-                scale=train_sf,
+                bandwidth=config.bw_init,
+                slope=config.slope,
             )
 
             histograms = state.aux
@@ -124,26 +118,24 @@ def run(
         # test before update
         #
         # results can be checked with:
-        # train_results = loss_fun(params, data=train, loss_type=config.objective)
+        # train_results = loss_fn(opt_pars, data=train, loss_type=config.objective)
         # print(train_results[0])
 
         # Evaluate losses.
         # small bandwidth + large slope for true hists
 
-        valid, valid_sf = next(batch["valid"])
-        valid_loss, valid_hists = loss_fun(
-            params,
-            data=valid,
+        valid_loss, valid_hists = loss_fn(
+            opt_pars,
+            data=next(batch["valid"]),
             loss_type=config.objective,
             bandwidth=1e-20,
             slope=1e20,
             validate_only=True,
         )
 
-        test, test_sf = next(batch["test"])
-        test_loss, test_hists = loss_fun(
-            params,
-            data=test,
+        test_loss, test_hists = loss_fn(
+            opt_pars,
+            data=next(batch["test"]),
             loss_type=config.objective,
             bandwidth=1e-20,
             slope=1e20,
@@ -157,8 +149,8 @@ def run(
         )
 
         # update
-        params, state = solver.update(
-            params,
+        opt_pars, state = optimizer.update(
+            opt_pars,
             state,
             data=train,
             scale=1 / batch_frac,
@@ -167,19 +159,21 @@ def run(
         # a large step can gow below 0 which breaks opt since
         # the cdf (and not the pdf) used for histogram calculation is flipped
 
-        params["bw"] = np.maximum(config.bw_min, np.abs(params["bw"]))
-        bw = params["bw"]
+        opt_pars["bw"] = np.maximum(config.bw_min, np.abs(opt_pars["bw"]))
+        bw = opt_pars["bw"]
         histograms = state.aux
 
-        if "bins" in params:
+        if "bins" in opt_pars:
             # gradient updates basically guarantee that they are unique, so
             # sort is enough
-            params["bins"] = np.clip(np.sort(np.abs(params["bins"])), 1e-6, 1 - 1e-6)
-            bins = np.array([0, *params["bins"], 1])
+            opt_pars["bins"] = np.clip(
+                np.sort(np.abs(opt_pars["bins"])), 1e-6, 1 - 1e-6
+            )
+            bins = np.array([0, *opt_pars["bins"], 1])
         else:
             bins = config.bins
 
-        # bins = np.array(params["bins"]) if "bins" in params else config.bins
+        # bins = np.array(opt_pars["bins"]) if "bins" in opt_pars else config.bins
         # save current bins
         if config.include_bins:
             actual_bins = (
@@ -198,7 +192,7 @@ def run(
 
         logging.info(f"slope: {slope}")
         metrics["slope"].append(slope)
-        # additional_logging(config, params, histograms)
+        # additional_logging(config, opt_pars, histograms)
 
         for hist in histograms.keys():
             metrics[hist].append(histograms[hist])
@@ -215,7 +209,7 @@ def run(
         yields, kde = get_yields(
             config,
             nn,
-            params,
+            opt_pars,
             train,
             bw,
             slope,
@@ -235,8 +229,8 @@ def run(
         if config.objective == "cls":
 
             # much nicer if we could the scaler transform i guess
-            optimized_m_jj = unscale_value(config, params["vbf_cut"], -2)
-            optimized_eta_jj = unscale_value(config, params["eta_cut"], -1)
+            optimized_m_jj = unscale_value(config, opt_pars["vbf_cut"], -2)
+            optimized_eta_jj = unscale_value(config, opt_pars["eta_cut"], -1)
 
             logging.info(f"vbf cut: {optimized_m_jj}")
             logging.info(f"eta cut: {optimized_eta_jj}")
@@ -281,7 +275,7 @@ def run(
         # pick best training
         objective = config.objective + "_test"
         if metrics[objective][-1] < best_test_loss:
-            best_params = params
+            best_opt_pars = opt_pars
             best_test_loss = metrics[objective][-1]
             metrics["epoch_best"] = i
             infer_metrics["epoch_best"] = infer_metrics_i
@@ -290,7 +284,7 @@ def run(
         if i % 10 == 0 and i != 0:
             epoch_name = f"epoch_{i:005d}"
             infer_metrics[epoch_name] = infer_metrics_i
-            model = eqx.combine(params["nn_pars"], nn_arch)
+            model = eqx.combine(opt_pars["nn"], nn_arch)
             eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
         if i == (config.num_steps - 1):
             infer_metrics["epoch_last"] = infer_metrics_i
@@ -301,7 +295,7 @@ def run(
 
         clear_caches()  # otherwise memore explodes
 
-    return best_params, params, metrics, infer_metrics
+    return best_opt_pars, opt_pars, metrics, infer_metrics
 
 
 def unscale_value(config, value, idx):
@@ -310,12 +304,12 @@ def unscale_value(config, value, idx):
     return value
 
 
-def make_flat_bkg(config, batch_iterator, init_pars, nn):
+def make_flat_bkg(config, batch_iterator, opt_pars, nn):
     logging.info("Initializing Background")
 
-    def mask_bw(params):
+    def mask_bw(opt_pars):
         # Return True only for 'bw', False for all other parameters
-        return {key: key == "bw" for key in params}
+        return {key: key == "bw" for key in opt_pars}
 
     init_optimizer = optax.chain(
         # optax.zero_nans(),  # avoid NaNs in optimization
@@ -335,27 +329,27 @@ def make_flat_bkg(config, batch_iterator, init_pars, nn):
     init_solver = OptaxSolver(init_loss, opt=init_optimizer, has_aux=True, jit=True)
     train, batch_num, num_batches = next(batch_iterator)
 
-    init_pars["bw"] = 0.13
+    opt_pars["bw"] = 0.13
     state = init_solver.init_state(
-        init_pars,
+        opt_pars,
         data=train,
     )
-    params = init_pars
+    opt_pars = opt_pars
 
     loss_value = jnp.inf
     i = 0
     previous_bw = 100
     bw_diff = []
-    while np.abs(previous_bw - params["bw"]) > 0.000000001:
+    while np.abs(previous_bw - opt_pars["bw"]) > 0.000000001:
         train, batch_num, num_batches = next(batch_iterator)
-        previous_bw = params["bw"]
-        params, state = init_solver.update(
-            params,
+        previous_bw = opt_pars["bw"]
+        opt_pars, state = init_solver.update(
+            opt_pars,
             state,
             data=train,
         )
-        # print(np.abs(previous_bw - params["bw"]))
-        bw_diff += [np.abs(previous_bw - params["bw"])]
+        # print(np.abs(previous_bw - opt_pars["bw"]))
+        bw_diff += [np.abs(previous_bw - opt_pars["bw"])]
         if i % 1 == 0:
             logging.info(f"Background Hist: {state.aux['bkg']}")
             logging.info(f"Signal     Hist: {state.aux['NOSYS']}")
@@ -365,10 +359,10 @@ def make_flat_bkg(config, batch_iterator, init_pars, nn):
         i += 1
     # print(repr(bw_diff))
 
-    return params
+    return opt_pars
 
 
-def additional_logging(config, params, histograms):
+def additional_logging(config, opt_pars, histograms):
     if config.objective == "cls":
         if config.do_stat_error:
             logging.info((f"hist stat sig bin 0: {histograms['NOSYS_stat_up_bin_0']}"))
@@ -381,8 +375,8 @@ def additional_logging(config, params, histograms):
             logging.info(
                 (f"hist ps unc: {1-(histograms['NOSYS']/histograms['ps_up'])}")
             )
-    logging.info(f"vbf scaled cut: {params['vbf_cut']}")
-    logging.info(f"eta scaled cut: {params['eta_cut']}")
+    logging.info(f"vbf scaled cut: {opt_pars['vbf_cut']}")
+    logging.info(f"eta scaled cut: {opt_pars['eta_cut']}")
 
 
 def asimov_sig(s, b) -> float:
@@ -442,14 +436,14 @@ def rescale_kde(hist, kde, bins):
     return kde_scaled
 
 
-def get_yields(config, nn, params, train, bw, slope, bins, scale):
+def get_yields(config, nn, opt_pars, train, bw, slope, bins, scale):
     data_dct = {k: v for k, v in zip(config.data_types, train)}
 
     yields = tomatos.histograms.get_hists(
-        nn_pars=params["nn_pars"],
+        nn_pars=opt_pars["nn"],
         config=config,
-        vbf_cut=params["vbf_cut"],
-        eta_cut=params["eta_cut"],
+        vbf_cut=opt_pars["vbf_cut"],
+        eta_cut=opt_pars["eta_cut"],
         nn=nn,
         data=data_dct,
         bandwidth=1e-100,
@@ -470,10 +464,10 @@ def get_yields(config, nn, params, train, bw, slope, bins, scale):
     # sample kde with 1000 bins
     kde_bins = jnp.linspace(bins[0], bins[-1], 1000)
     kde = tomatos.histograms.get_hists(
-        nn_pars=params["nn_pars"],
+        nn_pars=opt_pars["nn"],
         config=config,
-        vbf_cut=params["vbf_cut"],
-        eta_cut=params["eta_cut"],
+        vbf_cut=opt_pars["vbf_cut"],
+        eta_cut=opt_pars["eta_cut"],
         nn=nn,
         data=kde_dict,
         bandwidth=bw,

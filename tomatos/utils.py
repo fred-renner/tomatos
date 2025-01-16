@@ -7,7 +7,7 @@ import numpy as np
 import pyhf
 
 import tomatos.histograms
-import tomatos.optimization
+import tomatos.training
 import tomatos.workspace
 
 Array = jnp.ndarray
@@ -36,7 +36,7 @@ def get_hist(config, nn, best_params, data):
         bins = config.bins
         # to get correct yields would also need to pass whole data
     yields = tomatos.histograms.get_hists(
-        nn_pars=best_params["nn_pars"],
+        nn_pars=best_params["nn"],
         data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
         nn=nn,
         config=config,
@@ -58,7 +58,7 @@ def get_hist(config, nn, best_params, data):
     logging.info(
         (
             "Asimov Significance: ",
-            tomatos.optimization.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
+            tomatos.training.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
         )
     )
 

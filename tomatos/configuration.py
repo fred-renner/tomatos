@@ -12,27 +12,7 @@ class Setup:
 
         self.run_bkg_init = False
 
-        self.do_m_hh = False
         self.include_bins = False
-
-        if self.do_m_hh:
-            self.files = {
-                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
-                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv1cv1.h5",
-                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv1p5cv1.h5",
-                "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-l1cvv0cv1.h5",
-                "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-run2.h5",
-                "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_trigger_sf/dump-ps.h5",
-            }
-        else:
-            self.files = {
-                "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1cv1.h5",
-                # "signal": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv1p5cv1.h5",
-                "k2v0": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-l1cvv0cv1.h5",
-                "run2": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-run2.h5",
-                "ps": f"/lustre/fs22/group/atlas/freder/hh/run/dump/tomatos_vars_4_fold_trigger_sf_k_{args.k_fold}/dump-ps.h5",
-            }
 
         self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
         self.tree_name = "AnalysisMiniTree"
@@ -42,10 +22,11 @@ class Setup:
             for file in pathlib.Path(self.input_path).rglob("*.root")
             if file.is_file()
         ]
-        # put nominal samples first, not strictly necessary but e.g. useful for plotting
+        # put non-systematic samples first, not strictly necessary but e.g.
+        # a useful order for plots
         self.input_paths.sort(key=lambda x: ("NOSYS" not in x))
 
-        # expected structure: self.sample_path/SAMPLE/SYSTEMATIC.root
+        # expected structure: sample_path/SAMPLE/SYSTEMATIC.root
         # sample_sys will be the list of SAMPLE_SYSTEMATIC
         self.sample_sys = []
         for p in self.input_paths:
@@ -56,8 +37,9 @@ class Setup:
             k: v for k, v in zip(self.sample_sys, self.input_paths)
         }
         # total events that are batched in training from all samplesys combined
-        self.batch_size = 100_0000
-        # memory layout on disk per sample_sys, no yaml
+        self.batch_size = 10_000
+        # memory layout on disk per sample_sys, no yaml, see batcher for factor
+        # 2
         self.chunk_size = int(self.batch_size / len(self.sample_sys) / 2)
         # slows down I/O, but saves disk memory
         self.compress_input_files = False
@@ -95,65 +77,50 @@ class Setup:
             "h_eta",
             "h_phi",
             "h_m",
-            "weights",
-            "weights_sf_unc__1up",
-            "weights_sf_unc__1down",
+            "weight",
+            "weight_sf_unc__1up",
+            "weight_sf_unc__1down",
         )
         # the last nn variable, in that order defines the nn inputs
         # sliced array access is a huge speed up when slicing
         # array[:, :nn_inputs_idx] much faster than array[:, np.arange(nn_inputs_idx)]
+        # + 1  to also include the given one
         self.nn_inputs_idx = self.vars.index("h_m") + 1
         # nominal event weight
-        self.weight_idx = self.vars.index("weights")
+        self.weight_idx = self.vars.index("weight")
+
+        # bce (do we actually still need that?), cls_nn, cls_var
+        self.mode = "cls_nn"
+        # you can speed up cls_var, if you only setup var and the cut_vars in self.vars
+        # simple hist opt in this variable
+        self.cls_var_idx = self.vars.index("h_m")
 
         # cuts on vars to be optimized, keep variables either "above", "below"
-        # or below, start somewhere where the cut actually does something
+        # or below, start somewhere where the cut actually does something to
+        # find a gradient
         self.opt_cuts = {
-            "j1_pt": {"keep": "above", "init": 100},  # (MeV)
-            "j2_pt": {"keep": "above", "init": 100},
+            "j1_pt": {"keep": "above", "idx": -1, "init": 20_000},  # (MeV)
+            "j2_pt": {"keep": "above", "idx": -1, "init": 20_000},
         }
-        self.systematics = [
-            "NOSYS",
-            "xbb_pt_bin_0__1up",
-            "xbb_pt_bin_0__1down",
-            "xbb_pt_bin_1__1up",
-            "xbb_pt_bin_1__1down",
-            "xbb_pt_bin_2__1up",
-            "xbb_pt_bin_2__1down",
-            "xbb_pt_bin_3__1up",
-            "xbb_pt_bin_3__1down",
-            "GEN_MUR05_MUF05_PDF260000",
-            "GEN_MUR05_MUF10_PDF260000",
-            "GEN_MUR10_MUF05_PDF260000",
-            "GEN_MUR10_MUF10_PDF260000",
-            "GEN_MUR10_MUF20_PDF260000",
-            "GEN_MUR20_MUF10_PDF260000",
-            "GEN_MUR20_MUF20_PDF260000",
-        ]
+        for key in self.opt_cuts:
+            self.opt_cuts[key]["idx"] = self.vars.index(key)
+
+        # this should be a different yaml config
+        # if args.loss == "bce":
+        #     self.bw_init = 1e-100
+        #     self.bw_min = 1e-100
+        self.bw_init = 0.25
+        self.bw_min = 1e-100
+
+        self.slope = 20_000
 
         self.systematics_raw = []
         self.do_stat_error = False
         self.do_systematics = False
-        for sys in self.systematics:
-            if "1up" in sys:
-                self.systematics_raw += [sys.split("__")[0]]
 
         self.n_features = self.nn_inputs_idx + 1
 
         self.bins = np.linspace(0, 1, args.bins + 1)
-
-        if self.do_m_hh:
-            self.bw_init = 0.25
-            self.bw_min = 1e-100
-            self.batch_size = 10000
-        elif args.loss == "bce":
-            self.bw_init = 1e-100
-            self.bw_min = 1e-100
-        else:
-            self.bw_init = 0.2
-            self.bw_min = 0.001
-
-        self.slope = 20_000
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
@@ -192,8 +159,7 @@ class Setup:
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
-        if self.do_m_hh:
-            results_folder = "tomatos_m_hh/"
+
         # k_fold at end!
         if args.suffix != "":
             results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}_k_{args.k_fold}/"

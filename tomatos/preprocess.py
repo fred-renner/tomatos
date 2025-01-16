@@ -79,7 +79,7 @@ def init_splits(config, idx_bounds):
                 dtype="f4",
                 chunks=(
                     len(config.sample_sys),
-                    np.minimum(config.chunk_size, n_events / 2),
+                    np.minimum(config.chunk_size, n_events / 2),  # / 2 see batcher
                     len(config.vars),
                 ),
             )

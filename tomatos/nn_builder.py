@@ -29,28 +29,13 @@ class NeuralNetwork(eqx.Module):
         return x
 
 
-# this is basically a compatibility relict, however it works, and only looks
-# funny here
-# https://docs.kidger.site/equinox/examples/init_apply/
-def make_nn(config):
-    model = NeuralNetwork(config.n_features)
+def init(config):
+    model = NeuralNetwork(config.nn_inputs_idx)
 
     if config.preload_model:
         model = eqx.tree_deserialise_leaves(config.preload_model_path, model)
 
-    params, static = eqx.partition(model, eqx.is_inexact_array)
+    # split model into parameters to optimize and the nn function
+    nn_params, nn_arch = eqx.partition(model, eqx.is_array)
 
-    def init_fn():
-        return params
-
-    def apply_fn(_params, x):
-        model = eqx.combine(_params, static)
-        return model(x)
-
-    return init_fn, apply_fn, static
-
-
-def init(config):
-    init_random_params, nn, nn_arch = make_nn(config)
-
-    return init_random_params(), nn, nn_arch
+    return nn_params, nn_arch

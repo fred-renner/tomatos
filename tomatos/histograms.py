@@ -1,22 +1,16 @@
-# copied here from the neos and relaxed package to keep track of changes
-# from __future__ import annotations
-
 from functools import partial
-from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 
-import logging
-
-JAX_CHECK_TRACER_LEAKS = True
-
 
 Array = jnp.ndarray
 import relaxed
+import equinox as eqx
 
 
+# from relaxed and added weights
 @partial(jax.jit, static_argnames=["density", "reflect_infinities"])
 def hist(
     data: Array,
@@ -51,9 +45,6 @@ def hist(
     # bandwidth = bandwidth or events.shape[-1] ** -0.25  # Scott's rule
     # proof is for gaussian... and also wrong above, must be 3.49*sigma*n^(-1/3)
     # https://www.stat.cmu.edu/~rnugent/PCMI2016/papers/ScottBandwidth.pdf
-
-    # bins = jnp.array([-jnp.inf, *bins, jnp.inf]) if reflect_infinities else bins
-    # bins = jnp.array([-jnp.inf, *bins[1:-1], jnp.inf])
 
     # 7.2.3 nathan thesis
     # get cumulative counts (area under kde) for each set of bin edges
@@ -130,64 +121,67 @@ def get_w2sum(
     return counts
 
 
-def get_cut_weights(m_jj, eta_jj, vbf_cut, eta_cut, slope):
-    m_jj_cut_w = relaxed.cut(m_jj, vbf_cut, slope=slope, keep="above")
-    eta_cut_w = relaxed.cut(eta_jj, eta_cut, slope=slope, keep="above")
-    return m_jj_cut_w * eta_cut_w
-
-
 def get_hists(
+    pars,
+    data,
     config,
-    nn_pars: Array,
-    data: dict[str, Array],
-    nn: Callable,
-    bandwidth: float,
-    slope: float,
-    bins: Array,
-    vbf_cut: Array,
-    eta_cut: Array,
-    scale: float,
-) -> dict[str, Array]:
-    """Function that takes in data + analysis config parameters, and constructs
-    yields."""
+):
 
-    # indexing is horrible I know
-    # k index is sample index
-    values = {k: data[k][:, 0, :] for k in data}
-    weights = {k: data[k][:, 1, 0] * scale for k in data}
+    if config.include_bins:
+        bins = jnp.array([0, *pars["bins"], 1])
+    else:
+        bins = config.bins
+
+    # values = {k: data[k][:, 0, :] for k in data}
+    # weights = {k: data[k][:, 1, 0] * scale for k in data}
 
     # apply cuts to weights
-    if config.objective == "cls":
-        for k in values.keys():
-            cutted_weight = get_cut_weights(
-                values[k][:, -2],
-                values[k][:, -1],
-                vbf_cut,
-                eta_cut,
-                slope,
+    cut_weights = jnp.ones(data.shape[:2])
+    # collect them over all cuts and apply to weights once
+    for var, var_dict in config.opt_cuts.items():
+        # get the sigmoid weights for var_cut
+        cut_weights *= relaxed.cut(
+            data[:, :, var_dict["idx"]],
+            pars[var + "_cut"],
+            slope=config.slope,
+            keep=var_dict["keep"],
+        )
+    # apply to weights
+    # inside a jitted function this is not a copy
+    # https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html
+    data = data.at[:, :, config.weight_idx].multiply(cut_weights)
+
+    hists = {}
+
+    # make dedicated function, reduce compile
+    if config.mode == "cls_var":
+        for i, sample_sys in enumerate(config.sample_sys):
+            hists[sample_sys] = hist(
+                data=data[i, :, config.cls_var_idx],
+                weights=data[i, :, config.weight_idx],
+                bandwidth=pars["bw"],
+                bins=bins,
             )
 
-            weights[k] *= cutted_weight
+    else:
 
-    # define our histogram-maker with some hyperparameters (bandwidth, binning)
-    make_hist = partial(hist, bandwidth=bandwidth, bins=bins)
+        # combine parameters and nn architecture
+        nn = eqx.combine(pars["nn"], config.nn_arch)
 
-    if config.do_m_hh:
+        # the following is the same as, but faster
+        # for i, sample_sys in enumerate(config.sample_sys):
+        #     nn_prediction = jax.vmap(nn)(data[i, :, : config.nn_inputs_idx]).ravel()
+        def process_sample(i):
+            sample_data = data[i, :, : config.nn_inputs_idx]
+            nn_outputs = jax.vmap(nn)(sample_data)
+            return nn_outputs.ravel()
+
+        nn_prediction = jax.vmap(process_sample)(jnp.arange(len(config.sample_sys)))
+
         hists = {
-            k: make_hist(data=values[k][:, -3].ravel(), weights=weights[k])
-            for k, v in data.items()
+            k: make_hist(data=nn_output[k], weights=weights[k])
+            for k, v in nn_output.items()
         }
-        return hists
-
-    # apply the neural network to each data sample, and keep track of the
-    # sample names in a dict
-    nn_apply = partial(nn, nn_pars)
-    nn_output = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
-
-    hists = {
-        k: make_hist(data=nn_output[k], weights=weights[k])
-        for k, v in nn_output.items()
-    }
 
     if config.do_stat_error:
         # calculate stat error
