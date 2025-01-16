@@ -172,6 +172,7 @@ def model_from_hists(
             }
         ]
 
+        # review this, not sure anymore
         # if config.binned_w_CR:
         #     for i in range(len(config.bins) - 1):
         #         # this .at.set makes a copy without altering the original!

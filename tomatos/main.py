@@ -5,7 +5,7 @@ import equinox as eqx
 import jax
 import tomatos.configuration
 import tomatos.nn_builder
-import tomatos.optimization
+import tomatos.training
 import tomatos.plotting
 import tomatos.preprocess
 import tomatos.utils
@@ -19,7 +19,7 @@ jax.config.update("jax_enable_x64", True)
 # some debugging options
 jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 # jax.numpy.set_printoptions(suppress=True)
-# jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_disable_jit", True)
 # useful to find the cause of nan's
 # jax.config.update("jax_debug_nans", True)
 
@@ -45,35 +45,44 @@ def run():
 
     tomatos.preprocess.run(config)
 
-    nn_pars, nn, nn_arch = tomatos.nn_builder.init(config)
+    nn_pars, nn_arch = tomatos.nn_builder.init(config)
 
+    config.nn_arch = nn_arch
     # add vars to optimization
-    init_pars = {}
-    init_pars["nn_pars"] = nn_pars
+    opt_pars = {}
+    opt_pars["nn"] = nn_pars
     for var in config.opt_cuts:
-        init_pars[var + "_cut"] = config.opt_cuts[var]["init"]
-    init_pars["bw"] = config.bw_init
+        opt_pars[var + "_cut"] = config.opt_cuts[var]["init"]
+
+    opt_pars["bw"] = config.bw_init
     if config.include_bins:
         # exclude boundaries
-        init_pars["bins"] = config.bins[1:-1]
+        opt_pars["bins"] = config.bins[1:-1]
 
-    logging.info(init_pars)
+    for key in config.opt_cuts:
+        var_idx = config.vars.index(key)
+        config.opt_cuts[key]["idx"] = var_idx
+        init = config.opt_cuts[key]["init"]
+        init *= config.scaler.scale_[var_idx]
+        init += config.scaler.min_[var_idx]
+        print(init)
+        config.opt_cuts[key]["init"] = init
 
-    best_params, last_params, metrics, infer_metrics = tomatos.optimization.run(
+    logging.info(opt_pars)
+
+    best_params, last_params, metrics, infer_metrics = tomatos.training.run(
         config=config,
-        nn=nn,
-        init_pars=init_pars,
-        nn_arch=nn_arch,
+        opt_pars=opt_pars,
         args=args,
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
 
     # save model to file
-    model = eqx.combine(best_params["nn_pars"], nn_arch)
+    model = eqx.combine(best_params["nn"], nn_arch)
     eqx.tree_serialise_leaves(config.model_path + "epoch_best.eqx", model)
 
-    model = eqx.combine(last_params["nn_pars"], nn_arch)
+    model = eqx.combine(last_params["nn"], nn_arch)
     eqx.tree_serialise_leaves(config.model_path + "epoch_last.eqx", model)
 
     # save metrics
