@@ -30,7 +30,7 @@ def fill(
     # transform dict data into 2d array of dimension (events, vars)
     data_2d = np.array([data[var] for var in config.vars]).T
     # iteratively update min max for scaling of train vars
-    scaler.partial_fit(data_2d[:, : config.nn_inputs_idx])
+    scaler.partial_fit(data_2d[:, : config.nn_inputs_idx_end])
     with h5py.File(config.preprocess_files["data"], "r+") as f:
         ds = f[sample_sys]
         old_shape = ds.shape
@@ -49,7 +49,7 @@ def fill_2d_data(config, scaler):
             tree = file[config.tree_name]
             for data in tree.iterate(step_size=config.chunk_size, library="np"):
                 #######
-                # preselection could be here
+                # pre/analysis-selection could be here
                 # ...transfer generate test files code
                 #######
                 fill(config, sample_sys, data, scaler)
@@ -66,11 +66,10 @@ def get_max_events(config):
 
 
 def init_splits(config, idx_bounds):
-    config.split_events = {}
     for split in ["train", "valid", "test"]:
         n_events = idx_bounds[split][1] - idx_bounds[split][0]
         logging.info(f"{split} events: {n_events}")
-        config.split_events[split] = n_events
+        config.splitting[split]["events"] = n_events
         with h5py.File(config.preprocess_files[split], "w") as f_split:
             f_split.create_dataset(
                 name="stack",
@@ -109,29 +108,31 @@ def fill_splits(config, max_events, idx_bounds, scaler):
         # upsampling, shuffling, scaling nn inputs, scaling event weights
         # having them all together here avoids multiple IO
         for i, sample_sys in enumerate(config.sample_sys):
-            # quick and cheap for now, this should be safe for now
+            # quick and cheap for now
             # ds=(max_events=1e7, config.vars=20) ~ 1.6 GB for float32
-            # in particular avoids IO heavy random indexing read/write
+            # in particular avoids heavy random index read/write
             ds = file["data"][sample_sys][:]
             upsample_sf = ds.shape[0] / max_events
-            # suffle possibly ordered event correlations (in place)
+            # shuffle possibly ordered event correlations (in place)
             np.random.shuffle(ds)
             # this replicates from the beginning, i prefer this to random
             # resampling as duplication only happens if necessary
             ds = np.resize(ds, (max_events, len(config.vars)))
             # shuffle again to remove periodicity
             np.random.shuffle(ds)
-            # min max scale nn input vars
-            ds[:, : config.nn_inputs_idx] = scaler.transform(
-                ds[:, : config.nn_inputs_idx]
+            # min max scale nn input vars for this sample_sys
+            ds[:, : config.nn_inputs_idx_end] = scaler.transform(
+                ds[:, : config.nn_inputs_idx_end]
             )
             # write
             for split in ["train", "valid", "test"]:
-                out = ds[idx_bounds[split][0] : idx_bounds[split][1]]  # (this a view)
-                split_sf = 1 / config.split_ratio[split]
+                out = ds[idx_bounds[split][0] : idx_bounds[split][1]]
+                split_sf = 1 / config.splitting[split]["ratio"]
                 # account for resampling, splitting, and k-folding, such that
                 # except for stats the hist yields in each split are the same
-                out[:, config.weight_idx] *= upsample_sf * split_sf * config.k_fold_sf
+                config.splitting[split]["preprocess_scale_factor"][i] *= (
+                    upsample_sf * split_sf * config.k_fold_sf
+                )
                 file[split]["stack"][i, :] = out
 
 
@@ -145,8 +146,8 @@ def run(config):
     # scale to sample with most events
     max_events = get_max_events(config)
     # train valid test indices, can go in order since they are shuffled
-    train_end = round(max_events * config.split_ratio["train"])
-    valid_end = train_end + round(max_events * config.split_ratio["valid"])
+    train_end = round(max_events * config.splitting["train"]["ratio"])
+    valid_end = train_end + round(max_events * config.splitting["valid"]["ratio"])
     idx_bounds = {
         "train": [0, train_end],
         "valid": [train_end, valid_end],

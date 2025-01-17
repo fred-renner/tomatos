@@ -42,9 +42,6 @@ def hist(
     Array
         1D array of bKDE counts.
     """
-    # bandwidth = bandwidth or events.shape[-1] ** -0.25  # Scott's rule
-    # proof is for gaussian... and also wrong above, must be 3.49*sigma*n^(-1/3)
-    # https://www.stat.cmu.edu/~rnugent/PCMI2016/papers/ScottBandwidth.pdf
 
     # 7.2.3 nathan thesis
     # get cumulative counts (area under kde) for each set of bin edges
@@ -76,64 +73,8 @@ def hist(
     return counts
 
 
-# much easier to get w2sum from a dedicated jitted function
-@jax.jit
-def get_w2sum(
-    data: Array,
-    weights: Array,
-    bins: Array,
-    bandwidth: float,
-) -> Array:
-    """get w2 sum from Differentiable histogram, defined via a binned kernel density estimate (bKDE).
-
-    Parameters
-    ----------
-    data : Array
-        1D array of data to histogram.
-    weights : Array
-        weights to data
-    bins : Array
-        1D array of bin edges.
-    bandwidth : float
-        The bandwidth of the kernel. Bigger == lower gradient variance, but more bias.
-    Returns
-    -------
-    Array
-        1D array of bKDE counts.
-    """
-
-    # 7.2.3 nathan thesis
-    # get cumulative counts (area under kde) for each set of bin edges
-
-    # bins=np.array([0,1,2,3])
-    # bins.reshape(-1, 1)
-    # array([[0],
-    #        [1],
-    #        [2],
-    #        [3]])
-
-    cdf = jsp.stats.norm.cdf(bins.reshape(-1, 1), loc=data, scale=bandwidth)
-    cdf = cdf * jnp.power(weights, 2)
-
-    # sum kde contributions in each bin
-    counts = (cdf[1:, :] - cdf[:-1, :]).sum(axis=1)
-
-    return counts
-
-
-def get_hists(
-    pars,
-    data,
-    config,
-):
-
-    if config.include_bins:
-        bins = jnp.array([0, *pars["bins"], 1])
-    else:
-        bins = config.bins
-
-    # values = {k: data[k][:, 0, :] for k in data}
-    # weights = {k: data[k][:, 1, 0] * scale for k in data}
+@partial(jax.jit, static_argnames=["config"])
+def apply_cuts(pars, data, config):
 
     # apply cuts to weights
     cut_weights = jnp.ones(data.shape[:2])
@@ -141,8 +82,8 @@ def get_hists(
     for var, var_dict in config.opt_cuts.items():
         # get the sigmoid weights for var_cut
         cut_weights *= relaxed.cut(
-            data[:, :, var_dict["idx"]],
-            pars[var + "_cut"],
+            data=data[:, :, var_dict["idx"]],
+            cut_val=pars[var + "_cut"],
             slope=config.slope,
             keep=var_dict["keep"],
         )
@@ -150,61 +91,116 @@ def get_hists(
     # inside a jitted function this is not a copy
     # https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html
     data = data.at[:, :, config.weight_idx].multiply(cut_weights)
+    return data
 
+
+@partial(jax.jit, static_argnames=["config"])
+def get_hists(
+    pars,
+    data,
+    config,
+    scale,
+):
+    # this will hold the hists at the end
     hists = {}
 
-    # make dedicated function, reduce compile
+    if config.include_bins:
+        bins = jnp.array([0, *pars["bins"], 1])
+    else:
+        bins = config.bins
+
+    hist_ = partial(hist, bandwidth=pars["bw"], bins=bins)
+
     if config.mode == "cls_var":
-        for i, sample_sys in enumerate(config.sample_sys):
-            hists[sample_sys] = hist(
+
+        # looks a bit funny but it allows vectorization over sample_sys
+        def sample_hist(i):
+            return hist_(
                 data=data[i, :, config.cls_var_idx],
                 weights=data[i, :, config.weight_idx],
-                bandwidth=pars["bw"],
-                bins=bins,
+            )
+
+        def sample_hist_w2(i):
+            return hist_(
+                data=data[i, :, config.cls_var_idx],
+                weights=jnp.power(data[i, :, config.weight_idx], 2),
             )
 
     else:
-
         # combine parameters and nn architecture
         nn = eqx.combine(pars["nn"], config.nn_arch)
 
-        # the following is the same as, but faster
-        # for i, sample_sys in enumerate(config.sample_sys):
-        #     nn_prediction = jax.vmap(nn)(data[i, :, : config.nn_inputs_idx]).ravel()
-        def process_sample(i):
-            sample_data = data[i, :, : config.nn_inputs_idx]
-            nn_outputs = jax.vmap(nn)(sample_data)
-            return nn_outputs.ravel()
+        # vectorization of the nn foward pass over all samples
+        def predict_sample(i):
+            # this is for one sample
+            sample_data = data[i, :, : config.nn_inputs_idx_end]
+            sample_nn_output = jax.vmap(nn)(sample_data)
+            return sample_nn_output.ravel()
 
-        nn_prediction = jax.vmap(process_sample)(jnp.arange(len(config.sample_sys)))
+        nn_output = jax.vmap(predict_sample)(jnp.arange(len(config.sample_sys)))
 
-        hists = {
-            k: make_hist(data=nn_output[k], weights=weights[k])
-            for k, v in nn_output.items()
-        }
-
-    if config.do_stat_error:
-        # calculate stat error
-        NOSYS_stat_err = jnp.sqrt(
-            get_w2sum(
-                data=nn_output["NOSYS"],
-                weights=weights["NOSYS"],
-                bandwidth=bandwidth,
-                bins=bins,
+        # looks a bit funny but it allows vectorization over sample_sys with
+        # jax.vmap
+        def sample_hist(i):
+            return hist_(
+                data=nn_output[i, :],
+                weights=data[i, :, config.weight_idx],
             )
-        )
-        bkg_stat_err = jnp.sqrt(
-            get_w2sum(
-                data=nn_output["bkg"],
-                weights=weights["bkg"],
-                bandwidth=bandwidth,
-                bins=bins,
+
+        def sample_hist_w2(i):
+            return hist_(
+                data=nn_output[i, :],
+                weights=jnp.power(data[i, :, config.weight_idx], 2),
             )
+
+    # vectorize hist computation
+    hists_vector = jax.vmap(sample_hist)(jnp.arange(len(config.sample_sys)))
+    # hists dict for each sample
+    for i, sample_sys in enumerate(config.sample_sys):
+        hists[sample_sys] = hists_vector[i]
+
+    # w^2 will also be estimated and scaled up just like the counts
+    # note that this is over samples only, not sys
+    hists_nominal_w2_vector = jax.vmap(sample_hist_w2)(jnp.arange(len(config.samples)))
+
+    for i, sample in enumerate(config.samples):
+        hists[sample + "_" + config.nominal + "_w2"] = hists_nominal_w2_vector[i]
+
+    # its just an illustration that you can do this but should rather be
+    # treated with a designated SAMPLE/SYSTEMATIC.root
+    signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
+    w_sf_idx_up = config.vars.index("weight_my_sf_unc_up")
+    w_sf_idx_down = config.vars.index("weight_my_sf_unc_down")
+
+    if config.mode == "cls_var":
+        hists["weight_my_sf_unc_up"] = hist_(
+            data=data[signal_idx, :, config.cls_var_idx],
+            weights=data[signal_idx, :, w_sf_idx_up],
+        )
+        hists["weight_my_sf_unc_u"] = hist_(
+            data=data[signal_idx, :, config.cls_var_idx],
+            weights=data[signal_idx, :, w_sf_idx_down],
+        )
+    else:
+        hists["weight_my_sf_unc_up"] = hist_(
+            data=nn_output[signal_idx, :],
+            weights=data[signal_idx, :, w_sf_idx_up],
+        )
+        hists["weight_my_sf_unc_up"] = hist_(
+            data=nn_output[signal_idx, :],
+            weights=data[signal_idx, :, w_sf_idx_down],
         )
 
-        hists["NOSYS_stat_up"] = hists["NOSYS"] + NOSYS_stat_err
-        hists["NOSYS_stat_down"] = hists["NOSYS"] - NOSYS_stat_err
-        hists["bkg_stat_up"] = hists["bkg"] + bkg_stat_err
-        hists["bkg_stat_down"] = hists["bkg"] - bkg_stat_err
+    for i, sample_sys in enumerate(config.sample_sys):
+        # scale, including w2
+        scaled_hist = hists_vector[i] * scale[i]
+        hists[sample_sys] = jnp.where(scaled_hist > 0, scaled_hist, 0.001)
+
+    # stat error
+    for sample in config.samples:
+        sample_NOSYS = sample + "_" + config.nominal
+        sigma = jnp.sqrt(hists[sample_NOSYS + "_w2"])
+        hists[sample_NOSYS + "_stat_up"] = hists[sample_NOSYS] + sigma
+        hists[sample_NOSYS + "_stat_down"] = hists[sample_NOSYS] - sigma
 
     return hists

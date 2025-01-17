@@ -12,7 +12,7 @@ from functools import partial
 
 
 # this fixes the compilation of static args at compile time
-# basically the more you hints you give what is fixed more code can be
+# basically the more you hints you give what is fixed, more code can be
 # optimized for hardware accelaration
 @partial(jax.jit, static_argnames=["config"])
 def loss_fn(
@@ -21,11 +21,15 @@ def loss_fn(
     config,
     bandwidth,
     slope,
+    scale,
     validate_only=False,
 ):
+    ##### analysis computation could be here, need on the fly input for this scaling
 
-    hists = tomatos.histograms.get_hists(pars, data, config)
+    data = tomatos.histograms.apply_cuts(pars, data, config)
 
+    hists = tomatos.histograms.get_hists(pars, data, config, scale)
+    print(hists)
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
         do_m_hh,
