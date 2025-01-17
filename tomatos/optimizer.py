@@ -3,9 +3,10 @@ import optax
 from jaxopt import OptaxSolver
 
 
-def get(config, loss_fun, params):
+def get(config, loss_fn, params):
     # there are many schedules you can play with
     # https://optax.readthedocs.io/en/latest/api/optimizer_schedules.html#
+
     # this has worked particularly well and has a strong regularization effect
     # due to in between large lr
     lr_schedule = optax.linear_onecycle_schedule(
@@ -53,6 +54,6 @@ def get(config, loss_fun, params):
         ),  # limit cut updates
     )
 
-    # has_aux allows, to return additional values from loss_fun than just the
+    # has_aux allows, to return additional values from loss_fn than just the
     # loss value
-    return OptaxSolver(loss_fun, opt=optimizer, has_aux=True, jit=True)
+    return OptaxSolver(loss_fn, opt=optimizer, has_aux=True, jit=True)

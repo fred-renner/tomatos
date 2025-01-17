@@ -22,33 +22,44 @@ class Setup:
             for file in pathlib.Path(self.input_path).rglob("*.root")
             if file.is_file()
         ]
-        # put non-systematic samples first, not strictly necessary but e.g.
-        # a useful order for plots
-        self.input_paths.sort(key=lambda x: ("NOSYS" not in x))
+        # put non-systematic samples first
+        self.nominal = "NOSYS"
+        self.input_paths.sort(key=lambda x: (self.nominal not in x))
 
         # expected structure: sample_path/SAMPLE/SYSTEMATIC.root
         # sample_sys will be the list of SAMPLE_SYSTEMATIC
+        self.samples = []
         self.sample_sys = []
+
         for p in self.input_paths:
             sample_name = p.removesuffix(".root")
             sample_name = sample_name.split("/")
-            self.sample_sys += [sample_name[-2] + "_" + sample_name[-1]]
+            sample = sample_name[-2]
+            systematic = sample_name[-1]
+            if self.nominal == systematic:
+                self.samples += [sample]
+            self.sample_sys += [sample + "_" + systematic]
+
         self.sample_files_dict = {
             k: v for k, v in zip(self.sample_sys, self.input_paths)
         }
         # total events that are batched in training from all samplesys combined
-        self.batch_size = 10_000
-        # memory layout on disk per sample_sys, no yaml, see batcher for factor
-        # 2
+        self.batch_size = 1e6
+        # memory layout on disk per sample_sys, not in yaml, see batcher for
+        # factor 2
         self.chunk_size = int(self.batch_size / len(self.sample_sys) / 2)
         # slows down I/O, but saves disk memory
         self.compress_input_files = False
-        # need to add up to one
-        self.split_ratio = {
-            "train": 0.8,
-            "valid": 0.1,
-            "test": 0.1,
+        # ratio need to add up to one
+        self.splitting = {
+            "train": {"ratio": 0.8},
+            "valid": {"ratio": 0.1},
+            "test": {"ratio": 0.1},
         }
+        for k in self.splitting:
+            self.splitting[k]["events"] = 0
+            self.splitting[k]["preprocess_scale_factor"] = np.ones(len(self.sample_sys))
+            self.splitting[k]["scale_factor"] = np.ones(len(self.sample_sys))
 
         self.plot_inputs = False
         self.debug = args.debug
@@ -78,14 +89,14 @@ class Setup:
             "h_phi",
             "h_m",
             "weight",
-            "weight_sf_unc__1up",
-            "weight_sf_unc__1down",
+            "weight_my_sf_unc_up",
+            "weight_my_sf_unc_down",
         )
         # the last nn variable, in that order defines the nn inputs
         # sliced array access is a huge speed up when slicing
-        # array[:, :nn_inputs_idx] much faster than array[:, np.arange(nn_inputs_idx)]
+        # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
         # + 1  to also include the given one
-        self.nn_inputs_idx = self.vars.index("h_m") + 1
+        self.nn_inputs_idx_end = self.vars.index("h_m") + 1
         # nominal event weight
         self.weight_idx = self.vars.index("weight")
 
@@ -117,8 +128,6 @@ class Setup:
         self.systematics_raw = []
         self.do_stat_error = False
         self.do_systematics = False
-
-        self.n_features = self.nn_inputs_idx + 1
 
         self.bins = np.linspace(0, 1, args.bins + 1)
 

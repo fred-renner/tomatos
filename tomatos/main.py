@@ -44,15 +44,13 @@ def run():
         tomatos.plotting.plot_inputs(config)
 
     tomatos.preprocess.run(config)
-
+    
     nn_pars, nn_arch = tomatos.nn_builder.init(config)
 
     config.nn_arch = nn_arch
     # add vars to optimization
     opt_pars = {}
     opt_pars["nn"] = nn_pars
-    for var in config.opt_cuts:
-        opt_pars[var + "_cut"] = config.opt_cuts[var]["init"]
 
     opt_pars["bw"] = config.bw_init
     if config.include_bins:
@@ -65,8 +63,7 @@ def run():
         init = config.opt_cuts[key]["init"]
         init *= config.scaler.scale_[var_idx]
         init += config.scaler.min_[var_idx]
-        print(init)
-        config.opt_cuts[key]["init"] = init
+        opt_pars[key + "_cut"] = init
 
     logging.info(opt_pars)
 

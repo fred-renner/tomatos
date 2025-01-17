@@ -98,13 +98,17 @@ def run(
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
 
+        # the generator also adjusts the scale factor for the current batch
+        # size 
         if i == 0:
+
             state = optimizer.init_state(
                 opt_pars,
                 data=next(batch["train"]),
                 config=config,
                 bandwidth=config.bw_init,
                 slope=config.slope,
+                scale=config.splitting["train"]["scale_factor"],
             )
 
             histograms = state.aux

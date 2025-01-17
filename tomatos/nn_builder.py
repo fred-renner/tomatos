@@ -30,7 +30,7 @@ class NeuralNetwork(eqx.Module):
 
 
 def init(config):
-    model = NeuralNetwork(config.nn_inputs_idx)
+    model = NeuralNetwork(config.nn_inputs_idx_end)
 
     if config.preload_model:
         model = eqx.tree_deserialise_leaves(config.preload_model_path, model)
