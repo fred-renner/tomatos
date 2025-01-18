@@ -62,56 +62,43 @@ def get_symmetric_up_down(nom, sys):
     return up, down
 
 
-def threshold_uncertainty(h, threshold, a, find="below"):
-    # even though a divergent behavior at low h is desirable, power law, exp
-    # etc. were too aggressive for a stable training
-    if find == "below":
-        penalty = jnp.where(h < threshold, -a * (h - threshold) / h, 0)
-    elif find == "above":
-        penalty = jnp.where(h > threshold, a * (h - threshold) / h, 0)
-    up = 1 + penalty
-    down = 1 - penalty
+def transform_hists(hists):
 
-    down = jnp.where(down < 0, 0, down)
+    # here you could do stuff like: 
+    
+    # # bkg
+    # w_CR, err_w_CR = get_bkg_weight(hists, config)
+    # rel_err_w_CR = err_w_CR / w_CR
+    # hists["bkg"] *= w_CR
+    # if config.do_stat_error:
+    #     hists["bkg_stat_up"] *= w_CR
+    #     hists["bkg_stat_down"] *= w_CR
 
-    return up, down
+    # hists["bkg_estimate_in_VR"] = hists["bkg_VR_xbb_1"] * w_CR
+
+    # # need to protect several times
+    # hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
+    # hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
+
+    # bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
+    #     hists["bkg_estimate_in_VR"],
+    #     hists["bkg_VR_xbb_2"],
+    # )
+    # hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
+    # hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
+
+    # # signal
+    # ps_up, ps_down = get_symmetric_up_down(hists["k2v0"], hists["ps"])
+    # hists["ps_up"] = hists["NOSYS"] * ps_up
+    # hists["ps_down"] = hists["NOSYS"] * ps_down
+    return hists
 
 
 def model_from_hists(
-    do_m_hh,
-    hists: dict[str, Array],
-    config: object,
-    do_systematics: bool,
-    do_stat_error: bool,
-    validate_only: bool,
-) -> pyhf.Model:
-    """How to make your HistFactory model from your histograms."""
-
-    # bkg
-    w_CR, err_w_CR = get_bkg_weight(hists, config)
-    rel_err_w_CR = err_w_CR / w_CR
-    hists["bkg"] *= w_CR
-    if config.do_stat_error:
-        hists["bkg_stat_up"] *= w_CR
-        hists["bkg_stat_down"] *= w_CR
-
-    hists["bkg_estimate_in_VR"] = hists["bkg_VR_xbb_1"] * w_CR
-
-    # need to protect several times
-    hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
-    hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
-
-    bkg_shapesys_up, bkg_shapesys_down = get_symmetric_up_down(
-        hists["bkg_estimate_in_VR"],
-        hists["bkg_VR_xbb_2"],
-    )
-    hists["bkg_shape_sys_up"] = hists["bkg"] * bkg_shapesys_up
-    hists["bkg_shape_sys_down"] = hists["bkg"] * bkg_shapesys_down
-
-    # signal
-    ps_up, ps_down = get_symmetric_up_down(hists["k2v0"], hists["ps"])
-    hists["ps_up"] = hists["NOSYS"] * ps_up
-    hists["ps_down"] = hists["NOSYS"] * ps_down
+    hists,
+    config,
+):
+    # hists=
 
     # minimum bin value otherwise optimization can fail
     # important that this happens after the last nominal hist creations
@@ -240,6 +227,9 @@ def model_from_hists(
                     },
                 },
             )
+
+        self.signal_sample = "ggZH125_vvbb"
+
     spec = {
         "channels": [
             {

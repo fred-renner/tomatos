@@ -15,7 +15,7 @@ class Setup:
         self.include_bins = False
 
         self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
-        self.tree_name = "AnalysisMiniTree"
+        self.tree_name = "FilteredTree"
         # collect input files
         self.input_paths = [
             str(file)
@@ -89,6 +89,8 @@ class Setup:
             "h_phi",
             "h_m",
             "weight",
+            "bool_btag_1",
+            "bool_btag_2",
             "weight_my_sf_unc_up",
             "weight_my_sf_unc_down",
         )
@@ -100,21 +102,26 @@ class Setup:
         # nominal event weight
         self.weight_idx = self.vars.index("weight")
 
-        # bce (do we actually still need that?), cls_nn, cls_var
-        self.mode = "cls_nn"
+        # bce, cls_nn, cls_var (bins, cuts) in some variable
+        self.objective = "cls_nn"
         # you can speed up cls_var, if you only setup var and the cut_vars in self.vars
-        # simple hist opt in this variable
         self.cls_var_idx = self.vars.index("h_m")
 
         # cuts on vars to be optimized, keep variables either "above", "below"
         # or below, start somewhere where the cut actually does something to
         # find a gradient
         self.opt_cuts = {
-            "j1_pt": {"keep": "above", "idx": -1, "init": 20_000},  # (MeV)
-            "j2_pt": {"keep": "above", "idx": -1, "init": 20_000},
+            "j1_pt": {
+                "keep": "above",
+                "idx": self.vars.index("j1_pt"),
+                "init": 20_000,
+            },  # (MeV)
+            "j2_pt": {
+                "keep": "above",
+                "idx": self.vars.index("j2_pt"),
+                "init": 20_000,
+            },
         }
-        for key in self.opt_cuts:
-            self.opt_cuts[key]["idx"] = self.vars.index(key)
 
         # this should be a different yaml config
         # if args.loss == "bce":
@@ -144,8 +151,6 @@ class Setup:
             self.num_steps = 10 if args.steps == 200 else args.steps
             # self.bw = np.full(self.num_steps, 0.15)
 
-        # can choose from "cls", "discovery", "bce"
-        self.objective = args.loss
         # cuts scaled to parameter range [0,1]
         self.cuts_init = 0.01
         # scale cut parameter to increase update steps
