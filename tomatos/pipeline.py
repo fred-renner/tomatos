@@ -32,12 +32,8 @@ def loss_fn(
     print(hists)
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
-        do_m_hh,
         hists,
         config,
-        do_systematics,
-        do_stat_error,
-        validate_only,
     )
 
     # if you want s/b discrimination, no need to do anything complex!
