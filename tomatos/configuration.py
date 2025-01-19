@@ -61,7 +61,7 @@ class Setup:
             self.splitting[k]["preprocess_scale_factor"] = np.ones(len(self.sample_sys))
             self.splitting[k]["scale_factor"] = np.ones(len(self.sample_sys))
 
-        self.plot_inputs = False
+        self.plot_inputs = True
         self.debug = args.debug
 
         # jax likes predefined arrays.

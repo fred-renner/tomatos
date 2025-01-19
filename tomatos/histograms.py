@@ -3,7 +3,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-
+import tomatos.utils
 
 Array = jnp.ndarray
 import relaxed
@@ -76,6 +76,9 @@ def hist(
 
 @partial(jax.jit, static_argnames=["config"])
 def apply_cuts(pars, data, config):
+    # if you wonder why not doing cuts like this:
+    # var = jnp.where(var > cut_param, var, 0)
+    # it's discontinuous --> no gradient
 
     # apply cuts to weights
     cut_weights = jnp.ones(data.shape[:2])
@@ -95,6 +98,45 @@ def apply_cuts(pars, data, config):
     return data
 
 
+def select_events(data, config):
+    # apply selections via weights
+    # here on the fly increases the effective events that can be
+    # processed per batch, if selections are written at the preselection it
+    # would double the input vars for each selection, e.g. j1_pt_btag_1,
+    # j1_pt_btag_2
+    base_weights = data[:, :, config.weight_idx]
+    btag_1 = data[:, :, config.vars.index("bool_btag_1")]
+    btag_2 = data[:, :, config.vars.index("bool_btag_2")]
+    h_m = tomatos.utils.min_max_unscale(
+        config,
+        data[:, :, config.vars.index("h_m")],
+        config.vars.index("h_m"),
+    )
+
+    SR = (110e3 < h_m) & (h_m < 130e3)
+    VR = (100e3 < h_m) & (h_m < 110e3) | (140e3 < h_m) & (h_m < 150e3)
+    CR = (80e3 < h_m) & (h_m < 100e3) | (150e3 < h_m) & (h_m < 170e3)
+
+    weights = {
+        "nominal": base_weights,
+        "SR_btag_1": base_weights * SR * btag_1,
+        "SR_btag_2": base_weights * SR * btag_2,
+        "VR_btag_1": base_weights * VR * btag_1,
+        "VR_btag_2": base_weights * VR * btag_2,
+        "CR_btag_1": base_weights * CR * btag_1,
+        "CR_btag_2": base_weights * CR * btag_2,
+        "SR_btag_2_my_sf_unc_up": data[:, :, config.vars.index("weight_my_sf_unc_up")]
+        * SR
+        * btag_2,
+        "SR_btag_2_my_sf_unc_down": data[
+            :, :, config.vars.index("weight_my_sf_unc_down")
+        ]
+        * SR
+        * btag_2,
+    }
+    return weights
+
+
 @partial(jax.jit, static_argnames=["config"])
 def get_hists(
     pars,
@@ -104,84 +146,89 @@ def get_hists(
 ):
     # any magic in here is always just a call of the upper hist() function
 
-    # this will hold the hists at the end
-    hists = {}
+    selections = [
+        "SR_btag_1",
+        "SR_btag_2",
+        "VR_btag_1",
+        "VR_btag_2",
+        "CR_btag_1",
+        "CR_btag_2",
+    ]
+    hists = {sel: {} for sel in selections}
 
-    if config.include_bins:
-        bins = jnp.array([0, *pars["bins"], 1])
-    else:
-        bins = config.bins
+    bins = jnp.array([0, *pars["bins"], 1]) if config.include_bins else config.bins
+    sel_weights = select_events(data, config)
 
     # get nn output
     if config.objective == "cls_nn":
 
         nn = eqx.combine(pars["nn"], config.nn_arch)
 
+        # this also illustrates nicely how jax.vmap works
         def predict_sample(i):
             # Forward pass for one sample
             sample_data = data[i, :, : config.nn_inputs_idx_end]
+            # vmap all batch events
             sample_nn_output = jax.vmap(nn)(sample_data)
+            # flatten output of [[out_1], [out_2],...]
             return sample_nn_output.ravel()
 
         nn_output = jax.vmap(predict_sample)(jnp.arange(len(config.sample_sys)))
 
-    def select_weights(i, select):
-        # here you can add event selections, by multiplying to the event weights
-        base_weights = data[i, :, config.weight_idx]
-        if select == "nominal":
-            return base_weights
-        elif select == "btag_1":
-            return base_weights * data[i, :, config.vars.index("bool_btag_1")]
-        elif select == "btag_2":
-            return base_weights * data[i, :, config.vars.index("bool_btag_2")]
-        elif select == "my_sf_unc_up":
-            return data[i, :, config.vars.index("weight_my_sf_unc_up")]
-        elif select == "my_sf_unc_down":
-            return data[i, :, config.vars.index("weight_my_sf_unc_down")]
+    # bandwidth and bins dont change in get_hists(), this is essentially the
+    # same as setting static_argnames of these everywhere here
+    hist_ = partial(hist, bandwidth=pars["bw"], bins=bins)
 
-    def sample_hist(i, select, w2=False):
-        # this is a helper vectorization over the first ith dimension
+    def compute_hist(i, weights, w2=False):
+        # calc hist per sample i helper for vmap
         if config.objective == "cls_var":
-            data = data[i, :, config.cls_var_idx]
+            sample_data = data[i, :, config.cls_var_idx]
         elif config.objective == "cls_nn":
-            data = nn_output[i, :]
-        weights = select_weights(i, select=select)
+            sample_data = nn_output[i, :]
+        sample_weights = weights[i, :]
         if w2:
-            weights = jnp.power(weights, 2)
-        h = hist(
-            data=data,
-            weights=weights,
-            bandwidth=pars["bw"],
-            bins=bins,
-        )
+            sample_weights = jnp.power(sample_weights, 2)
         # scale works also as estimate for w2
-        return h * scale[i]
+        return hist_(sample_data, sample_weights) * scale[i]
 
-    # Compute histograms for all samples_sys per selection sel
-    for sel in ["btag_1", "btag_2"]:
-        # this holds len(hists)=n_samples
-        hists_vector = jax.vmap(lambda i: sample_hist(i, select=sel))(
+    for sel in selections:
+        hists_vector = jax.vmap(lambda i: compute_hist(i, weights=sel_weights[sel]))(
             jnp.arange(len(config.sample_sys))
         )
-        for i, sample_sys in enumerate(config.sample_sys):
-            hists[sample_sys + "_" + sel] = hists_vector[i]
+        for sample_sys, h in zip(config.sample_sys, hists_vector):
+            hists[sel][sample_sys] = h
+
+    hists = extra_hists(config, compute_hist, sel_weights, hists)
+
+    return hists
+
+
+def extra_hists(config, compute_hist, sel_weights, hists):
 
     # Compute w2 histograms for the final selection btag_2 only
     hists_nominal_w2_vector = jax.vmap(
-        lambda i: sample_hist(i, select="btag_2", w2=True)
+        lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"], w2=True)
     )(jnp.arange(len(config.samples)))
 
     # workaround stat up and down hists
-    for i, sample in enumerate(config.samples):
-        sample_NOSYS = sample + "_" + config.nominal + "_btag_2"
-        hists[sample_NOSYS + "_w2"] = hists_nominal_w2_vector[i]
-        sigma = jnp.sqrt(hists_nominal_w2_vector[i])
-        hists[sample_NOSYS + "_stat_up"] = hists[sample_NOSYS] + sigma
-        hists[sample_NOSYS + "_stat_down"] = hists[sample_NOSYS] - sigma
+    for sample, h in zip(config.samples, hists_nominal_w2_vector):
+        sample_NOSYS = sample + "_" + config.nominal
+        # hists[sample_NOSYS]["SR_btag_2"]["w2"] = h
+        sigma = jnp.sqrt(h)
+        hists["SR_btag_2"][sample_NOSYS + "_stat_up"] = (
+            hists["SR_btag_2"][sample_NOSYS] + sigma
+        )
+        hists["SR_btag_2"][sample_NOSYS + "_stat_down"] = (
+            hists["SR_btag_2"][sample_NOSYS] - sigma
+        )
 
-    # some special signal weight unc
+    # some special signal weight unc, e.g. btag sf
     signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
-    hists["signal_my_sf_unc_up"] = sample_hist(signal_idx, select="my_sf_unc_up")
-    hists["signal_my_sf_unc_down"] = sample_hist(signal_idx, select="my_sf_unc_down")
+    hists["SR_btag_2"]["signal_my_sf_unc_up"] = compute_hist(
+        signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
+    )
+    hists["SR_btag_2"]["signal_my_sf_unc_down"] = compute_hist(
+        signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
+    )
 
     return hists

@@ -29,7 +29,7 @@ def loss_fn(
     data = tomatos.histograms.apply_cuts(pars, data, config)
 
     hists = tomatos.histograms.get_hists(pars, data, config, scale)
-    print(hists)
+
     # build our statistical model, and calculate the loss!
     model, hists = tomatos.workspace.model_from_hists(
         hists,
