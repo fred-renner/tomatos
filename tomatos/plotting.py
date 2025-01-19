@@ -49,8 +49,8 @@ def plot_inputs(config):
             mean = np.mean(data)
             std = np.std(data)
 
-            # Filter data within 5 standard deviations
-            filtered_data = data[(data > mean - 5 * std) & (data < mean + 5 * std)]
+            # Filter data within 3 standard deviations
+            filtered_data = data[(data > mean - (3 * std)) & (data < mean + (3 * std))]
 
             # Plot histogram
             ax.hist(

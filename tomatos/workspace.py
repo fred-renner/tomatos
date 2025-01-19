@@ -7,7 +7,7 @@ from functools import partial
 
 
 def get_generator_weight_envelope(hists):
-    nominal = hists["NOSYS"]
+    nominal = hists["blah"]
     gens = [
         "GEN_MUR05_MUF05_PDF260000",
         "GEN_MUR05_MUF10_PDF260000",
@@ -26,17 +26,12 @@ def get_generator_weight_envelope(hists):
     return envelope_up, envelope_down
 
 
-def get_bkg_weight(hists, config):
+def get_abcd_weight(hists, config):
 
-    if config.binned_w_CR:
-        # binned transferfactor
-        CR_4b_Data = hists["bkg_CR_xbb_2"]
-        CR_2b_Data = hists["bkg_CR_xbb_1"]
-    else:
-        # simple transferfactor
-        CR_4b_Data = jnp.sum(hists["bkg_CR_xbb_2"])
-        CR_2b_Data = jnp.sum(hists["bkg_CR_xbb_1"])
+    A = jnp.sum(hists["bkg_CR_xbb_2"])
+    B = jnp.sum(hists["bkg_CR_xbb_1"])
 
+    # assumes data
     errCR1 = jnp.sqrt(CR_4b_Data)
     errCR2 = jnp.sqrt(CR_2b_Data)
 
@@ -64,10 +59,11 @@ def get_symmetric_up_down(nom, sys):
 
 def transform_hists(hists):
 
-    # here you could do stuff like: 
-    
+    # here you could do stuff like:
+    hists = {k: jnp.where(v < 0.001, 0.001, v) for k, v in hists.items()}
+
     # # bkg
-    # w_CR, err_w_CR = get_bkg_weight(hists, config)
+    w_CR, err_w_CR = get_bkg_weight(hists, config)
     # rel_err_w_CR = err_w_CR / w_CR
     # hists["bkg"] *= w_CR
     # if config.do_stat_error:
@@ -98,11 +94,9 @@ def model_from_hists(
     hists,
     config,
 ):
-    # hists=
 
-    # minimum bin value otherwise optimization can fail
-    # important that this happens after the last nominal hist creations
-    hists = {k: jnp.where(v < 0.01, 0.01, v) for k, v in hists.items()}
+    hists = transform_hists(hists)
+    hists = {k: jnp.where(v < 0.001, 0.001, v) for k, v in hists.items()}
 
     signal_modifiers = []
     bkg_modifiers = []
