@@ -29,16 +29,18 @@ class Setup:
         # expected structure: sample_path/SAMPLE/SYSTEMATIC.root
         # sample_sys will be the list of SAMPLE_SYSTEMATIC
         self.samples = []
+        # this defines the first dimension of the main data array
         self.sample_sys = []
-
+        self.sample_sys_dict = {}
         for p in self.input_paths:
-            sample_name = p.removesuffix(".root")
-            sample_name = sample_name.split("/")
-            sample = sample_name[-2]
-            systematic = sample_name[-1]
+            sample, systematic = p.removesuffix(".root").split("/")[-2:]
             if self.nominal == systematic:
                 self.samples += [sample]
-            self.sample_sys += [sample + "_" + systematic]
+            sample_sys = sample + "_" + systematic
+            self.sample_sys += [sample_sys]
+            self.sample_sys_dict[sample_sys] = (sample, systematic)
+        # play safe and make this immutable
+        self.sample_sys = tuple(self.sample_sys)
 
         self.sample_files_dict = {
             k: v for k, v in zip(self.sample_sys, self.input_paths)
@@ -65,16 +67,11 @@ class Setup:
         self.debug = args.debug
 
         # jax likes predefined arrays.
-        # self.vars defines the main data array ofdimension (n_events, self.vars).
+        # self.vars defines the main data array of dimension (samples, n_events, self.vars).
         # Need to keep event correspondence for weights, preprocessing,
         # batching, hists,...
         # keeping them all together simplifies the program workflow a lot even
         # though it has to be setup with care. order matters, see below.
-        # it also means that currently, except for histogram transformations,
-        # vars created after the prepare step would be a bit tricky to input
-        # scale and the nn input setup here would need to be changed. However I
-        # can't think of an optimization calculation that couldn't be done
-        # before opt.
         self.vars = (
             "j1_pt",
             "j1_eta",
@@ -97,7 +94,7 @@ class Setup:
         # the last nn variable, in that order defines the nn inputs
         # sliced array access is a huge speed up when slicing
         # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
-        # + 1  to also include the given one
+        # + 1 to also include the given one when slicing
         self.nn_inputs_idx_end = self.vars.index("h_m") + 1
         # nominal event weight
         self.weight_idx = self.vars.index("weight")
