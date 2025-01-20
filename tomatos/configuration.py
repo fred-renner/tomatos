@@ -24,6 +24,8 @@ class Setup:
         ]
         # put non-systematic samples first
         self.nominal = "NOSYS"
+        self.signal_sample = "ggZH125_vvbb"
+
         self.input_paths.sort(key=lambda x: (self.nominal not in x))
 
         # expected structure: sample_path/SAMPLE/SYSTEMATIC.root
@@ -39,7 +41,8 @@ class Setup:
             sample_sys = sample + "_" + systematic
             self.sample_sys += [sample_sys]
             self.sample_sys_dict[sample_sys] = (sample, systematic)
-        # play safe and make this immutable
+        # make them immutable
+        self.samples = tuple(self.samples)
         self.sample_sys = tuple(self.sample_sys)
 
         self.sample_files_dict = {

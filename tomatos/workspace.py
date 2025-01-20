@@ -1,9 +1,8 @@
 import jax.numpy as jnp
 import numpy as np
 import pyhf
-
-Array = jnp.ndarray
-from functools import partial
+import pprint
+import tomatos.utils
 
 
 def get_generator_weight_envelope(hists):
@@ -28,10 +27,11 @@ def get_generator_weight_envelope(hists):
 
 
 def get_abcd_weight(A, B):
-    w_CR = jnp.sum(A) / jnp.sum(B)
+
+    w_CR = A / B
     errA = jnp.sqrt(A)
     errB = jnp.sqrt(B)
-    stat_err_w_CR = w_CR * jnp.sqrt(jnp.square(errA / A) + jnp.square(errB / B))
+    stat_err_w_CR = jnp.sqrt(jnp.square(errA / A) + jnp.square(errB / B))
     return w_CR, stat_err_w_CR
 
 
@@ -63,8 +63,8 @@ def hist_transforms(hists):
 
     # aim to scale btag_1 to btag_2 in SR from ratio in CR
     w_CR, stat_err_w_CR = get_abcd_weight(
-        A=hists["CR_btag_2"]["bkg"]["NOSYS"],
-        B=hists["CR_btag_1"]["bkg"]["NOSYS"],
+        A=jnp.sum(hists["CR_btag_2"]["bkg"]["NOSYS"]),
+        B=jnp.sum(hists["CR_btag_1"]["bkg"]["NOSYS"]),
     )
     # scale single tagged for bkg estimate
     hists["bkg_estimate"] = hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR
@@ -77,10 +77,8 @@ def hist_transforms(hists):
 
     # normilzation uncertainty background estimate
     w_CR_stat_up, w_CR_stat_down = symmetric_up_down_sf(w_CR, w_CR + stat_err_w_CR)
-    hists["SR_btag_2"]["bkg"]["NORM_up"] = (
-        hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR_stat_up
-    )
-    hists["SR_btag_2"]["bkg"]["NORM_down"] = (
+    hists["bkg_estimate_NORM_up"] = hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR_stat_up
+    hists["bkg_estimate_NORM_down"] = (
         hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR_stat_down
     )
 
@@ -106,19 +104,9 @@ def hist_transforms(hists):
     return hists
 
 
-def model_from_hists(
-    hists,
-    config,
-):
-    # attentive user action needed here
-
-    hists = hist_transforms(hists)
-
-    # standard uncerainty modifiers per sample
-    # enforce 1UP, 1DOWN for autosetup here
-    fit_region = "SR_btag_2"
-
+def get_modifiers(hists, config, fit_region):
     modifiers = {k: [] for k in config.samples}
+    # autocollect 1UP 1DOWN
     for sample in hists[fit_region]:
         for sys in hists[fit_region][sample]:
             if "1UP" in sys:
@@ -134,13 +122,14 @@ def model_from_hists(
                     },
                 )
 
-    modifiers["bkg"] += [
+    # custom
+    modifiers["bkg_estimate"] = [
         {
             "name": "bkg_estimate_norm",
             "type": "histosys",
             "data": {
-                "hi_data": hists["SR_btag_2"]["bkg"]["NORM_up"],
-                "lo_data": hists["SR_btag_2"]["bkg"]["NORM_down"],
+                "hi_data": hists["bkg_estimate_NORM_up"],
+                "lo_data": hists["bkg_estimate_NORM_down"],
             },
         }
     ]
@@ -152,14 +141,18 @@ def model_from_hists(
     # modifier
     for i in jnp.arange(len(config.bins) - 1):
         for sample in config.samples:
-            nom = hists["SR_btag_2"][sample][config.nominal + "_stat_up"]
+            nom = hists["SR_btag_2"][sample][config.nominal]
             nom_up = jnp.copy(nom)
-            stat_up_i = nom_up.at[i].set(hists["bkg_estimate_stat_up"][i])
+            stat_up_i = nom_up.at[i].set(
+                hists["SR_btag_2"][sample][config.nominal + "_stat_up"][i]
+            )
             nom_down = jnp.copy(nom)
-            stat_down_i = nom_down.at[i].set(hists["bkg_estimate_stat_up"][i])
+            stat_down_i = nom_down.at[i].set(
+                hists["SR_btag_2"][sample][config.nominal + "_stat_down"][i]
+            )
             modifiers[sample] += (
                 {
-                    "name": f"stat_err_{sample}_{i}",
+                    "name": f"stat_err_{sample}_{i+1}",
                     "type": "histosys",
                     "data": {
                         "hi_data": jnp.copy(stat_up_i),
@@ -171,10 +164,10 @@ def model_from_hists(
         nom_up = jnp.copy(hists["bkg_estimate"])
         stat_up_i = nom_up.at[i].set(hists["bkg_estimate_stat_up"][i])
         nom_down = jnp.copy(hists["bkg_estimate"])
-        stat_down_i = nom_down.at[i].set(hists["bkg_estimate_stat_up"][i])
-        modifiers["bkg"] += (
+        stat_down_i = nom_down.at[i].set(hists["bkg_estimate_stat_down"][i])
+        modifiers["bkg_estimate"] += (
             {
-                "name": f"stat_err_bkg_{i}",
+                "name": f"stat_err_bkg_{i+1}",
                 "type": "histosys",
                 "data": {
                     "hi_data": jnp.copy(stat_up_i),
@@ -183,33 +176,69 @@ def model_from_hists(
             },
         )
 
+    return modifiers
+
+
+def get_auto_sample_spec(hists, config, fit_region, modifiers):
+    # sample setup for all systematics
+    no_auto_setup_samples = [config.signal_sample, "bkg"]
+    auto_setup_samples = list(set(config.samples) - set(no_auto_setup_samples))
+    # this list is empty here since these are the only two samples, but  auto
+    # sets up the modifiers for all up down uncertainties
+    auto_samples = [
+        {
+            "name": sample,
+            "data": hists[fit_region][sample][config.nominal],
+            "modifiers": modifiers[sample],
+        }
+        for sample in auto_setup_samples
+    ]
+
+    return auto_samples
+
+
+def get_pyhf_model(
+    hists,
+    config,
+):
+    # attentive user action needed here
+
+    # configurable?
+    fit_region = "SR_btag_2"
+
+    # standard uncerainty modifiers per sample
+    # enforce 1UP, 1DOWN for autosetup here
+    modifiers = get_modifiers(hists, config, fit_region)
+
     spec = {
         "channels": [
             {
-                "name": "singlechannel",  # we only have one "channel" (data region)
+                "name": fit_region,
                 "samples": [
                     {
-                        "name": "ggZH125_vvbb",
-                        "data": hists["ggZH125_vvbb"],  # signal
+                        "name": config.signal_sample,
+                        "data": hists[fit_region][config.signal_sample]["NOSYS"],
                         "modifiers": [
                             {
                                 "name": "mu",
                                 "type": "normfactor",
                                 "data": None,
                             },  # our signal strength modifier (parameter of interest)
-                            *signal_modifiers,
+                            *modifiers[config.signal_sample],
                         ],
                     },
                     {
-                        "name": "background",
-                        "data": hists["bkg"],  # background
-                        "modifiers": [
-                            *bkg_modifiers,
-                        ],
+                        "name": "bkg_estimate",
+                        "data": hists["bkg_estimate"],  # background
+                        "modifiers": modifiers["bkg_estimate"],
                     },
+                    *get_auto_sample_spec(hists, config, fit_region, modifiers),
                 ],
-            },
+            }
         ],
     }
+
+    if config.debug:
+        pprint.pprint(tomatos.utils.to_python_lists(spec))
 
     return pyhf.Model(spec, validate=False), hists
