@@ -45,6 +45,8 @@ class Setup:
         self.samples = tuple(self.samples)
         self.sample_sys = tuple(self.sample_sys)
 
+        # all of these lists also the lower define a index-mapping you can
+        # acces with e.g. self.samples.index("bkg")
         self.sample_files_dict = {
             k: v for k, v in zip(self.sample_sys, self.input_paths)
         }
@@ -61,10 +63,10 @@ class Setup:
             "valid": {"ratio": 0.1},
             "test": {"ratio": 0.1},
         }
+
         for k in self.splitting:
-            self.splitting[k]["events"] = 0
+            self.splitting[k]["events"] = -1
             self.splitting[k]["preprocess_scale_factor"] = np.ones(len(self.sample_sys))
-            self.splitting[k]["scale_factor"] = np.ones(len(self.sample_sys))
 
         self.plot_inputs = True
         self.debug = args.debug
@@ -91,10 +93,11 @@ class Setup:
             "weight",
             "bool_btag_1",
             "bool_btag_2",
-            "weight_my_sf_unc_up",
-            "weight_my_sf_unc_down",
+            "my_sf_unc_up",
+            "my_sf_unc_down",
         )
-        # the last nn variable, in that order defines the nn inputs
+        # the last nn variable, in that order defines the nn inputs and also
+        # the last variable that will be min max scaled
         # sliced array access is a huge speed up when slicing
         # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
         # + 1 to also include the given one when slicing
@@ -128,15 +131,28 @@ class Setup:
         #     self.bw_init = 1e-100
         #     self.bw_min = 1e-100
         self.bw_init = 0.25
-        self.bw_min = 1e-100
-
+        self.bw_min = 1e-10
         self.slope = 20_000
-
-        self.systematics_raw = []
-        self.do_stat_error = False
-        self.do_systematics = False
-
         self.bins = np.linspace(0, 1, args.bins + 1)
+
+        # histograms for each sample and region as you will define in
+        # tomatos.select.events
+        # its a bit odd to have this configurable here since the hist
+        # transforms might depend on them
+        self.regions_to_sel = [
+            "SR_btag_1",
+            "SR_btag_2",
+            "VR_btag_1",
+            "VR_btag_2",
+            "CR_btag_1",
+            "CR_btag_2",
+        ]
+        # fit channel
+        self.fit_region = "SR_btag_2"
+        self.kde_sampling = 1000
+
+        # hists that contain these strings will be plotted
+        self.plot_hists_filter = [self.fit_region, "bkg_estimate"]
 
         # with all systs 0.001 seems too small
         self.lr = args.lr

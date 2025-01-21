@@ -30,6 +30,7 @@ def plot_inputs(config):
 
     # Determine grid size for combined plot
     n_vars = len(config.vars)
+    
     cols = math.ceil(math.sqrt(n_vars))
     rows = math.ceil(n_vars / cols)
 
@@ -53,20 +54,22 @@ def plot_inputs(config):
             filtered_data = data[(data > mean - (3 * std)) & (data < mean + (3 * std))]
 
             # Plot histogram
-            ax.hist(
-                filtered_data,
-                bins=30,
-                density=True,
-                histtype="step",
-                label=sample,
-            )
-            plt.hist(
-                filtered_data,
-                bins=30,
-                density=True,
-                histtype="step",
-                label=sample,
-            )
+            
+            with np.errstate(divide="ignore", invalid="ignore"):
+                    ax.hist(
+                        filtered_data,
+                        bins=30,
+                        density=True,
+                        histtype="step",
+                        label=sample,
+                    )
+                    plt.hist(
+                        filtered_data,
+                        bins=30,
+                        density=True,
+                        histtype="step",
+                        label=sample,
+                    )
         ax.set_xlabel(var)
         ax.set_ylabel("Event Density")
         ax.legend()

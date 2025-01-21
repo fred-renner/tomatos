@@ -19,7 +19,7 @@ jax.config.update("jax_enable_x64", True)
 # some debugging options
 jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 # jax.numpy.set_printoptions(suppress=True)
-jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_disable_jit", True)
 # useful to find the cause of nan's
 # jax.config.update("jax_debug_nans", True)
 
@@ -43,34 +43,17 @@ def run():
     if config.plot_inputs:
         tomatos.plotting.plot_inputs(config)
 
+    # need to write scaler to data.h5 then load into config
     tomatos.preprocess.run(config)
-    
+
     nn_pars, nn_arch = tomatos.nn_builder.init(config)
-
     config.nn_arch = nn_arch
-    # add vars to optimization
-    opt_pars = {}
-    opt_pars["nn"] = nn_pars
-
-    opt_pars["bw"] = config.bw_init
-    if config.include_bins:
-        # exclude boundaries
-        opt_pars["bins"] = config.bins[1:-1]
-
-    for key in config.opt_cuts:
-        var_idx = config.vars.index(key)
-        config.opt_cuts[key]["idx"] = var_idx
-        init = config.opt_cuts[key]["init"]
-        init *= config.scaler.scale_[var_idx]
-        init += config.scaler.min_[var_idx]
-        opt_pars[key + "_cut"] = init
+    opt_pars = tomatos.utils.setup_opt_pars(config, nn_pars)
 
     logging.info(opt_pars)
 
     best_params, last_params, metrics, infer_metrics = tomatos.training.run(
-        config=config,
-        opt_pars=opt_pars,
-        args=args,
+        config, opt_pars
     )
 
     bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)

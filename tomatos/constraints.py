@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import numpy as np
 
 
 def min_events_per_bin(h, thresh, intensity=0.01):
@@ -13,6 +14,20 @@ def penalize_loss(loss_value, hists):
 
     # reasonable for fitting, also critical to distribute events with bandwidth
     # reduction mechansim
-    loss_value += min_events_per_bin(hists["bkg_estimate"], thresh=5, intensity=0.01)
+    loss_value += min_events_per_bin(
+        hists["SR_btag_2"]["bkg_estimate"]["NOSYS"], thresh=5, intensity=0.01
+    )
 
     return loss_value
+
+
+def opt_pars(config, opt_pars):
+    # a large step can gow below 0 which breaks opt since this flips
+    # the cdf (not the pdf) used for histogram calculation, also not go
+    # below a minimum to maintain gradients
+    opt_pars["bw"] = np.maximum(config.bw_min, np.abs(opt_pars["bw"]))
+
+    if config.include_bins:
+        # maintain order and avoid going out of 0, 1 range
+        opt_pars["bins"] = np.clip(np.sort(np.abs(opt_pars["bins"])), 1e-6, 1 - 1e-6)
+    return opt_pars

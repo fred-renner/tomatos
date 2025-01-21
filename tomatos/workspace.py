@@ -27,11 +27,10 @@ def get_generator_weight_envelope(hists):
 
 
 def get_abcd_weight(A, B):
-
     w_CR = A / B
     errA = jnp.sqrt(A)
     errB = jnp.sqrt(B)
-    stat_err_w_CR = jnp.sqrt(jnp.square(errA / A) + jnp.square(errB / B))
+    stat_err_w_CR = w_CR * jnp.sqrt(jnp.square(errA / A) + jnp.square(errB / B))
     return w_CR, stat_err_w_CR
 
 
@@ -66,36 +65,30 @@ def hist_transforms(hists):
         A=jnp.sum(hists["CR_btag_2"]["bkg"]["NOSYS"]),
         B=jnp.sum(hists["CR_btag_1"]["bkg"]["NOSYS"]),
     )
+    hists["SR_btag_2"]["bkg_estimate"] = {}
     # scale single tagged for bkg estimate
-    hists["bkg_estimate"] = hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR
+    hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] = (
+        hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR
+    )
 
     # current hack until proper diffable norm/stat modifier
-    hists["bkg_estimate_stat_up"] = hists["SR_btag_1"]["bkg"]["NOSYS_stat_up"] * w_CR
-    hists["bkg_estimate_stat_down"] = (
-        hists["SR_btag_1"]["bkg"]["NOSYS_stat_down"] * w_CR
+    hists["SR_btag_2"]["bkg_estimate"]["NOSYS_STAT_1UP"] = (
+        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] * w_CR
+    )
+    hists["SR_btag_2"]["bkg_estimate"]["NOSYS_STAT_1DOWN"] = (
+        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] * w_CR
     )
 
     # normilzation uncertainty background estimate
     w_CR_stat_up, w_CR_stat_down = symmetric_up_down_sf(w_CR, w_CR + stat_err_w_CR)
-    hists["bkg_estimate_NORM_up"] = hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR_stat_up
-    hists["bkg_estimate_NORM_down"] = (
-        hists["SR_btag_1"]["bkg"]["NOSYS"] * w_CR_stat_down
+    hists["SR_btag_2"]["bkg_estimate"]["NORM_1UP"] = (
+        hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * w_CR_stat_up
+    )
+    hists["SR_btag_2"]["bkg_estimate"]["NORM_1DOWN"] = (
+        hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * w_CR_stat_down
     )
 
-    # this is bad, as opt sculpts unc for kinematics in VR
-    # which is not an unbiased unc proxy for the SR, maybe only apply to valid,
-    # and testing? too little events?
-    # may be also illustrative to have here?
-    # fit afterwards in train loop without opt?
-    # hists["bkg_estimate_VR"] = hists["VR_btag_1"]["bkg_NOSYS"] * w_CR
-    # bkg_shapesys_up, bkg_shapesys_down = symmetric_up_down_sf(
-    #     nom=hists["bkg_estimate_in_VR"],
-    #     sys=hists["VR_btag_2"]["bkg_NOSYS"],
-    # )
-    # hists["bkg_shape_sys_up"] = hists["bkg_estimate_SR"] * bkg_shapesys_up
-    # hists["bkg_shape_sys_down"] = hists["bkg_estimate_SR"] * bkg_shapesys_down
-
-    # e.g. if generatorweights are available
+    # e.g. if generator weights are available
     # hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
 
     # make sure again after transforms!
@@ -104,141 +97,128 @@ def hist_transforms(hists):
     return hists
 
 
-def get_modifiers(hists, config, fit_region):
-    modifiers = {k: [] for k in config.samples}
+def get_modifiers(hists, config):
+    modifiers = {k: [] for k in hists[config.fit_region]}
     # autocollect 1UP 1DOWN
-    for sample in hists[fit_region]:
-        for sys in hists[fit_region][sample]:
+    for sample in hists[config.fit_region]:
+        for sys in hists[config.fit_region][sample]:
             if "1UP" in sys:
-                sys_ = sys.replace("1UP", "")
+                if "NOSYS_STAT" in sys:
+                    continue
+                sys = sys.replace("_1UP", "")
                 modifiers[sample] += (
                     {
                         "name": sys,
                         "type": "histosys",
                         "data": {
-                            "hi_data": hists[fit_region][sample][sys_ + "1UP"],
-                            "lo_data": hists[fit_region][sample][sys_ + "1DOWN"],
+                            "hi_data": hists[config.fit_region][sample][sys + "_1UP"],
+                            "lo_data": hists[config.fit_region][sample][sys + "_1DOWN"],
                         },
                     },
                 )
-
-    # custom
-    modifiers["bkg_estimate"] = [
-        {
-            "name": "bkg_estimate_norm",
-            "type": "histosys",
-            "data": {
-                "hi_data": hists["bkg_estimate_NORM_up"],
-                "lo_data": hists["bkg_estimate_NORM_down"],
-            },
-        }
-    ]
 
     # this an ad-hoc hack for stat uncertainty, and nothing more than
     # that until we have the diffable modifier. Blows up the number of fit
     # parameters unnecessarily for stat unc, which instead of having one
     # parameter per bin, histosys makes a parameter for each bin and each
     # modifier
-    for i in jnp.arange(len(config.bins) - 1):
-        for sample in config.samples:
-            nom = hists["SR_btag_2"][sample][config.nominal]
-            nom_up = jnp.copy(nom)
-            stat_up_i = nom_up.at[i].set(
-                hists["SR_btag_2"][sample][config.nominal + "_stat_up"][i]
-            )
-            nom_down = jnp.copy(nom)
-            stat_down_i = nom_down.at[i].set(
-                hists["SR_btag_2"][sample][config.nominal + "_stat_down"][i]
-            )
-            modifiers[sample] += (
-                {
-                    "name": f"stat_err_{sample}_{i+1}",
-                    "type": "histosys",
-                    "data": {
-                        "hi_data": jnp.copy(stat_up_i),
-                        "lo_data": jnp.copy(stat_down_i),
-                    },
-                },
-            )
-
-        nom_up = jnp.copy(hists["bkg_estimate"])
-        stat_up_i = nom_up.at[i].set(hists["bkg_estimate_stat_up"][i])
-        nom_down = jnp.copy(hists["bkg_estimate"])
-        stat_down_i = nom_down.at[i].set(hists["bkg_estimate_stat_down"][i])
-        modifiers["bkg_estimate"] += (
-            {
-                "name": f"stat_err_bkg_{i+1}",
-                "type": "histosys",
-                "data": {
-                    "hi_data": jnp.copy(stat_up_i),
-                    "lo_data": jnp.copy(stat_down_i),
-                },
-            },
-        )
+    # for sample in [*config.samples, "bkg_estimate"]:
+    #     for i in range(len(config.bins) - 1):
+    #         nom = hists[config.fit_region][sample][config.nominal]
+    #         nom_up = jnp.copy(nom)
+    #         stat_up_i = nom_up.at[i].set(
+    #             hists[config.fit_region][sample][config.nominal + "_STAT_1UP"][i]
+    #         )
+    #         nom_down = jnp.copy(nom)
+    #         stat_down_i = nom_down.at[i].set(
+    #             hists[config.fit_region][sample][config.nominal + "_STAT_1DOWN"][i]
+    #         )
+    #         modifiers[sample] += (
+    #             {
+    #                 "name": f"STAT_{i+1}",
+    #                 "type": "histosys",
+    #                 "data": {
+    #                     "hi_data": jnp.copy(stat_up_i),
+    #                     "lo_data": jnp.copy(stat_down_i),
+    #                 },
+    #             },
+    #         )
 
     return modifiers
 
 
-def get_auto_sample_spec(hists, config, fit_region, modifiers):
-    # sample setup for all systematics
-    no_auto_setup_samples = [config.signal_sample, "bkg"]
-    auto_setup_samples = list(set(config.samples) - set(no_auto_setup_samples))
+def sample_spec_from_modifiers(hists, config, modifiers, samples):
     # this list is empty here since these are the only two samples, but  auto
     # sets up the modifiers for all up down uncertainties
-    auto_samples = [
+    sample_spec = [
         {
             "name": sample,
-            "data": hists[fit_region][sample][config.nominal],
+            "data": hists[config.fit_region][sample][config.nominal],
             "modifiers": modifiers[sample],
         }
-        for sample in auto_setup_samples
+        for sample in samples
     ]
 
-    return auto_samples
+    return sample_spec
 
 
-def get_pyhf_model(
+def pyhf_model(
     hists,
     config,
 ):
     # attentive user action needed here
 
-    # configurable?
-    fit_region = "SR_btag_2"
-
     # standard uncerainty modifiers per sample
     # enforce 1UP, 1DOWN for autosetup here
-    modifiers = get_modifiers(hists, config, fit_region)
+    modifiers = get_modifiers(hists, config)
 
+    # exclude from autosetup, "bkg" is not
+    exclude = [config.signal_sample, "bkg"]
+    auto_samples = list(set(modifiers.keys()) - set(exclude))
+    auto_spec = sample_spec_from_modifiers(hists, config, modifiers, auto_samples)
+    # this is the workspace jsons
     spec = {
         "channels": [
             {
-                "name": fit_region,
+                "name": config.fit_region,
                 "samples": [
+                    # signal sample
                     {
                         "name": config.signal_sample,
-                        "data": hists[fit_region][config.signal_sample]["NOSYS"],
+                        "data": hists[config.fit_region][config.signal_sample][
+                            config.nominal
+                        ],
                         "modifiers": [
+                            # signal strength modifier (parameter of interest)
                             {
                                 "name": "mu",
                                 "type": "normfactor",
                                 "data": None,
-                            },  # our signal strength modifier (parameter of interest)
+                            },
+                            # My custom scale factor uncertainty
+                            {
+                                "name": "MY_SF_UNC",
+                                "type": "histosys",
+                                "data": {
+                                    "hi_data": hists["SR_btag_2"]["ggZH125_vvbb"][
+                                        "MY_SF_UNC_1UP"
+                                    ],
+                                    "lo_data": hists["SR_btag_2"]["ggZH125_vvbb"][
+                                        "MY_SF_UNC_1DOWN"
+                                    ],
+                                },
+                            },
                             *modifiers[config.signal_sample],
                         ],
                     },
-                    {
-                        "name": "bkg_estimate",
-                        "data": hists["bkg_estimate"],  # background
-                        "modifiers": modifiers["bkg_estimate"],
-                    },
-                    *get_auto_sample_spec(hists, config, fit_region, modifiers),
+                    *auto_spec,
                 ],
             }
         ],
     }
 
+    # # this is very handy for debugging, however breaks after first iteration
     if config.debug:
-        pprint.pprint(tomatos.utils.to_python_lists(spec))
+        pprint.pprint(spec)
 
     return pyhf.Model(spec, validate=False), hists
