@@ -35,7 +35,7 @@ def init(config):
     if config.preload_model:
         model = eqx.tree_deserialise_leaves(config.preload_model_path, model)
 
-    # split model into parameters to optimize and the nn function
-    nn_params, nn_arch = eqx.partition(model, eqx.is_array)
+    # split model into parameters to optimize and the nn architecture
+    nn_pars, nn_arch = eqx.partition(model, eqx.is_array)
 
-    return nn_params, nn_arch
+    return nn_pars, nn_arch

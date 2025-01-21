@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
 import optax
 from jaxopt import OptaxSolver
+import tomatos.pipeline
+from functools import partial
 
 
-def get(config, loss_fn, params):
+def setup(config, pars):
     # there are many schedules you can play with
     # https://optax.readthedocs.io/en/latest/api/optimizer_schedules.html#
 
@@ -39,21 +41,25 @@ def get(config, loss_fn, params):
     # https://optax.readthedocs.io/en/latest/api/combining_optimizers.html
 
     # apply updates only to vars
-    def mask(params: dict, vars: list):
-        return {key: key in vars for key in params}
+    def mask(pars: dict, vars: list):
+        return {key: key in vars for key in pars}
 
+    # limiting bandwidth and cut updates is important to avoid gradient
+    # explosion
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
         optax.masked(
-            optax.clip(max_delta=0.001), mask(params, ["bw"])
-        ),  # limit bandwidth updates
+            optax.clip(max_delta=0.001),
+            mask(pars, ["bw"]),
+        ),
         optax.masked(
             optax.clip(max_delta=0.0001),
-            mask(params, config.opt_cuts.keys()),
-        ),  # limit cut updates
+            mask(pars, config.opt_cuts.keys()),
+        ),
     )
 
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
-    return OptaxSolver(loss_fn, opt=optimizer, has_aux=True, jit=True)
+
+    return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=True)

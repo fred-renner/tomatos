@@ -1,11 +1,11 @@
 import logging
 from functools import partial
-
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyhf
-
+import gc
+import sys
 import tomatos.histograms
 import tomatos.training
 import tomatos.workspace
@@ -28,9 +28,71 @@ def setup_logger(config):
     pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
 
 
-def min_max_unscale(config, arr, idx):
-    unscaled_arr = (arr - config.scaler.min_[idx]) / config.scaler.scale_[idx]
+def setup_opt_pars(config, nn_pars):
+    opt_pars = {}
+    opt_pars["nn"] = nn_pars
+    opt_pars["bw"] = config.bw_init
+    if config.include_bins:
+        # exclude boundaries
+        opt_pars["bins"] = config.bins[1:-1]
+
+    for key in config.opt_cuts:
+        var_idx = config.vars.index(key)
+        config.opt_cuts[key]["idx"] = var_idx
+        init = config.opt_cuts[key]["init"]
+        init *= config.scaler_scale[var_idx]
+        init += config.scaler_min[var_idx]
+        opt_pars[key + "_cut"] = init
+
+    return opt_pars
+
+
+def inverse_min_max_scale(config, arr, var_idx):
+    unscaled_arr = (arr - config.scaler_min[var_idx]) / config.scaler_scale[var_idx]
     return unscaled_arr
+
+
+def flatten_dict(nested_dict):
+    # e.g.
+    # hists[sel][sample][sys] -->
+    # hists[sel_sample_sys]
+    flat_dict = {}
+
+    def recurse(d, parent_key=""):
+        for key, value in d.items():
+            new_key = f"{parent_key}_{key}" if parent_key else key
+            if isinstance(value, dict):
+                recurse(value, new_key)
+            elif isinstance(value, jnp.ndarray):
+                flat_dict[new_key] = value
+
+    recurse(nested_dict)
+    return flat_dict
+
+
+def filter_hists(config, hists):
+    hists = flatten_dict(hists)
+
+    filtered_hists = {}
+    for h_key, h in hists.items():
+        if any([filter_key in h_key for filter_key in config.plot_hists_filter]):
+            filtered_hists[h_key] = h
+
+    return filtered_hists
+
+
+# clear caches each update otherwise memory explodes
+# https://github.com/google/jax/issues/10828
+def clear_caches():
+    # process = psutil.Process()
+    # if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
+    for module_name, module in sys.modules.items():
+        if module_name.startswith("jax"):
+            for obj_name in dir(module):
+                obj = getattr(module, obj_name)
+                if hasattr(obj, "cache_clear"):
+                    obj.cache_clear()
+    gc.collect()
 
 
 def get_hist(config, nn, best_params, data):
@@ -121,7 +183,8 @@ def binary_cross_entropy(preds, labels):
     return -jnp.mean(labels * jnp.log(preds) + (1 - labels) * jnp.log(1 - preds))
 
 
-def bce(data, nn, pars):
+def bce(pars, data, config):
+    # broken at the moment
     # only need sig and bkg
     values = {k: data[k][:, 0, :] for k in ["NOSYS", "bkg"]}
 
@@ -187,3 +250,16 @@ def bce(data, nn, pars):
 #     bins = jnp.sort(bins)
 
 #     return bins
+
+
+def is_inverted(hist):
+    # Set inverted based on which half has the greater sum
+
+    # Calculate the midpoint of the histogram
+    midpoint = len(hist) // 2
+
+    # Split the histogram into lower and upper halves
+    lower_half = hist[:midpoint]
+    upper_half = hist[midpoint:]
+
+    return 1 if lower_half.sum() > upper_half.sum() else 0

@@ -20,9 +20,9 @@ def get_generator(config, split):
                 # scale to total events
                 batch_sf = config.splitting[split]["events"] / batch.shape[1]
                 # this is an array of sample_sys size
-                config.splitting[split]["scale_factor"] = jnp.array(
+                scale_factor = jnp.array(
                     config.splitting[split]["preprocess_scale_factor"] * batch_sf
                 )
 
-                yield batch
+                yield batch, scale_factor
             np.random.shuffle(batch_combi)

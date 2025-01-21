@@ -156,5 +156,6 @@ def run(config):
     # create train.h5, valid.h5, test.h5 with according event_sizes
     init_splits(config, idx_bounds)
     fill_splits(config, max_events, idx_bounds, scaler)
-    # save scaler
-    config.scaler = scaler
+    # collect scaling, avoid writing objects to config -->jax
+    config.scaler_scale = scaler.scale_
+    config.scaler_min = scaler.min_
