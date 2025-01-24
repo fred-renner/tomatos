@@ -58,10 +58,10 @@ def setup(config, pars):
             mask(pars, config.opt_cuts.keys()),
         ),
     )
-    # opt_config = tomatos.utils.make_opt_config(config)
-    # print(opt_config)
-    # loss = partial(tomatos.pipeline.loss_fn, config=opt_config)
+    
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
 
+    # dont jit the tomatos.pipeline.loss_fn, only literally jits this function
+    # and will fail in the current setup
     return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=False)

@@ -61,8 +61,8 @@ def events(data, config, base_weights):
         # "base_weights": base_weights,
         "SR_btag_1": base_weights * SR * btag_1,
         "SR_btag_2": base_weights * SR * btag_2,
-        "VR_btag_1": base_weights * VR * btag_1,
-        "VR_btag_2": base_weights * VR * btag_2,
+        # "VR_btag_1": base_weights * VR * btag_1,
+        # "VR_btag_2": base_weights * VR * btag_2,
         "CR_btag_1": base_weights * CR * btag_1,
         "CR_btag_2": base_weights * CR * btag_2,
         "SR_btag_2_my_sf_unc_up": base_weights
