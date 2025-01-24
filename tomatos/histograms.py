@@ -73,24 +73,66 @@ def hist(
     return counts
 
 
-# @partial(jax.jit, static_argnames=["config"])
-def get_nn_output(pars, data, config):
-    nn = eqx.combine(pars["nn"], config.nn_arch)
+@partial(jax.jit, static_argnames=["nn_arch", "nn_inputs_idx_end"])
+def get_nn_output(
+    pars,
+    data,
+    nn_arch,
+    nn_inputs_idx_end,
+):
+    nn = eqx.combine(pars["nn"], nn_arch)
 
     # this also illustrates nicely how jax.vmap works
     def predict_sample(i):
         # Forward pass for one sample
-        sample_data = data[i, :, : config.nn_inputs_idx_end]
+        sample_data = data[i, :, :nn_inputs_idx_end]
         # vmap all events in batch for this sample
         sample_nn_output = jax.vmap(nn)(sample_data)
         # flatten output of [[out_1], [out_2],...]
         return sample_nn_output.ravel()
 
-    nn_output = jax.vmap(predict_sample)(jnp.arange(len(config.sample_sys)))
+    nn_output = jax.vmap(predict_sample)(jnp.arange(data.shape[0]))
     return nn_output
 
 
-# @partial(jax.jit, static_argnames=["config", "validate_only"])
+# jitting seems to not help here
+@partial(jax.jit, static_argnames=["objective", "cls_var_idx", "w2"])
+def compute_hist_wrapper(
+    i,
+    objective,
+    data,
+    cls_var_idx,
+    nn_output,
+    weights,
+    scale,
+    bw,
+    bins,
+    w2=False,
+):
+    # lots of args due to the pure function paradigm
+    # these ifs only work because of static_argnames
+    if objective == "cls_var":
+        sample_data = data[i, :, cls_var_idx]
+    elif objective == "cls_nn":
+        sample_data = nn_output[i, :]
+
+    sample_weights = weights[i, :]
+
+    if w2:
+        sample_weights = jnp.power(sample_weights, 2)
+
+    # Scale works also as an estimate for w2
+    return (
+        hist(
+            data=sample_data,
+            weights=sample_weights,
+            bandwidth=bw,
+            bins=bins,
+        )
+        * scale[i]
+    )
+
+
 def fill_hists(
     pars,
     data,
@@ -105,10 +147,6 @@ def fill_hists(
     # make hists sharp if validation
     bw = 1e-20 if validate_only else pars["bw"]
 
-    # bandwidth and bins dont change in get_hists(), this is essentially the
-    # same as setting static_argnames of these everywhere here
-    hist_ = partial(hist, bandwidth=bw, bins=bins)
-
     # this will hold: hists[sel][sample][sys]
     hists = {
         sel: {sample: {} for sample in config.samples} for sel in config.regions_to_sel
@@ -116,34 +154,52 @@ def fill_hists(
 
     # get nn output
     if config.objective == "cls_nn":
-        nn_output = get_nn_output(pars, data, config)
-
-    def compute_hist(i, weights, w2=False):
-        # calc hist per sample i helper for vmap
-        if config.objective == "cls_var":
-            sample_data = data[i, :, config.cls_var_idx]
-        elif config.objective == "cls_nn":
-            sample_data = nn_output[i, :]
-        sample_weights = weights[i, :]
-        if w2:
-            sample_weights = jnp.power(sample_weights, 2)
-        # scale works also as estimate for w2
-        return hist_(sample_data, sample_weights) * scale[i]
-
-    for sel in config.regions_to_sel:
-        hists_vector = jax.vmap(lambda i: compute_hist(i, weights=sel_weights[sel]))(
-            jnp.arange(len(config.sample_sys))
+        nn_output = get_nn_output(
+            pars,
+            data,
+            config.nn_arch,
+            config.nn_inputs_idx_end,
         )
-        for sample_sys, h in zip(config.sample_sys, hists_vector):
-            sample, sys = config.sample_sys_dict[sample_sys]
-            hists[sel][sample][sys] = h
+    else:
+        nn_output = None
+
+    compute_hist = partial(
+        compute_hist_wrapper,
+        objective=config.objective,
+        data=data,
+        cls_var_idx=config.cls_var_idx,
+        nn_output=nn_output,
+        scale=scale,
+        bw=bw,
+        bins=bins,
+    )
+    # calc all hists for all samples in "SR_btag_2"
+    hists_vector = jax.vmap(
+        lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"])
+    )(jnp.arange(len(config.sample_sys)))
+
+    # vmap seems to have to even overhead here, lets see with many
+    # samples, otherwise just go sequential, also for readability:
+    # hists_vector = []
+    # for i in range(len(config.sample_sys)):
+    #     hist = compute_hist(i, weights=sel_weights["SR_btag_2"])
+    #     hists_vector.append(hist)
+
+    for sample_sys, h in zip(config.sample_sys, hists_vector):
+        sample, sys = config.sample_sys_dict[sample_sys]
+        hists["SR_btag_2"][sample][sys] = h
 
     def extra_hists(hists):
+
         # Compute w2 histograms only for the ones we need
         # going over len(config.samples) works because NOSYS are the first ones per
         # sample, see config
         hists_nominal_w2_vector = jax.vmap(
-            lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"], w2=True)
+            lambda i: compute_hist(
+                i,
+                weights=sel_weights["SR_btag_2"],
+                w2=True,
+            )
         )(jnp.arange(len(config.samples)))
 
         # workaround stat up and down hists
@@ -156,23 +212,34 @@ def fill_hists(
                 hists["SR_btag_2"][sample][config.nominal] - sigma
             )
 
+        signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
+        bkg_idx = config.sample_sys.index("bkg_NOSYS")
         # dedicated stat error calc for bkg estimate
+        hists["SR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
+            i=bkg_idx, weights=sel_weights["SR_btag_1"]
+        )
         h_w2_SR_btag_1 = compute_hist(
-            config.sample_sys.index("bkg_NOSYS"),
-            weights=sel_weights["SR_btag_1"],
+            i=bkg_idx, weights=sel_weights["SR_btag_1"], w2=True
         )
         sigma = jnp.sqrt(h_w2_SR_btag_1)
         hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] = h_w2_SR_btag_1 + sigma
         hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
 
+        hists["CR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
+            i=bkg_idx, weights=sel_weights["CR_btag_2"]
+        )
+        hists["CR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
+            i=bkg_idx, weights=sel_weights["CR_btag_1"]
+        )
+
         # some special signal weight unc, e.g. btag sf
-        signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
         hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1UP"] = compute_hist(
-            signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
+            i=signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
         )
         hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1DOWN"] = compute_hist(
-            signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
+            i=signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
         )
+
         return hists
 
     hists = extra_hists(hists)

@@ -131,6 +131,8 @@ class Setup:
         self.slope = 20_000
         self.bins = np.linspace(0, 1, args.bins + 1)
 
+        # this is nonsense, only one nominal fit region, the rest are special
+        # hists
         # histograms for each sample and region as you will define in
         # tomatos.select.events
         # its a bit odd to have this configurable here since the hist
@@ -138,12 +140,12 @@ class Setup:
         self.regions_to_sel = [
             "SR_btag_1",
             "SR_btag_2",
-            "VR_btag_1",
-            "VR_btag_2",
+            # "VR_btag_1",
+            # "VR_btag_2",
             "CR_btag_1",
             "CR_btag_2",
         ]
-        
+
         self.signal_sample = "ggZH125_vvbb"
         self.fit_region = "SR_btag_2"
         self.kde_sampling = 1000

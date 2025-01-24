@@ -80,42 +80,30 @@ def run(config):
                 metrics[k] = []
                 metrics[k + "_test"] = []
 
-        # since the optaxsolver holds the loss, however it is
-        # always step i-1 and evaluation is expensive --> evaluate valid and
-        # test before update
-        #
-        # i want to investigate this again
-        # results can be checked with:
-        # train_results = tomatos.pipeline.loss_fn(
-        #     opt_pars,
-        #     data=train_data,
-        #     config=config,
-        #     scale=train_sf,
-        # )
-        # print(state)
-        # print(train_results[0])
-
-        # # Evaluate losses
-        # valid_data, valid_sf = next(batch["valid"])
-        # valid_loss, valid_hists = tomatos.pipeline.loss_fn(
-        #     opt_pars,
-        #     data=valid_data,
-        #     config=config,
-        #     scale=valid_sf,
-        #     validate_only=True,
-        # )
-        # test_data, test_sf = next(batch["test"])
-        # test_loss, test_hists = tomatos.pipeline.loss_fn(
-        #     opt_pars,
-        #     data=test_data,
-        #     config=config,
-        #     scale=test_sf,
-        #     validate_only=True,
-        # )
+        # Evaluate losses
+        valid_data, valid_sf = next(batch["valid"])
+        valid_loss, valid_hists = tomatos.pipeline.loss_fn(
+            opt_pars,
+            data=valid_data,
+            config=config,
+            scale=valid_sf,
+            validate_only=True,
+        )
+        test_data, test_sf = next(batch["test"])
+        test_loss, test_hists = tomatos.pipeline.loss_fn(
+            opt_pars,
+            data=test_data,
+            config=config,
+            scale=test_sf,
+            validate_only=True,
+        )
 
         # this has to be here
-        # metrics[f"valid_loss"].append(valid_loss)
-        # metrics[f"test_loss"].append(test_loss)
+        # since the optaxsolver of step i-1, evaluation is expensive
+        metrics[f"valid_loss"].append(valid_loss)
+        metrics[f"test_loss"].append(test_loss)
+        metrics[f"train_loss"].append(state.value)
+
         opt_pars, state = optimizer.update(
             opt_pars,
             state,
@@ -124,24 +112,20 @@ def run(config):
             scale=train_sf,
         )
 
-        # hists = tomatos.utils.filter_hists(config, hists)
+        hists = tomatos.utils.filter_hists(config, hists)
 
-        # # write train loss here, as optaxsolver state.value holds loss[i-1] and
-        # # evaluation is expensive
-        # metrics[f"train_loss"].append(state.value)
-
-        # opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
-        # # save current bins
-        # if config.include_bins:
-        #     actual_bins = (
-        #         tomatos.utils.inverse_min_max_scale(
-        #             config, np.copy(opt_pars["bins"]), config.cls_var_idx
-        #         )
-        #         if config.objective == "cls_var"
-        #         else config.bins
-        #     )
-        #     logging.info((f"next bin edges: {actual_bins}"))
-        #     metrics["bins"].append(actual_bins)
+        opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
+        # save current bins
+        if config.include_bins:
+            actual_bins = (
+                tomatos.utils.inverse_min_max_scale(
+                    config, np.copy(opt_pars["bins"]), config.cls_var_idx
+                )
+                if config.objective == "cls_var"
+                else config.bins
+            )
+            logging.info((f"next bin edges: {actual_bins}"))
+            metrics["bins"].append(actual_bins)
 
         # for hist in hists.keys():
         #     metrics[hist].append(hists[hist])
@@ -228,7 +212,7 @@ def run(config):
         # if i == (config.num_steps - 1):
         #     infer_metrics["epoch_last"] = infer_metrics_i
 
-        # # LOGGING
+        # LOGGING
         # logging.info(
         #     f"{config.objective} train: {metrics[f'{config.objective}_train'][-1]:.4f}"
         # )
@@ -237,11 +221,11 @@ def run(config):
         # logging.info((f"bKDE hist sig: {hists['NOSYS']}"))
         # logging.info((f"bKDE hist bkg: {hists['bkg']}"))
 
-        # end = perf_counter()
-        # logging.info(f"update took {end-start:.4f}s")
-        # logging.info("\n")
+        end = perf_counter()
+        logging.info(f"update took {end-start:.4f}s")
+        logging.info("\n")
 
-        # # otherwise memore explodes in this jax version
+        # otherwise memore explodes in this jax version
         tomatos.utils.clear_caches()
 
     return best_opt_pars, opt_pars, metrics, infer_metrics
