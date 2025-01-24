@@ -10,19 +10,9 @@ import tomatos.constraints
 import pprint
 
 from functools import partial
-# from tomatos.config import get_config
-
-# config = get_config()
 
 
-# this fixes the compilation of static args at compile time
-# basically the more you hints you give what is fixed, more code can be
-# optimized for hardware accelaration, both for speed and memory, a
-# statically marked variable change triggers recompilation
-# https://jax.readthedocs.io/en/latest/jit-compilation.html#marking-arguments-as-static
-# @partial(jax.jit, static_argnames=["config", "validate_only"])
-# @jax.jit
-def make_hists(pars, data, config, scale, validate_only):
+def make_hists(pars, data, config, scale, validate_only=False):
     # event manipulations are done via weights to the base weights
 
     base_weights = data[:, :, config.weight_idx]
@@ -37,6 +27,7 @@ def make_hists(pars, data, config, scale, validate_only):
     )
     # calculate additional hists based on existing hists
     hists = tomatos.workspace.hist_transforms(hists)
+
     return hists
 
 

@@ -41,6 +41,7 @@ print(parser)
 
 config = get_config(args)
 
+
 def run():
 
     print(args)
@@ -53,21 +54,20 @@ def run():
     nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
     # split model into parameters to optimize and the nn architecture
     nn_pars, nn_arch = eqx.partition(nn_model, eqx.is_array)
+
+    md = {
+        "config": tomatos.utils.to_python_lists(config.__dict__),
+    }
+
+    # save config
+    with open(config.metadata_file_path, "w") as file:
+        json.dump(md, file)
+        logging.info(config.metadata_file_path)
+
     config.nn_arch = nn_arch
     config.init_pars = tomatos.utils.init_opt_pars(config, nn_pars)
 
-    best_params, last_params, metrics, infer_metrics = tomatos.training.run(
-        config,
-    )
-
-    bins, yields = tomatos.utils.get_hist(config, nn, best_params, data=test)
-
-    # save model to file
-    model = eqx.combine(best_params["nn"], nn_arch)
-    eqx.tree_serialise_leaves(config.model_path + "epoch_best.eqx", model)
-
-    model = eqx.combine(last_params["nn"], nn_arch)
-    eqx.tree_serialise_leaves(config.model_path + "epoch_last.eqx", model)
+    tomatos.training.run(config)
 
     # save metrics
     with open(config.metrics_file_path, "w") as file:
@@ -81,8 +81,6 @@ def run():
 
     md = {
         "config": tomatos.utils.to_python_lists(config.__dict__),
-        "bins": tomatos.utils.to_python_lists(bins),
-        "yields": tomatos.utils.to_python_lists(yields),
     }
 
     # save metadata
