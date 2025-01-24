@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pathlib
-
 import pyhf
 
 pyhf.set_backend("jax", default=True, precision="32b")
@@ -9,10 +8,9 @@ pyhf.set_backend("jax", default=True, precision="32b")
 
 class Setup:
     def __init__(self, args):
-
         self.run_bkg_init = False
 
-        self.include_bins = False
+        self.include_bins = True
 
         self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
         self.tree_name = "FilteredTree"
@@ -24,8 +22,6 @@ class Setup:
         ]
         # put non-systematic samples first
         self.nominal = "NOSYS"
-        self.signal_sample = "ggZH125_vvbb"
-
         self.input_paths.sort(key=lambda x: (self.nominal not in x))
 
         # expected structure: sample_path/SAMPLE/SYSTEMATIC.root
@@ -77,7 +73,7 @@ class Setup:
         # batching, hists,...
         # keeping them all together simplifies the program workflow a lot even
         # though it has to be setup with care. order matters, see below.
-        self.vars = (
+        self.vars = [
             "j1_pt",
             "j1_eta",
             "j1_phi",
@@ -95,7 +91,7 @@ class Setup:
             "bool_btag_2",
             "my_sf_unc_up",
             "my_sf_unc_down",
-        )
+        ]
         # the last nn variable, in that order defines the nn inputs and also
         # the last variable that will be min max scaled
         # sliced array access is a huge speed up when slicing
@@ -147,7 +143,8 @@ class Setup:
             "CR_btag_1",
             "CR_btag_2",
         ]
-        # fit channel
+        
+        self.signal_sample = "ggZH125_vvbb"
         self.fit_region = "SR_btag_2"
         self.kde_sampling = 1000
 
@@ -181,11 +178,6 @@ class Setup:
 
         # simple transfer factor or binned transferfactor
         self.binned_w_CR = False
-
-        # if initialize parameters of a trained model
-        self.preload_model = False
-        if self.preload_model:
-            self.preload_model_path = f"/lustre/fs22/group/atlas/freder/hh/run/tomatos/tomatos_cls_5_2000_lr_0p0001_bw_0p15_slope_100k_{args.k_fold}/neos_model.eqx"
 
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
@@ -221,3 +213,19 @@ class Setup:
         self.metrics_file_path = self.results_path + "metrics.json"
 
         self.best_epoch_results_path = self.results_path + "best_epoch_results.json"
+        self.scaler_scale = np.full(len(self.vars), 1.0)
+        self.scaler_min = np.full(len(self.vars), 0.0)
+
+
+_config_instance = None
+_args = None
+
+
+def get_config(args=None):
+    global _config_instance, _args
+    if args is not None:
+        _args = args  # Store args for later use
+
+    if _config_instance is None:
+        _config_instance = Setup(_args)
+    return _config_instance

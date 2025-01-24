@@ -10,20 +10,25 @@ import tomatos.constraints
 import pprint
 
 from functools import partial
+# from tomatos.config import get_config
+
+# config = get_config()
 
 
 # this fixes the compilation of static args at compile time
 # basically the more you hints you give what is fixed, more code can be
-# optimized for hardware accelaration, both for speed and memory, if a
-# statically marked variable changes results in recompilation
+# optimized for hardware accelaration, both for speed and memory, a
+# statically marked variable change triggers recompilation
 # https://jax.readthedocs.io/en/latest/jit-compilation.html#marking-arguments-as-static
-@partial(jax.jit, static_argnames=["config", "validate_only"])
+# @partial(jax.jit, static_argnames=["config", "validate_only"])
+# @jax.jit
 def make_hists(pars, data, config, scale, validate_only):
     # event manipulations are done via weights to the base weights
+
     base_weights = data[:, :, config.weight_idx]
     cut_weights = tomatos.select.cuts(pars, data, config, validate_only)
     # apply cuts
-    base_weights *= cut_weights
+    base_weights = jnp.multiply(base_weights, cut_weights)
     # get event selections
     sel_weights = tomatos.select.events(data, config, base_weights)
 
@@ -35,7 +40,6 @@ def make_hists(pars, data, config, scale, validate_only):
     return hists
 
 
-@partial(jax.jit, static_argnames=["config", "validate_only"])
 def loss_fn(
     pars,  # OptaxSolver expects opt_pars as first arg
     data,
