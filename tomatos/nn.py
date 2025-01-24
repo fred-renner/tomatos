@@ -1,11 +1,10 @@
 import equinox as eqx
 import jax
 
+
 # the choice for equinox is ease of use with jax, by a core jax developer
 # https://www.reddit.com/r/MachineLearning/comments/u34oh2/d_what_jax_nn_library_to_use/
 # https://docs.kidger.site/equinox/
-
-
 class NeuralNetwork(eqx.Module):
     layers: list
 
@@ -27,15 +26,3 @@ class NeuralNetwork(eqx.Module):
         for layer in self.layers:
             x = layer(x)
         return x
-
-
-def init(config):
-    model = NeuralNetwork(config.nn_inputs_idx_end)
-
-    if config.preload_model:
-        model = eqx.tree_deserialise_leaves(config.preload_model_path, model)
-
-    # split model into parameters to optimize and the nn architecture
-    nn_pars, nn_arch = eqx.partition(model, eqx.is_array)
-
-    return nn_pars, nn_arch

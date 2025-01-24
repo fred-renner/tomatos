@@ -105,7 +105,7 @@ def fill_splits(config, max_events, idx_bounds, scaler):
             "test": f_test,
         }
 
-        # upsampling, shuffling, scaling nn inputs, scaling event weights
+        # upsampling, shuffling, scaling nn inputs
         # having them all together here avoids multiple IO
         for i, sample_sys in enumerate(config.sample_sys):
             # quick and cheap for now
@@ -156,6 +156,6 @@ def run(config):
     # create train.h5, valid.h5, test.h5 with according event_sizes
     init_splits(config, idx_bounds)
     fill_splits(config, max_events, idx_bounds, scaler)
-    # collect scaling, avoid writing objects to config -->jax
+    # save scaling
     config.scaler_scale = scaler.scale_
     config.scaler_min = scaler.min_

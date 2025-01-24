@@ -10,7 +10,8 @@ import tomatos.histograms
 import tomatos.training
 import tomatos.workspace
 
-Array = jnp.ndarray
+from collections import namedtuple
+
 import pprint
 
 
@@ -28,7 +29,7 @@ def setup_logger(config):
     pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
 
 
-def setup_opt_pars(config, nn_pars):
+def init_opt_pars(config, nn_pars):
     opt_pars = {}
     opt_pars["nn"] = nn_pars
     opt_pars["bw"] = config.bw_init
@@ -50,6 +51,71 @@ def setup_opt_pars(config, nn_pars):
 def inverse_min_max_scale(config, arr, var_idx):
     unscaled_arr = (arr - config.scaler_min[var_idx]) / config.scaler_scale[var_idx]
     return unscaled_arr
+
+
+def to_jax_static(value, top_level=True):
+    """Convert values to JAX-compatible static types using namedtuples."""
+    if isinstance(value, list):
+        return tuple(to_jax_static(v, top_level=False) for v in value)
+    elif isinstance(value, dict):
+        NamedTuple = namedtuple("NamedTuple", sorted(value.keys()))
+        return NamedTuple(
+            **{k: to_jax_static(v, top_level=False) for k, v in value.items()}
+        )
+    elif isinstance(value, np.ndarray):
+        return tuple(value.tolist())
+    elif isinstance(value, str) and top_level:
+        StringNamedTuple = namedtuple("StringNamedTuple", [f"{value}"])
+        return value
+    elif isinstance(value, (int, str, float, bool)):
+        return value
+    return value
+
+
+def make_opt_config(config):
+    """
+    Extracts selected attributes from a Setup instance and converts them to
+    JAX-compatible static types.
+
+    Args:
+        config (Setup): An instance of the Setup class.
+
+    Returns:
+        namedtuple: A namedtuple with attributes converted to static
+        JAX-compatible types.
+    """
+    opt_attributes = [
+        "weight_idx",
+        "objective",
+        "slope",
+        "opt_cuts",
+        "vars",
+        "nn_inputs_idx_end",
+        "sample_sys",
+        "sample_sys_dict",
+        "regions_to_sel",
+        "include_bins",
+        "bins",
+        "cls_var_idx",
+        "samples",
+        "fit_region",
+        "nominal",
+        "signal_sample",
+        "debug",
+        "scaler_min",
+        "scaler_scale",
+        "nn_arch",
+    ]
+
+    static_data = {}
+
+    for attr in opt_attributes:
+        value = getattr(config, attr, None)
+        static_data[attr] = to_jax_static(value)
+
+    # Create a namedtuple with extracted static data
+    StaticConfig = namedtuple("opt_config", opt_attributes)
+    return StaticConfig(**static_data)
 
 
 def flatten_dict(nested_dict):

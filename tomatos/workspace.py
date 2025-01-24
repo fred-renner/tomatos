@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 import numpy as np
 import pyhf
+
 import pprint
-import tomatos.utils
 
 
 def get_generator_weight_envelope(hists):
@@ -59,7 +59,6 @@ def hist_transforms(hists):
 
     # to also protect for e.g. divisions in the following
     hists = zero_protect(hists)
-
     # aim to scale btag_1 to btag_2 in SR from ratio in CR
     w_CR, stat_err_w_CR = get_abcd_weight(
         A=jnp.sum(hists["CR_btag_2"]["bkg"]["NOSYS"]),
@@ -79,7 +78,7 @@ def hist_transforms(hists):
         hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] * w_CR
     )
 
-    # normilzation uncertainty background estimate
+    # norm uncertainty background estimate
     w_CR_stat_up, w_CR_stat_down = symmetric_up_down_sf(w_CR, w_CR + stat_err_w_CR)
     hists["SR_btag_2"]["bkg_estimate"]["NORM_1UP"] = (
         hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * w_CR_stat_up
@@ -122,27 +121,27 @@ def get_modifiers(hists, config):
     # parameters unnecessarily for stat unc, which instead of having one
     # parameter per bin, histosys makes a parameter for each bin and each
     # modifier
-    # for sample in [*config.samples, "bkg_estimate"]:
-    #     for i in range(len(config.bins) - 1):
-    #         nom = hists[config.fit_region][sample][config.nominal]
-    #         nom_up = jnp.copy(nom)
-    #         stat_up_i = nom_up.at[i].set(
-    #             hists[config.fit_region][sample][config.nominal + "_STAT_1UP"][i]
-    #         )
-    #         nom_down = jnp.copy(nom)
-    #         stat_down_i = nom_down.at[i].set(
-    #             hists[config.fit_region][sample][config.nominal + "_STAT_1DOWN"][i]
-    #         )
-    #         modifiers[sample] += (
-    #             {
-    #                 "name": f"STAT_{i+1}",
-    #                 "type": "histosys",
-    #                 "data": {
-    #                     "hi_data": jnp.copy(stat_up_i),
-    #                     "lo_data": jnp.copy(stat_down_i),
-    #                 },
-    #             },
-    #         )
+    for sample in [*config.samples, "bkg_estimate"]:
+        for i in range(len(config.bins) - 1):
+            nom = hists[config.fit_region][sample][config.nominal]
+            nom_up = jnp.copy(nom)
+            stat_up_i = nom_up.at[i].set(
+                hists[config.fit_region][sample][config.nominal + "_STAT_1UP"][i]
+            )
+            nom_down = jnp.copy(nom)
+            stat_down_i = nom_down.at[i].set(
+                hists[config.fit_region][sample][config.nominal + "_STAT_1DOWN"][i]
+            )
+            modifiers[sample] += (
+                {
+                    "name": f"STAT_{i+1}",
+                    "type": "histosys",
+                    "data": {
+                        "hi_data": jnp.copy(stat_up_i),
+                        "lo_data": jnp.copy(stat_down_i),
+                    },
+                },
+            )
 
     return modifiers
 
@@ -162,10 +161,7 @@ def sample_spec_from_modifiers(hists, config, modifiers, samples):
     return sample_spec
 
 
-def pyhf_model(
-    hists,
-    config,
-):
+def pyhf_model(hists, config):
     # attentive user action needed here
 
     # standard uncerainty modifiers per sample
@@ -217,8 +213,8 @@ def pyhf_model(
         ],
     }
 
-    # # this is very handy for debugging, however breaks after first iteration
-    if config.debug:
-        pprint.pprint(spec)
+    # # this is very handy for debugging when you turn off jit in the main.py
+    # if config.debug:
+    #     pprint.pprint(spec)
 
     return pyhf.Model(spec, validate=False), hists

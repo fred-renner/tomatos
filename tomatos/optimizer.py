@@ -3,7 +3,7 @@ import optax
 from jaxopt import OptaxSolver
 import tomatos.pipeline
 from functools import partial
-
+import tomatos.utils
 
 def setup(config, pars):
     # there are many schedules you can play with
@@ -24,12 +24,12 @@ def setup(config, pars):
         lr_schedule = optax.constant_schedule(config.lr)
 
     learning_rates = [lr_schedule(i) for i in range(config.num_steps)]
-    config.lr_schedule = learning_rates
+    # config.lr_schedule = learning_rates
 
     # nice to plot this right away
     plt.figure(figsize=(6, 5))
     plt.plot(learning_rates)
-    # plt.yscale("log")
+    plt.yscale("log")
     plt.xlabel("Epoch")
     plt.ylabel("Learning Rate")
     plt.tight_layout()
@@ -58,8 +58,10 @@ def setup(config, pars):
             mask(pars, config.opt_cuts.keys()),
         ),
     )
-
+    # opt_config = tomatos.utils.make_opt_config(config)
+    # print(opt_config)
+    # loss = partial(tomatos.pipeline.loss_fn, config=opt_config)
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
 
-    return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=True)
+    return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=False)

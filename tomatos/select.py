@@ -9,7 +9,8 @@ import relaxed
 import equinox as eqx
 
 
-@partial(jax.jit, static_argnames=["config", "validate_only"])
+# @partial(jax.jit, static_argnames=["config", "validate_only"])
+# @jax.jit
 def cuts(pars, data, config, validate_only):
     # remove approximation with large slope for validation --> sharp cuts
     slope = 1e20 if validate_only else config.slope
@@ -33,7 +34,8 @@ def cuts(pars, data, config, validate_only):
     return cut_weights
 
 
-@partial(jax.jit, static_argnames=["config"])
+# @partial(jax.jit, static_argnames=["config"])
+# @jax.jit
 def events(data, config, base_weights):
     # apply selections via weights
     # on the fly here increases the effective events that can be

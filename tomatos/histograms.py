@@ -73,7 +73,7 @@ def hist(
     return counts
 
 
-@partial(jax.jit, static_argnames=["config"])
+# @partial(jax.jit, static_argnames=["config"])
 def get_nn_output(pars, data, config):
     nn = eqx.combine(pars["nn"], config.nn_arch)
 
@@ -90,7 +90,7 @@ def get_nn_output(pars, data, config):
     return nn_output
 
 
-@partial(jax.jit, static_argnames=["config", "validate_only"])
+# @partial(jax.jit, static_argnames=["config", "validate_only"])
 def fill_hists(
     pars,
     data,
@@ -131,8 +131,6 @@ def fill_hists(
         return hist_(sample_data, sample_weights) * scale[i]
 
     for sel in config.regions_to_sel:
-        # let's see if we can afford this memory-wise, otherwise
-        # fall back to sequential processing of i
         hists_vector = jax.vmap(lambda i: compute_hist(i, weights=sel_weights[sel]))(
             jnp.arange(len(config.sample_sys))
         )
@@ -140,45 +138,43 @@ def fill_hists(
             sample, sys = config.sample_sys_dict[sample_sys]
             hists[sel][sample][sys] = h
 
-    hists = extra_hists(config, compute_hist, sel_weights, hists)
+    def extra_hists(hists):
+        # Compute w2 histograms only for the ones we need
+        # going over len(config.samples) works because NOSYS are the first ones per
+        # sample, see config
+        hists_nominal_w2_vector = jax.vmap(
+            lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"], w2=True)
+        )(jnp.arange(len(config.samples)))
 
-    return hists
+        # workaround stat up and down hists
+        for sample, h_w2 in zip(config.samples, hists_nominal_w2_vector):
+            sigma = jnp.sqrt(h_w2)
+            hists["SR_btag_2"][sample][config.nominal + "_STAT_1UP"] = (
+                hists["SR_btag_2"][sample][config.nominal] + sigma
+            )
+            hists["SR_btag_2"][sample][config.nominal + "_STAT_1DOWN"] = (
+                hists["SR_btag_2"][sample][config.nominal] - sigma
+            )
 
-
-def extra_hists(config, compute_hist, sel_weights, hists):
-    # Compute w2 histograms only for the ones we need
-    # going over len(config.samples) works because NOSYS are the first ones per
-    # sample, see config
-    hists_nominal_w2_vector = jax.vmap(
-        lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"], w2=True)
-    )(jnp.arange(len(config.samples)))
-
-    # workaround stat up and down hists
-    for sample, h_w2 in zip(config.samples, hists_nominal_w2_vector):
-        sigma = jnp.sqrt(h_w2)
-        hists["SR_btag_2"][sample][config.nominal + "_STAT_1UP"] = (
-            hists["SR_btag_2"][sample][config.nominal] + sigma
+        # dedicated stat error calc for bkg estimate
+        h_w2_SR_btag_1 = compute_hist(
+            config.sample_sys.index("bkg_NOSYS"),
+            weights=sel_weights["SR_btag_1"],
         )
-        hists["SR_btag_2"][sample][config.nominal + "_STAT_1DOWN"] = (
-            hists["SR_btag_2"][sample][config.nominal] - sigma
+        sigma = jnp.sqrt(h_w2_SR_btag_1)
+        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] = h_w2_SR_btag_1 + sigma
+        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
+
+        # some special signal weight unc, e.g. btag sf
+        signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
+        hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1UP"] = compute_hist(
+            signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
         )
+        hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1DOWN"] = compute_hist(
+            signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
+        )
+        return hists
 
-    # dedicated stat error calc for bkg estimate
-    h_w2_SR_btag_1 = compute_hist(
-        config.sample_sys.index("bkg_NOSYS"),
-        weights=sel_weights["SR_btag_1"],
-    )
-    sigma = jnp.sqrt(h_w2_SR_btag_1)
-    hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] = h_w2_SR_btag_1 + sigma
-    hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
-
-    # some special signal weight unc, e.g. btag sf
-    signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
-    hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1UP"] = compute_hist(
-        signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
-    )
-    hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1DOWN"] = compute_hist(
-        signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
-    )
+    hists = extra_hists(hists)
 
     return hists
