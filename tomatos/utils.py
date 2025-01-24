@@ -9,8 +9,11 @@ import sys
 import tomatos.histograms
 import tomatos.training
 import tomatos.workspace
-
+import psutil
 from collections import namedtuple
+
+import json
+import os
 
 import pprint
 
@@ -26,7 +29,6 @@ def setup_logger(config):
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
-    pprint.pprint(tomatos.utils.to_python_lists(config.__dict__))
 
 
 def init_opt_pars(config, nn_pars):
@@ -150,52 +152,15 @@ def filter_hists(config, hists):
 # clear caches each update otherwise memory explodes
 # https://github.com/google/jax/issues/10828
 def clear_caches():
-    # process = psutil.Process()
-    # if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
-    for module_name, module in sys.modules.items():
-        if module_name.startswith("jax"):
-            for obj_name in dir(module):
-                obj = getattr(module, obj_name)
-                if hasattr(obj, "cache_clear"):
-                    obj.cache_clear()
+    process = psutil.Process()
+    if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
+        for module_name, module in sys.modules.items():
+            if module_name.startswith("jax"):
+                for obj_name in dir(module):
+                    obj = getattr(module, obj_name)
+                    if hasattr(obj, "cache_clear"):
+                        obj.cache_clear()
     gc.collect()
-
-
-def get_hist(config, nn, best_params, data):
-    if config.include_bins:
-        bins = best_params["bins"]
-        logging.info(best_params["bins"])
-    else:
-        bins = config.bins
-        # to get correct yields would also need to pass whole data
-    yields = tomatos.histograms.get_hists(
-        nn_pars=best_params["nn"],
-        data={k: v + 1e-8 for k, v in zip(config.data_types, data)},
-        nn=nn,
-        config=config,
-        vbf_cut=best_params["vbf_cut"],
-        eta_cut=best_params["eta_cut"],
-        bandwidth=1e-6,
-        slope=1e6,
-        bins=best_params["bins"] if config.include_bins else config.bins,
-        scale=1,
-    )
-    model, yields = tomatos.workspace.model_from_hists(
-        do_m_hh=False,
-        hists=yields,
-        config=config,
-        do_systematics=config.do_systematics,
-        do_stat_error=config.do_stat_error,
-        validate_only=False,
-    )
-    logging.info(
-        (
-            "Asimov Significance: ",
-            tomatos.training.asimov_sig(s=yields["NOSYS"], b=yields["bkg"]),
-        )
-    )
-
-    return bins, yields
 
 
 def print_cls(config, yields):
@@ -250,7 +215,7 @@ def binary_cross_entropy(preds, labels):
 
 
 def bce(pars, data, config):
-    # broken at the moment
+    # broken
     # only need sig and bkg
     values = {k: data[k][:, 0, :] for k in ["NOSYS", "bkg"]}
 
@@ -265,57 +230,6 @@ def bce(pars, data, config):
     preds = jnp.concatenate((sig, bkg))
 
     return binary_cross_entropy(preds, labels)
-
-
-# def bin_correction(bins):
-#     bins = np.concatenate([[0], bins, [1]])
-#     # calculate neighbor distance
-#     diff = bins[1:] - bins[:-1]
-#     # sort check
-#     increasing = diff > 0
-#     # check if they are some distance apart, to not break in next update step
-#     # with config.lr = 1e-2 the bins are pulled around ~ 0.01
-#     neighbor_distance = np.abs(diff) > 0.05
-#     # since neighbor calc add the first one
-#     increasing = np.append(True, increasing)
-#     neighbor_distance = np.append(True, neighbor_distance)
-#     # pop the one left to the one if the last is too close to 1
-#     if neighbor_distance[-1] == False:
-#         neighbor_distance[-2] = False
-#     combined_condition = (bins < 1) & (bins > 0) & increasing & neighbor_distance
-#     corrected_bins = bins[combined_condition]
-
-#     # Ensure at least one bin remains after filtering.
-#     return corrected_bins if corrected_bins.size > 0 else np.array([0.5])
-
-
-# def bin_correction_(bins):
-#     # make sure bins don't overlap and are unique, need to avoid loops and
-#     # whatnot since this is a jitted function --> jnp.where
-
-#     # # take care of out of bound
-#     # bins = jnp.where(bins > 0, bins, 0.01)
-#     # bins = jnp.where(bins < 1, bins, 0.99)
-#     # find duplicates
-#     is_not_duplicate = bins[1:] != bins[:-1]
-#     # comparison does not include last value for condition
-#     is_not_duplicate = jnp.concatenate((is_not_duplicate, jnp.array([True])))
-#     # pad duplicates
-#     unique_increment = jnp.arange(bins.size) * 0.001
-#     # now return former values or pad if duplicate
-#     bins = jnp.where(is_not_duplicate, bins, bins + unique_increment)
-#     # monotonically increase
-
-#     # calculate neighbor distance
-#     diff = bins[1:] - bins[:-1]
-#     # sort check
-#     increasing = diff > 0
-#     # check if they are some distance apart, to not break in next update step
-#     # with config.lr = 1e-2 the bins are pulled around ~ 0.01
-#     neighbor_distance = np.abs(diff) > 0.05
-#     bins = jnp.sort(bins)
-
-#     return bins
 
 
 def is_inverted(hist):

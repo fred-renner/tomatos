@@ -194,10 +194,12 @@ class Setup:
             os.makedirs(self.preprocess_path)
         if not os.path.isdir(self.results_path):
             os.makedirs(self.results_path)
+        if not os.path.isdir(self.model_path):
             os.makedirs(self.model_path)
 
-        self.metadata_file_path = self.results_path + "metadata.json"
+        self.config_file_path = self.results_path + "config.json"
         self.metrics_file_path = self.results_path + "metrics.json"
+        self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
 
         self.best_epoch_results_path = self.results_path + "best_epoch_results.json"
         self.scaler_scale = np.full(len(self.vars), 1.0)

@@ -37,59 +37,34 @@ parser.add_argument("--aux", type=float, default=1)
 parser.add_argument("--aux-list", type=lambda s: [float(item) for item in s.split("_")])
 
 args = parser.parse_args()
-print(parser)
 
 config = get_config(args)
 
 
 def run():
 
-    print(args)
     tomatos.utils.setup_logger(config)
     if config.plot_inputs:
         tomatos.plotting.plot_inputs(config)
 
-    # need to write scaler to data.h5 then load into config
+    # need to write scaler to json then load into config
     tomatos.preprocess.run(config)
+
     nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
     # split model into parameters to optimize and the nn architecture
     nn_pars, nn_arch = eqx.partition(nn_model, eqx.is_array)
 
-    md = {
-        "config": tomatos.utils.to_python_lists(config.__dict__),
-    }
-
     # save config
-    with open(config.metadata_file_path, "w") as file:
-        json.dump(md, file)
-        logging.info(config.metadata_file_path)
+    with open(config.config_file_path, "w") as file:
+        json.dump(tomatos.utils.to_python_lists(config.__dict__), file)
 
     config.nn_arch = nn_arch
     config.init_pars = tomatos.utils.init_opt_pars(config, nn_pars)
 
     tomatos.training.run(config)
 
-    # save metrics
-    with open(config.metrics_file_path, "w") as file:
-        json.dump(tomatos.utils.to_python_lists(metrics), file)
-        logging.info(config.metrics_file_path)
-
-    # save infer_metrics
-    with open(config.model_path + "infer_metrics.json", "w") as file:
-        json.dump(tomatos.utils.to_python_lists(infer_metrics), file)
-        logging.info(config.model_path + "infer_metrics.json")
-
-    md = {
-        "config": tomatos.utils.to_python_lists(config.__dict__),
-    }
-
-    # save metadata
-    with open(config.metadata_file_path, "w") as file:
-        json.dump(md, file)
-        logging.info(config.metadata_file_path)
-
-    plot()
-    tomatos.giffer.run(config.model)
+    # plot()
+    # tomatos.giffer.run(config.model)
 
 
 def plot():
