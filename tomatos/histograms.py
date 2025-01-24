@@ -95,7 +95,7 @@ def get_nn_output(
     return nn_output
 
 
-# jitting seems to not help here
+# jitting however not of much help here
 @partial(jax.jit, static_argnames=["objective", "cls_var_idx", "w2"])
 def compute_hist_wrapper(
     i,
@@ -148,9 +148,7 @@ def fill_hists(
     bw = 1e-20 if validate_only else pars["bw"]
 
     # this will hold: hists[sel][sample][sys]
-    hists = {
-        sel: {sample: {} for sample in config.samples} for sel in config.regions_to_sel
-    }
+    hists = {sel: {sample: {} for sample in config.samples} for sel in sel_weights}
 
     # get nn output
     if config.objective == "cls_nn":
@@ -173,21 +171,21 @@ def fill_hists(
         bw=bw,
         bins=bins,
     )
-    # calc all hists for all samples in "SR_btag_2"
+    # calc all hists for all samples in fit region
     hists_vector = jax.vmap(
-        lambda i: compute_hist(i, weights=sel_weights["SR_btag_2"])
+        lambda i: compute_hist(i, weights=sel_weights[config.fit_region])
     )(jnp.arange(len(config.sample_sys)))
 
-    # vmap seems to have to even overhead here, lets see with many
+    # vmap seems to have even overhead here, lets see with many
     # samples, otherwise just go sequential, also for readability:
     # hists_vector = []
     # for i in range(len(config.sample_sys)):
-    #     hist = compute_hist(i, weights=sel_weights["SR_btag_2"])
+    #     hist = compute_hist(i, weights=sel_weights[config.fit_region])
     #     hists_vector.append(hist)
 
     for sample_sys, h in zip(config.sample_sys, hists_vector):
         sample, sys = config.sample_sys_dict[sample_sys]
-        hists["SR_btag_2"][sample][sys] = h
+        hists[config.fit_region][sample][sys] = h
 
     def extra_hists(hists):
 

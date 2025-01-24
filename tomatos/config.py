@@ -113,8 +113,8 @@ class Setup:
             "j1_pt": {
                 "keep": "above",
                 "idx": self.vars.index("j1_pt"),
-                "init": 20_000,
-            },  # (MeV)
+                "init": 20_000,  # (MeV)
+            },
             "j2_pt": {
                 "keep": "above",
                 "idx": self.vars.index("j2_pt"),
@@ -126,29 +126,14 @@ class Setup:
         # if args.loss == "bce":
         #     self.bw_init = 1e-100
         #     self.bw_min = 1e-100
-        self.bw_init = 0.25
-        self.bw_min = 1e-10
+        self.bw_init = 0.2
+        self.bw_min = 0.01
         self.slope = 20_000
         self.bins = np.linspace(0, 1, args.bins + 1)
 
-        # this is nonsense, only one nominal fit region, the rest are special
-        # hists
-        # histograms for each sample and region as you will define in
-        # tomatos.select.events
-        # its a bit odd to have this configurable here since the hist
-        # transforms might depend on them
-        self.regions_to_sel = [
-            "SR_btag_1",
-            "SR_btag_2",
-            # "VR_btag_1",
-            # "VR_btag_2",
-            "CR_btag_1",
-            "CR_btag_2",
-        ]
-
         self.signal_sample = "ggZH125_vvbb"
         self.fit_region = "SR_btag_2"
-        self.kde_sampling = 1000
+        self.kde_sampling = 100
 
         # hists that contain these strings will be plotted
         self.plot_hists_filter = [self.fit_region, "bkg_estimate"]
