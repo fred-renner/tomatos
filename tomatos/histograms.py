@@ -176,8 +176,7 @@ def fill_hists(
         lambda i: compute_hist(i, weights=sel_weights[config.fit_region])
     )(jnp.arange(len(config.sample_sys)))
 
-    # vmap seems to have even overhead here, lets see with many
-    # samples, otherwise just go sequential, also for readability:
+    # this is the sequential version
     # hists_vector = []
     # for i in range(len(config.sample_sys)):
     #     hist = compute_hist(i, weights=sel_weights[config.fit_region])

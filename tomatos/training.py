@@ -19,6 +19,7 @@ import equinox as eqx
 import tomatos.batcher
 import tomatos.constraints
 import copy
+import json
 
 
 def run(config):
@@ -55,6 +56,7 @@ def run(config):
     # https://optax.readthedocs.io/en/latest/_collections/examples/gradient_accumulation.html
 
     for i in range(config.num_steps):
+
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
 
@@ -70,9 +72,9 @@ def run(config):
             hists = state.aux
             hists = tomatos.utils.filter_hists(config, hists)
 
-            for k in hists.keys():
-                metrics[k] = []
-                metrics[k + "_test"] = []
+        for k in hists.keys():
+            metrics[k] = []
+            metrics[k + "_test"] = []
 
         # Evaluate losses
         valid_data, valid_sf = next(batch["valid"])
@@ -108,7 +110,7 @@ def run(config):
 
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
 
-        ####### extra calc and logging #######
+        ########## extra calc and logging #######
         # this is computationally chep
         infer_metrics_i = {}
         hists = state.aux
@@ -194,11 +196,13 @@ def run(config):
             infer_metrics[epoch_name] = infer_metrics_i
             model = eqx.combine(opt_pars["nn"], config.nn_arch)
             eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
-        # save last
+
         if i == (config.num_steps - 1):
-            infer_metrics["epoch_last"] = infer_metrics_i
-            model = eqx.combine(opt_pars["nn"], config.nn_arch)
-            eqx.tree_serialise_leaves(config.model_path + "epoch_last.eqx", model)
+            # save metrics
+            with open(config.metrics_file_path, "w") as file:
+                json.dump(tomatos.utils.to_python_lists(metrics), file)
+            with open(config.infer_metrics_file_path, "w") as file:
+                json.dump(tomatos.utils.to_python_lists(infer_metrics), file)
 
         # nominal hists
         for key, h in hists.items():
