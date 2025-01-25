@@ -2,8 +2,25 @@ import os
 import numpy as np
 import pathlib
 import pyhf
+import jax
+
+from alive_progress import config_handler
+
+config_handler.set_global(enrich_print=False)
 
 pyhf.set_backend("jax", default=True, precision="32b")
+
+jax.config.update("jax_enable_x64", True)
+# jax.config.update("jax_platforms", "cpu")
+jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
+
+# some debugging options
+# jax.numpy.set_printoptions(suppress=True)
+# jax.config.update("jax_disable_jit", True)
+
+# jax.config.update("jax_check_tracer_leaks", True)
+# useful to find the cause of nan's
+# jax.config.update("jax_debug_nans", True)
 
 
 class Setup:
@@ -54,15 +71,9 @@ class Setup:
         # slows down I/O, but saves disk memory
         self.compress_input_files = False
         # ratio need to add up to one
-        self.splitting = {
-            "train": {"ratio": 0.8},
-            "valid": {"ratio": 0.1},
-            "test": {"ratio": 0.1},
-        }
-
-        for k in self.splitting:
-            self.splitting[k]["events"] = -1
-            self.splitting[k]["preprocess_scale_factor"] = np.ones(len(self.sample_sys))
+        self.train_ratio = 0.8
+        self.valid_ratio = 0.1
+        self.test_ratio = 0.1
 
         self.plot_inputs = True
         self.debug = args.debug
@@ -182,8 +193,8 @@ class Setup:
         self.model = results_folder.split("/")[0]
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
-
         self.preprocess_path = self.results_path + "preprocessed/"
+
         self.preprocess_files = {
             "data": self.preprocess_path + "data.h5",
             "train": self.preprocess_path + "train.h5",
@@ -198,23 +209,8 @@ class Setup:
             os.makedirs(self.model_path)
 
         self.config_file_path = self.results_path + "config.json"
-        self.metrics_file_path = self.results_path + "metrics.json"
+        self.preprocess_md_file_path = self.results_path + "preprocess_md.json"
+        self.metrics_file_path = self.results_path + "metrics.h5"
         self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
 
         self.best_epoch_results_path = self.results_path + "best_epoch_results.json"
-        self.scaler_scale = np.full(len(self.vars), 1.0)
-        self.scaler_min = np.full(len(self.vars), 0.0)
-
-
-_config_instance = None
-_args = None
-
-
-def get_config(args=None):
-    global _config_instance, _args
-    if args is not None:
-        _args = args  # Store args for later use
-
-    if _config_instance is None:
-        _config_instance = Setup(_args)
-    return _config_instance

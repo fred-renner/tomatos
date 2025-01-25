@@ -12,6 +12,8 @@ import tomatos.workspace
 import psutil
 from collections import namedtuple
 
+import h5py
+import numpy as np
 import json
 import os
 
@@ -29,25 +31,6 @@ def setup_logger(config):
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.getLogger("pyhf").setLevel(logging.WARNING)
     logging.getLogger("relaxed").setLevel(logging.WARNING)
-
-
-def init_opt_pars(config, nn_pars):
-    opt_pars = {}
-    opt_pars["nn"] = nn_pars
-    opt_pars["bw"] = config.bw_init
-    if config.include_bins:
-        # exclude boundaries
-        opt_pars["bins"] = config.bins[1:-1]
-
-    for key in config.opt_cuts:
-        var_idx = config.vars.index(key)
-        config.opt_cuts[key]["idx"] = var_idx
-        init = config.opt_cuts[key]["init"]
-        init *= config.scaler_scale[var_idx]
-        init += config.scaler_min[var_idx]
-        opt_pars[key + "_cut"] = init
-
-    return opt_pars
 
 
 def inverse_min_max_scale(config, arr, var_idx):
@@ -144,14 +127,93 @@ def filter_hists(config, hists):
     filtered_hists = {}
     for h_key, h in hists.items():
         if any([filter_key in h_key for filter_key in config.plot_hists_filter]):
+            h_key = h_key.replace(f"{config.fit_region}_", "")
             filtered_hists[h_key] = h
 
     return filtered_hists
 
 
-# clear caches each update otherwise memory explodes
-# https://github.com/google/jax/issues/10828
+def init_metrics(
+    config,
+    state,
+):
+    # init metrics and metrics.h5 for the 1d and 2d cases
+    metrics = {}
+    metrics = {k: -1.0 for k in ["train_loss", "valid_loss", "test_loss", "bw"]}
+    metrics["bins"] = []
+
+    for var, cut_dict in config.opt_cuts.items():
+        var_cut = f"{var}_cut"
+        metrics[var_cut] = -1.0
+    hists = state.aux
+
+    for k in hists.keys():
+        metrics[k] = []
+        metrics[k + "_test"] = []  # necessary?
+        metrics["kde_" + k] = []
+    print(hists)
+    with h5py.File(config.metrics_file_path, "w") as h5f:
+        for key, value in metrics.items():
+            if isinstance(value, float):
+                h5f.create_dataset(
+                    key,
+                    (0,),
+                    maxshape=(None,),
+                    dtype="f4",
+                    compression="gzip",
+                )
+            elif isinstance(value, list):
+                h5f.create_dataset(
+                    key,
+                    (0, len(value)),
+                    maxshape=(None, len(value)),
+                    dtype="f4",
+                    compression="gzip",
+                )
+    return metrics
+
+
+import h5py
+
+
+def write_metrics(config, metrics, init):
+
+    metrics = to_python_lists(metrics)
+
+    if init:
+        # Initialize HDF5 file and create datasets
+        with h5py.File(config.metrics_file_path, "w") as h5f:
+            for key, value in metrics.items():
+                if isinstance(value, float):
+                    shape = (0,)
+                    maxshape = (None,)
+                elif isinstance(value, list):
+                    shape = (0, len(value))
+                    maxshape = (None, len(value))
+
+                h5f.create_dataset(
+                    key, shape=shape, maxshape=maxshape, dtype="f4", compression="gzip"
+                )
+
+                h5f[key].resize((1,) + h5f[key].shape[1:])
+                h5f[key][0] = value
+
+    else:
+        # Append new data to existing HDF5 file
+        with h5py.File(config.metrics_file_path, "r+") as h5f:
+            for key, value in metrics.items():
+                dataset = h5f[key]
+                if isinstance(value, float):
+                    dataset.resize((dataset.shape[0] + 1,))
+                    dataset[-1] = value
+                else:
+                    dataset.resize((dataset.shape[0] + 1, dataset.shape[1]))
+                    dataset[-1, :] = value
+
+
 def clear_caches():
+    # clear caches each update otherwise memory explodes
+    # https://github.com/google/jax/issues/10828
     process = psutil.Process()
     if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
         for module_name, module in sys.modules.items():

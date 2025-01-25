@@ -28,6 +28,7 @@ dependencies = [
     "imageio",
     "imageio-ffmpeg",
     "uproot",
+    "alive-progress",
 ]
 
 [tool.setuptools.packages]

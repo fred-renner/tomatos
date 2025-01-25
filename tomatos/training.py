@@ -13,41 +13,95 @@ import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
 import tomatos.pipeline
-import tomatos.optimizer
+import tomatos.solver
 import tomatos.initialize
 import equinox as eqx
 import tomatos.batcher
 import tomatos.constraints
 import copy
 import json
+import tomatos.nn
+from alive_progress import alive_it
 
 
-def run(config):
+def init_opt_pars(config, nn_pars):
 
+    # build opt_pars
+    opt_pars = {}
+    opt_pars["nn"] = nn_pars
+    opt_pars["bw"] = config.bw_init
+    if config.include_bins:
+        # exclude boundaries
+        opt_pars["bins"] = config.bins[1:-1]
+
+    for key in config.opt_cuts:
+        var_idx = config.vars.index(key)
+        config.opt_cuts[key]["idx"] = var_idx
+        init = config.opt_cuts[key]["init"]
+        init *= config.scaler_scale[var_idx]
+        init += config.scaler_min[var_idx]
+        opt_pars[key + "_cut"] = init
+
+    return opt_pars
+
+
+def init(config):
+    # init nn and opt pars
+    nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
+    # split model into parameters to optimize and the nn architecture
+    nn_pars, nn_arch = eqx.partition(nn_model, eqx.is_array)
+    config.nn_arch = nn_arch
+
+    # get preprocess md
+    with open(config.preprocess_md_file_path, "r") as json_file:
+        config.preprocess_md = json.load(json_file)
+    # for unscaling of vars
+    config.scaler_scale = np.array(config.preprocess_md["scaler_scale"])
+    config.scaler_min = np.array(config.preprocess_md["scaler_min"])
+
+    opt_pars = init_opt_pars(config, nn_pars)
+
+    # batcher
     batch = {}
     for split in ["train", "valid", "test"]:
         batch[split] = tomatos.batcher.get_generator(config, split)
 
-    opt_pars = config.init_pars
-    optimizer = tomatos.optimizer.setup(config, opt_pars)
+    # solver
 
-    best_opt_pars = opt_pars
+    solver = tomatos.solver.setup(config, opt_pars)
+    train_data, train_sf = next(batch["train"])
+    state = solver.init_state(
+        opt_pars,
+        data=train_data,
+        config=config,
+        scale=train_sf,
+    )
+
+    return solver, state, opt_pars, batch
+
+
+def evaluate_losses(opt_pars, config, batch):
+    """Evaluates validation and test losses."""
+    valid_data, valid_sf = next(batch["valid"])
+    valid_loss, valid_hists = tomatos.pipeline.loss_fn(
+        opt_pars, valid_data, config, valid_sf, validate_only=True
+    )
+
+    test_data, test_sf = next(batch["test"])
+    test_loss, test_hists = tomatos.pipeline.loss_fn(
+        opt_pars, test_data, config, test_sf, validate_only=True
+    )
+
+    return valid_loss, valid_hists, test_loss, test_hists
+
+
+def run(config):
+
+    solver, state, opt_pars, batch = init(config)
+
     best_test_loss = 999
-
-    # log
-    metrics = {
-        k: []
-        for k in [
-            "train_loss",
-            "valid_loss",
-            "test_loss",
-            "bins",
-            "bw",
-            *config.opt_cuts.keys(),
-        ]
-    }
-
     # this holds optimization params like cuts for epochs, for deployment
+    metrics = {}
     infer_metrics = {}
 
     # one step is one batch (not necessarily epoch)
@@ -55,75 +109,47 @@ def run(config):
     # future as it reduces noise in the gradient updates
     # https://optax.readthedocs.io/en/latest/_collections/examples/gradient_accumulation.html
 
-    for i in range(config.num_steps):
+    for i in alive_it(range(config.num_steps)):
 
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
 
         train_data, train_sf = next(batch["train"])
-        if i == 0:
-            state = optimizer.init_state(
-                opt_pars,
-                data=train_data,
-                config=config,
-                scale=train_sf,
-            )
-
-            hists = state.aux
-            hists = tomatos.utils.filter_hists(config, hists)
-
-        for k in hists.keys():
-            metrics[k] = []
-            metrics[k + "_test"] = []
 
         # Evaluate losses
-        valid_data, valid_sf = next(batch["valid"])
-        valid_loss, valid_hists = tomatos.pipeline.loss_fn(
-            opt_pars,
-            data=valid_data,
-            config=config,
-            scale=valid_sf,
-            validate_only=True,
-        )
-        test_data, test_sf = next(batch["test"])
-        test_loss, test_hists = tomatos.pipeline.loss_fn(
-            opt_pars,
-            data=test_data,
-            config=config,
-            scale=test_sf,
-            validate_only=True,
+        valid_loss, valid_hists, test_loss, test_hists = evaluate_losses(
+            opt_pars, config, batch
         )
 
         # this has to be here
         # since the optaxsolver of step i-1, evaluation is expensive
-        metrics["train_loss"].append(state.value)
-        metrics["valid_loss"].append(valid_loss)
-        metrics["test_loss"].append(test_loss)
+        metrics["train_loss"] = state.value
+        metrics["valid_loss"] = valid_loss
+        metrics["test_loss"] = test_loss
 
-        opt_pars, state = optimizer.update(
+        # gradient update
+        opt_pars, state = solver.update(
             opt_pars,
             state,
             data=train_data,
             config=config,
             scale=train_sf,
         )
-
+        # apply limitations
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
 
         ########## extra calc and logging #######
         # this is computationally chep
         infer_metrics_i = {}
         hists = state.aux
-        hists = tomatos.utils.filter_hists(config, hists)
-        test_hists = tomatos.utils.filter_hists(config, test_hists)
         bins = (
             np.array([0, *opt_pars["bins"], 1]) if config.include_bins else config.bins
         )
 
         # hists
         for hist in hists.keys():
-            metrics[hist].append(hists[hist])
-            metrics[hist + "_test"].append(test_hists[hist])
+            metrics[hist] = hists[hist]
+            metrics[hist + "_test"] = test_hists[hist]
 
         # kde
         kde = sample_kde_distribution(
@@ -132,12 +158,10 @@ def run(config):
             data=train_data,
             scale=train_sf,
             hists=hists,
+            bins=bins,
         )
         for key, h in kde.items():
-            kde_key = "kde_" + key
-            if kde_key not in metrics:
-                metrics[kde_key] = []
-            metrics[kde_key].append(h)
+            metrics["kde_" + key] = h
 
         if config.include_bins:
             actual_bins = (
@@ -147,8 +171,8 @@ def run(config):
                 if config.objective == "cls_var"
                 else bins
             )
-            logging.info((f"next bin edges: {actual_bins}"))
-            metrics["bins"].append(actual_bins)
+            logging.info((f"bins: {actual_bins}"))
+            metrics["bins"] = actual_bins
             infer_metrics_i["bins"] = actual_bins
 
         if "cls" in config.objective:
@@ -161,7 +185,7 @@ def run(config):
                 logging.info(f"{var_cut}: {opt_cut}")
                 if var_cut not in metrics:
                     metrics[var_cut] = []
-                metrics[var_cut].append(opt_cut)
+                metrics[var_cut] = opt_cut
                 infer_metrics_i[var_cut] = opt_cut
 
             # sharp evaluation train data hists
@@ -172,14 +196,9 @@ def run(config):
                 train_sf,
                 validate_only=True,
             )
-            sharp_hists = tomatos.utils.filter_hists(config, sharp_hists)
 
             for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
-                if (
-                    config.nominal in key
-                    and config.fit_region in key
-                    and not "STAT" in key
-                ):
+                if config.nominal in key and not "STAT" in key:
                     # hist approx ratio
                     logging.info(f"Sharp hist ratio: {h/sharp_h}")
 
@@ -197,25 +216,20 @@ def run(config):
             model = eqx.combine(opt_pars["nn"], config.nn_arch)
             eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
 
-        if i == (config.num_steps - 1):
-            # save metrics
-            with open(config.metrics_file_path, "w") as file:
-                json.dump(tomatos.utils.to_python_lists(metrics), file)
-            with open(config.infer_metrics_file_path, "w") as file:
-                json.dump(tomatos.utils.to_python_lists(infer_metrics), file)
+        if i > 0:
+            tomatos.utils.write_metrics(config, metrics, init=True if i == 1 else False)
 
         # nominal hists
         for key, h in hists.items():
-            if config.nominal in key and config.fit_region in key and not "STAT" in key:
-                logging.info(f"{key.ljust(30)}: {h}")
+            if config.nominal in key and not "STAT" in key:
+                logging.info(f"{key.ljust(25)}: {h}")
         logging.info(f"bw: {opt_pars['bw']}")
 
         end = perf_counter()
-        logging.info(f"update took {end-start:.4f}s\n")
-
-        # otherwise memore explodes in this jax version
-        # without it, the test is 3 times faster, however this is very
-        # memory expensive
+        logging.info(f"update took {end-start:.4f}s")
+        logging.info("\n")
+        # if you want to run locally we need to clear the compilation caches
+        # otherwise memory explodes, need to see how it scales on gpu
         tomatos.utils.clear_caches()
 
     return metrics, infer_metrics
@@ -253,24 +267,28 @@ def sample_kde_distribution(
     data,
     scale,
     hists,
+    bins,
 ):
     # get kde distribution by sampling with a many bin histogram
     # enough to get kde only from the nominal ones
     sample_indices = np.arange(len(config.samples))
     nominal_data = data[sample_indices, :, :]
-    kde_bins = np.linspace(0, 1, config.kde_sampling)
     kde_config = copy.deepcopy(config)
+    kde_bins = np.linspace(0, 1, config.kde_sampling)
     kde_config.bins = kde_bins
+    config.include_bins = False
+
     # to also collect the background estimate
     kde_dist = tomatos.pipeline.make_hists(
         opt_pars,
         nominal_data,
         kde_config,
         scale,
+        filter_hists=True,
     )
-    kde_dist = tomatos.utils.filter_hists(config, kde_dist)
+    print(kde_dist["bkg_estimate_NOSYS"])
     kde_dist = {
-        h_key: rescale_kde(config, hists[h_key], kde_dist[h_key], opt_pars["bins"])
+        h_key: rescale_kde(config, hists[h_key], kde_dist[h_key], bins)
         for h_key in kde_dist
     }
 
