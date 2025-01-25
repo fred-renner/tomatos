@@ -18,10 +18,11 @@ def get_generator(config, split):
                 # shape is (n_sample_sys, n_events, n_vars)
                 batch = jnp.concatenate([ds[b] for b in batch], axis=1)
                 # scale to total events
-                batch_sf = config.splitting[split]["events"] / batch.shape[1]
+                batch_events = batch.shape[1]
+                batch_sf = config.preprocess_md[split]["events"] / batch_events
                 # this is an array of sample_sys size
                 scale_factor = jnp.array(
-                    config.splitting[split]["preprocess_scale_factor"] * batch_sf
+                    np.array(config.preprocess_md[split]["scale_factor"]) * batch_sf
                 )
 
                 yield batch, scale_factor

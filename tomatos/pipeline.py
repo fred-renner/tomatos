@@ -12,7 +12,7 @@ import pprint
 from functools import partial
 
 
-def make_hists(pars, data, config, scale, validate_only=False):
+def make_hists(pars, data, config, scale, validate_only=False, filter_hists=False):
     # event manipulations are done via weights to the base weights
 
     base_weights = data[:, :, config.weight_idx]
@@ -27,7 +27,8 @@ def make_hists(pars, data, config, scale, validate_only=False):
     )
     # calculate additional hists based on existing hists
     hists = tomatos.workspace.hist_transforms(hists)
-
+    # flatten and reduces to the configured filter
+    hists = tomatos.utils.filter_hists(config, hists) if filter_hists else hists
     return hists
 
 
@@ -37,19 +38,21 @@ def loss_fn(
     config,
     scale,
     validate_only=False,
+    filter_hists=True,
 ):
 
     hists = make_hists(pars, data, config, scale, validate_only)
     model, hists = tomatos.workspace.pyhf_model(hists, config)
 
-    # do we want to keep this
+    # do we want to keep this?
     if "bce" in config.objective:
-        return tomatos.utils.bce(pars, data, config), hists
-
+        loss_value = tomatos.utils.bce(pars, data, config)
     if "cls" in config.objective:
         loss_value = neos.loss_from_model(model, loss="cls")
 
         if not validate_only:
             loss_value = tomatos.constraints.penalize_loss(loss_value, hists)
 
-        return loss_value, hists
+    # flatten and reduces to the configured filter
+    hists = tomatos.utils.filter_hists(config, hists) if filter_hists else hists
+    return loss_value, hists

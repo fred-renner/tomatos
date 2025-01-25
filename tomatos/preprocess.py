@@ -3,6 +3,9 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import logging
 import uproot
+import json
+import tomatos.utils
+from alive_progress import alive_it
 
 
 def init_2d_data(config):
@@ -44,7 +47,7 @@ def fill(
 
 
 def fill_2d_data(config, scaler):
-    for sample_sys, path in config.sample_files_dict.items():
+    for sample_sys, path in alive_it(config.sample_files_dict.items()):
         with uproot.open(path) as file:
             tree = file[config.tree_name]
             for data in tree.iterate(step_size=config.chunk_size, library="np"):
@@ -53,6 +56,32 @@ def fill_2d_data(config, scaler):
                 # ...transfer generate test files code
                 #######
                 fill(config, sample_sys, data, scaler)
+
+
+def init_preprocess_md(config, max_events):
+    preprocess_md = {
+        k: {
+            "ratio": getattr(config, f"{k}_ratio"),
+            "events": -1,
+            "scale_factor": np.ones(len(config.sample_sys)),
+        }
+        for k in ["train", "valid", "test"]
+    }
+    # Calculate split indices
+    train_end = round(max_events * preprocess_md["train"]["ratio"])
+    valid_end = train_end + round(max_events * preprocess_md["valid"]["ratio"])
+
+    preprocess_md["train"]["idx_bounds"] = (0, train_end)
+    preprocess_md["valid"]["idx_bounds"] = (train_end, valid_end)
+    preprocess_md["test"]["idx_bounds"] = (valid_end, max_events)
+
+    # Assign event counts and log results
+    for split in ["train", "valid", "test"]:
+        start_idx, end_idx = preprocess_md[split]["idx_bounds"]
+        n_events = end_idx - start_idx
+        preprocess_md[split]["events"] = n_events
+
+    return preprocess_md
 
 
 def get_max_events(config):
@@ -65,27 +94,29 @@ def get_max_events(config):
     return max_events
 
 
-def init_splits(config, idx_bounds):
+def init_splits(config, preprocess_md):
     for split in ["train", "valid", "test"]:
-        n_events = idx_bounds[split][1] - idx_bounds[split][0]
-        logging.info(f"{split} events: {n_events}")
-        config.splitting[split]["events"] = n_events
         with h5py.File(config.preprocess_files[split], "w") as f_split:
             f_split.create_dataset(
                 name="stack",
-                shape=(len(config.sample_sys), n_events, len(config.vars)),
+                shape=(
+                    len(config.sample_sys),
+                    preprocess_md[split]["events"],
+                    len(config.vars),
+                ),
                 compression="gzip" if config.compress_input_files else None,
                 dtype="f4",
                 chunks=(
                     len(config.sample_sys),
-                    np.minimum(config.chunk_size, n_events / 2),  # / 2 see batcher
+                    np.minimum(
+                        config.chunk_size, preprocess_md[split]["events"] / 2
+                    ),  # / 2 see batcher
                     len(config.vars),
                 ),
             )
 
 
-def fill_splits(config, max_events, idx_bounds, scaler):
-
+def fill_splits(config, max_events, preprocess_md, scaler):
     # upsampling is straightforward and intuitive to avoid a class imbalance
     # makes particular sense for jax as it likes predefined array sizes,
     # also unifies workflow a lot
@@ -107,8 +138,8 @@ def fill_splits(config, max_events, idx_bounds, scaler):
 
         # upsampling, shuffling, scaling nn inputs
         # having them all together here avoids multiple IO
-        for i, sample_sys in enumerate(config.sample_sys):
-            # quick and cheap for now
+        for i, sample_sys in alive_it(enumerate(config.sample_sys)):
+            # quick and cheap for now and avoids random idx disk IO
             # ds=(max_events=1e7, config.vars=20) ~ 1.6 GB for float32
             # in particular avoids heavy random index read/write
             ds = file["data"][sample_sys][:]
@@ -126,11 +157,12 @@ def fill_splits(config, max_events, idx_bounds, scaler):
             )
             # write
             for split in ["train", "valid", "test"]:
-                out = ds[idx_bounds[split][0] : idx_bounds[split][1]]
-                split_sf = 1 / config.splitting[split]["ratio"]
+                start_idx, end_idx = preprocess_md[split]["idx_bounds"]
+                out = ds[start_idx:end_idx]
+                split_sf = 1 / preprocess_md[split]["ratio"]
                 # account for resampling, splitting, and k-folding, such that
                 # except for stats the hist yields in each split are the same
-                config.splitting[split]["preprocess_scale_factor"][i] *= (
+                preprocess_md[split]["scale_factor"][i] *= (
                     upsample_sf * split_sf * config.k_fold_sf
                 )
                 file[split]["stack"][i, :] = out
@@ -142,20 +174,21 @@ def run(config):
     # scaler for nn inputs
     scaler = MinMaxScaler()
     # fill data.h5 from trees
+    logging.info("Prepare Data Array")
     fill_2d_data(config, scaler)
     # scale to sample with most events
     max_events = get_max_events(config)
-    # train valid test indices, can go in order since they are shuffled
-    train_end = round(max_events * config.splitting["train"]["ratio"])
-    valid_end = train_end + round(max_events * config.splitting["valid"]["ratio"])
-    idx_bounds = {
-        "train": [0, train_end],
-        "valid": [train_end, valid_end],
-        "test": [valid_end, max_events],
-    }
+    preprocess_md = init_preprocess_md(config, max_events)
     # create train.h5, valid.h5, test.h5 with according event_sizes
-    init_splits(config, idx_bounds)
-    fill_splits(config, max_events, idx_bounds, scaler)
+    init_splits(config, preprocess_md)
+    logging.info("Fill Splits")
+    fill_splits(config, max_events, preprocess_md, scaler)
+
+    for split in ["train", "valid", "test"]:
+        logging.info(f"{split} events: {preprocess_md[split]['events']}")
+
     # save scaling
-    config.scaler_scale = scaler.scale_
-    config.scaler_min = scaler.min_
+    preprocess_md["scaler_min"] = scaler.min_
+    preprocess_md["scaler_scale"] = scaler.scale_
+    with open(config.preprocess_md_file_path, "w") as json_file:
+        json.dump(tomatos.utils.to_python_lists(preprocess_md), json_file, indent=4)

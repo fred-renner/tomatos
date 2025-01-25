@@ -5,6 +5,7 @@ import tomatos.pipeline
 from functools import partial
 import tomatos.utils
 
+
 def setup(config, pars):
     # there are many schedules you can play with
     # https://optax.readthedocs.io/en/latest/api/optimizer_schedules.html#
@@ -30,7 +31,7 @@ def setup(config, pars):
     plt.figure(figsize=(6, 5))
     plt.plot(learning_rates)
     plt.yscale("log")
-    plt.xlabel("Epoch")
+    plt.xlabel("Batch")
     plt.ylabel("Learning Rate")
     plt.tight_layout()
     plt.savefig(config.results_path + "lr_schedule.pdf")
@@ -40,12 +41,12 @@ def setup(config, pars):
     # optax.chain
     # https://optax.readthedocs.io/en/latest/api/combining_optimizers.html
 
-    # apply updates only to vars
+    # mask gradient updates only for passed vars
     def mask(pars: dict, vars: list):
         return {key: key in vars for key in pars}
 
     # limiting bandwidth and cut updates is important to avoid gradient
-    # explosion
+    # explosion for these
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
@@ -58,10 +59,9 @@ def setup(config, pars):
             mask(pars, config.opt_cuts.keys()),
         ),
     )
-    
+
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
-
     # dont jit the tomatos.pipeline.loss_fn, only literally jits this function
     # and will fail in the current setup
     return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=False)

@@ -9,21 +9,10 @@ import tomatos.plotting
 import tomatos.preprocess
 import tomatos.utils
 import tomatos.giffer
-import tomatos.nn
 import json
 import numpy as np
-from tomatos.config import get_config
+import tomatos.config
 
-jax.config.update("jax_enable_x64", True)
-# jax.config.update("jax_platforms", "cpu")
-# some debugging options
-jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
-# jax.numpy.set_printoptions(suppress=True)
-# jax.config.update("jax_disable_jit", True)
-
-# jax.config.update("jax_check_tracer_leaks", True)
-# useful to find the cause of nan's
-# jax.config.update("jax_debug_nans", True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=5)
@@ -38,29 +27,20 @@ parser.add_argument("--aux-list", type=lambda s: [float(item) for item in s.spli
 
 args = parser.parse_args()
 
-config = get_config(args)
-
 
 def run():
-
+    config = tomatos.config.Setup(args)
     tomatos.utils.setup_logger(config)
-    if config.plot_inputs:
-        tomatos.plotting.plot_inputs(config)
 
-    # need to write scaler to json then load into config
-    tomatos.preprocess.run(config)
+    # if config.plot_inputs:
+    #     logging.info("Plotting Inputs...")
+    #     tomatos.plotting.plot_inputs(config)
 
-    nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
-    # split model into parameters to optimize and the nn architecture
-    nn_pars, nn_arch = eqx.partition(nn_model, eqx.is_array)
+    # logging.info("Preprocessing...")
+    # # need to write scaler to json then load into config
+    # tomatos.preprocess.run(config)
 
-    # save config
-    with open(config.config_file_path, "w") as file:
-        json.dump(tomatos.utils.to_python_lists(config.__dict__), file)
-
-    config.nn_arch = nn_arch
-    config.init_pars = tomatos.utils.init_opt_pars(config, nn_pars)
-
+    logging.info("Training...")
     tomatos.training.run(config)
 
     # plot()

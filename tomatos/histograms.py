@@ -144,6 +144,7 @@ def fill_hists(
     # any magic in here will at the end just call the upper hist() function
 
     bins = jnp.array([0, *pars["bins"], 1]) if config.include_bins else config.bins
+    print(bins)
     # make hists sharp if validation
     bw = 1e-20 if validate_only else pars["bw"]
 
