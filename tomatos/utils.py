@@ -151,7 +151,6 @@ def init_metrics(
         metrics[k] = []
         metrics[k + "_test"] = []  # necessary?
         metrics["kde_" + k] = []
-    print(hists)
     with h5py.File(config.metrics_file_path, "w") as h5f:
         for key, value in metrics.items():
             if isinstance(value, float):
