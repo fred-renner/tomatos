@@ -45,7 +45,7 @@ def init_opt_pars(config, nn_pars):
     return opt_pars
 
 
-def init(config):
+def train_init(config):
     # init nn and opt pars
     nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
     # split model into parameters to optimize and the nn architecture
@@ -97,12 +97,11 @@ def evaluate_losses(opt_pars, config, batch):
 
 def run(config):
 
-    solver, state, opt_pars, batch = init(config)
+    solver, state, opt_pars, batch = train_init(config)
 
     best_test_loss = 999
-    # this holds optimization params like cuts for epochs, for deployment
     metrics = {}
-    infer_metrics = {}
+    # this holds optimization params like cuts for epochs, for deployment
 
     # one step is one batch (not necessarily epoch)
     # gradient_accumulation interesting for more stable generalization in the
@@ -111,6 +110,7 @@ def run(config):
 
     for i in alive_it(range(config.num_steps)):
 
+        infer_metrics = {}
         start = perf_counter()
         logging.info(f"step {i}: loss={config.objective}")
 
@@ -142,9 +142,19 @@ def run(config):
         # this is computationally chep
         infer_metrics_i = {}
         hists = state.aux
+
         bins = (
             np.array([0, *opt_pars["bins"], 1]) if config.include_bins else config.bins
         )
+        actual_bins = (
+            tomatos.utils.inverse_min_max_scale(
+                config, np.copy(bins), config.cls_var_idx
+            )
+            if config.objective == "cls_var"
+            else bins
+        )
+        metrics["bins"] = actual_bins
+        infer_metrics_i["bins"] = actual_bins
 
         # hists
         for hist in hists.keys():
@@ -162,18 +172,6 @@ def run(config):
         )
         for key, h in kde.items():
             metrics["kde_" + key] = h
-
-        if config.include_bins:
-            actual_bins = (
-                tomatos.utils.inverse_min_max_scale(
-                    config, np.copy(bins), config.cls_var_idx
-                )
-                if config.objective == "cls_var"
-                else bins
-            )
-            logging.info((f"bins: {actual_bins}"))
-            metrics["bins"] = actual_bins
-            infer_metrics_i["bins"] = actual_bins
 
         if "cls" in config.objective:
             # cuts
@@ -216,14 +214,15 @@ def run(config):
             model = eqx.combine(opt_pars["nn"], config.nn_arch)
             eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
 
-        if i > 0:
-            tomatos.utils.write_metrics(config, metrics, init=True if i == 1 else False)
+        tomatos.utils.write_metrics(config, metrics, init=(i == 0))
 
         # nominal hists
         for key, h in hists.items():
             if config.nominal in key and not "STAT" in key:
                 logging.info(f"{key.ljust(25)}: {h}")
         logging.info(f"bw: {opt_pars['bw']}")
+        if config.include_bins:
+            logging.info((f"bins: {actual_bins}"))
 
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
@@ -276,7 +275,7 @@ def sample_kde_distribution(
     kde_config = copy.deepcopy(config)
     kde_bins = np.linspace(0, 1, config.kde_sampling)
     kde_config.bins = kde_bins
-    config.include_bins = False
+    kde_config.include_bins = False
 
     # to also collect the background estimate
     kde_dist = tomatos.pipeline.make_hists(
@@ -286,7 +285,7 @@ def sample_kde_distribution(
         scale,
         filter_hists=True,
     )
-    print(kde_dist["bkg_estimate_NOSYS"])
+
     kde_dist = {
         h_key: rescale_kde(config, hists[h_key], kde_dist[h_key], bins)
         for h_key in kde_dist

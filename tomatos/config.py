@@ -11,13 +11,13 @@ config_handler.set_global(enrich_print=False)
 pyhf.set_backend("jax", default=True, precision="32b")
 
 jax.config.update("jax_enable_x64", True)
-# jax.config.update("jax_platforms", "cpu")
+# avoid some printing 
+jax.config.update("jax_platforms", "cpu")
 jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 
 # some debugging options
 # jax.numpy.set_printoptions(suppress=True)
 # jax.config.update("jax_disable_jit", True)
-
 # jax.config.update("jax_check_tracer_leaks", True)
 # useful to find the cause of nan's
 # jax.config.update("jax_debug_nans", True)
@@ -144,7 +144,7 @@ class Setup:
 
         self.signal_sample = "ggZH125_vvbb"
         self.fit_region = "SR_btag_2"
-        self.kde_sampling = 100
+        self.kde_sampling = 1000
 
         # hists that contain these strings will be plotted
         self.plot_hists_filter = [self.fit_region, "bkg_estimate"]
