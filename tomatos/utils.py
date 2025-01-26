@@ -175,40 +175,6 @@ def init_metrics(
 import h5py
 
 
-def write_metrics(config, metrics, init):
-
-    metrics = to_python_lists(metrics)
-
-    if init:
-        # Initialize HDF5 file and create datasets
-        with h5py.File(config.metrics_file_path, "w") as h5f:
-            for key, value in metrics.items():
-                if isinstance(value, float):
-                    shape = (0,)
-                    maxshape = (None,)
-                elif isinstance(value, list):
-                    shape = (0, len(value))
-                    maxshape = (None, len(value))
-                h5f.create_dataset(
-                    key, shape=shape, maxshape=maxshape, dtype="f4", compression="gzip"
-                )
-
-                h5f[key].resize((1,) + h5f[key].shape[1:])
-                h5f[key][0] = value
-
-    else:
-        # Append new data to existing HDF5 file
-        with h5py.File(config.metrics_file_path, "r+") as h5f:
-            for key, value in metrics.items():
-                dataset = h5f[key]
-                if isinstance(value, float):
-                    dataset.resize((dataset.shape[0] + 1,))
-                    dataset[-1] = value
-                else:
-                    dataset.resize((dataset.shape[0] + 1, dataset.shape[1]))
-                    dataset[-1, :] = value
-
-
 def clear_caches():
     # clear caches each update otherwise memory explodes
     # https://github.com/google/jax/issues/10828
@@ -264,42 +230,3 @@ def to_python_lists(obj):
         # Return other objects as is
         return obj
 
-
-# this is for conservative NN training tests
-
-
-def binary_cross_entropy(preds, labels):
-    epsilon = 1e-15  # To avoid log(0)
-    preds = jnp.clip(preds, epsilon, 1 - epsilon)
-    return -jnp.mean(labels * jnp.log(preds) + (1 - labels) * jnp.log(1 - preds))
-
-
-def bce(pars, data, config):
-    # broken
-    # only need sig and bkg
-    values = {k: data[k][:, 0, :] for k in ["NOSYS", "bkg"]}
-
-    # apply the neural network to each data sample, and keep track of the
-    # sample names in a dict
-    nn_apply = partial(nn, pars)
-    preds = {k: jax.vmap(nn_apply)(values[k]).ravel() for k in values}
-
-    sig = preds["NOSYS"]
-    bkg = preds["bkg"]
-    labels = jnp.concatenate([jnp.ones_like(sig), jnp.zeros_like(bkg)])
-    preds = jnp.concatenate((sig, bkg))
-
-    return binary_cross_entropy(preds, labels)
-
-
-def is_inverted(hist):
-    # Set inverted based on which half has the greater sum
-
-    # Calculate the midpoint of the histogram
-    midpoint = len(hist) // 2
-
-    # Split the histogram into lower and upper halves
-    lower_half = hist[:midpoint]
-    upper_half = hist[midpoint:]
-
-    return 1 if lower_half.sum() > upper_half.sum() else 0

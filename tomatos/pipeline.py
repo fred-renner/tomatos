@@ -5,6 +5,7 @@ import pyhf
 import tomatos.histograms
 import tomatos.select
 import tomatos.utils
+import tomatos.train_utils
 import tomatos.workspace
 import tomatos.constraints
 import pprint
@@ -44,9 +45,10 @@ def loss_fn(
     hists = make_hists(pars, data, config, scale, validate_only)
     model, hists = tomatos.workspace.pyhf_model(hists, config)
 
-    # do we want to keep this?
     if "bce" in config.objective:
-        loss_value = tomatos.utils.bce(pars, data, config)
+        # adjist to data you want to use, lets see if anyone wants to use
+        # this
+        loss_value = tomatos.train_utils.bce(ones=data[1, :, 0], zeros=data[0, :, 0])
     if "cls" in config.objective:
         loss_value = neos.loss_from_model(model, loss="cls")
 

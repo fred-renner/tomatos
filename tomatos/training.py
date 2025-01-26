@@ -22,6 +22,7 @@ import copy
 import json
 import tomatos.nn
 from alive_progress import alive_it
+import tomatos.train_utils
 
 
 def init_opt_pars(config, nn_pars):
@@ -97,175 +98,6 @@ def evaluate_losses(opt_pars, config, batch):
     return valid_loss, valid_hists, test_loss, test_hists
 
 
-def log_cuts(config, opt_pars, metrics, infer_metrics_i):
-    for var, cut_dict in config.opt_cuts.items():
-        var_cut = f"{var}_cut"
-        opt_cut = tomatos.utils.inverse_min_max_scale(
-            config, opt_pars[var_cut], cut_dict["idx"]
-        )
-        logging.info(f"{var_cut}: {opt_cut}")
-        if var_cut not in metrics:
-            metrics[var_cut] = []
-        metrics[var_cut] = opt_cut
-        infer_metrics_i[var_cut] = opt_cut
-
-
-def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins):
-    kde = sample_kde_distribution(
-        config=config,
-        opt_pars=opt_pars,
-        data=train_data,
-        scale=train_sf,
-        hists=hists,
-        bins=bins,
-    )
-    for key, h in kde.items():
-        metrics["kde_" + key] = h
-
-
-def log_hists(config, metrics, test_hists, hists):
-    for h_key, h in hists.items():
-        metrics[h_key] = h
-        metrics[h_key + "_test"] = h
-
-        # nominal hists
-    logging.info("Nominal Hists:")
-    for key, h in hists.items():
-        if config.nominal in key and not "STAT" in key:
-            logging.info(f"{key.ljust(25)}: {h}")
-
-
-def log_bins(config, metrics, bins, infer_metrics_i):
-    scaled_bins = (
-        tomatos.utils.inverse_min_max_scale(config, np.copy(bins), config.cls_var_idx)
-        if config.objective == "cls_var"
-        else bins
-    )
-    metrics["bins"] = scaled_bins
-    infer_metrics_i["bins"] = scaled_bins
-
-    if config.include_bins:
-        logging.info(f"{'bins'.ljust(25)}: {scaled_bins}")
-
-    return bins
-
-
-def rescale_kde(config, hist, kde, bins):
-
-    # need to upscale sampled kde hist as it is a very fine binned version of
-    # the histogram, use the largest bin for it,
-    # NB: this is an approximation, only works properly for the largest bin
-
-    # use the largest bin of a binned kde hist
-    max_bin_idx = np.argmax(hist)
-    max_bin_edges = np.array([bins[max_bin_idx], bins[max_bin_idx + 1]])
-    # integrate histogram for this bin
-    hist_x_width = np.diff(max_bin_edges)
-    hist_height = hist[max_bin_idx]
-    area_hist = hist_x_width * hist_height
-
-    # integrate kde for this bin
-    kde_indices = (max_bin_edges * config.kde_sampling).astype(int)
-    kde_heights = kde[kde_indices[0] : kde_indices[1]]
-    kde_dx = 1 / config.kde_sampling
-    area_kde = np.sum(kde_dx * kde_heights)
-
-    scale_factor = area_hist / area_kde
-    kde_scaled = kde * scale_factor
-
-    return kde_scaled
-
-
-def sample_kde_distribution(
-    config,
-    opt_pars,
-    data,
-    scale,
-    hists,
-    bins,
-):
-    # get kde distribution by sampling with a many bin histogram
-    # enough to get kde only from the nominal ones
-    sample_indices = np.arange(len(config.samples))
-    nominal_data = data[sample_indices, :, :]
-    kde_config = copy.deepcopy(config)
-    kde_bins = np.linspace(0, 1, config.kde_sampling)
-    kde_config.bins = kde_bins
-    kde_config.include_bins = False
-
-    # to also collect the background estimate
-    kde_dist = tomatos.pipeline.make_hists(
-        opt_pars,
-        nominal_data,
-        kde_config,
-        scale,
-        filter_hists=True,
-    )
-
-    kde_dist = {
-        h_key: rescale_kde(config, hists[h_key], kde_dist[h_key], bins)
-        for h_key in kde_dist
-    }
-
-    return kde_dist
-
-
-def log_sharp_hists(
-    opt_pars,
-    train_data,
-    config,
-    train_sf,
-    hists,
-    metrics,
-):
-    # sharp evaluation train data hists
-    sharp_hists = tomatos.pipeline.make_hists(
-        opt_pars,
-        train_data,
-        config,
-        train_sf,
-        validate_only=True,  # sharp hists
-        filter_hists=True,
-    )
-    logging.info("(Nominal hist) / (Sharp hist) Ratios:")
-    for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
-        if config.nominal in h_key and not "STAT" in h_key:
-            # hist approx ratio
-            metrics[h_key + "_sharp"] = h
-            logging.info(f"{h_key.ljust(25)}:  {h/sharp_h}")
-
-
-def save_model(
-    i,
-    test_loss,
-    best_test_loss,
-    config,
-    opt_pars,
-    metrics,
-    infer_metrics,
-    infer_metrics_i,
-):
-    # pick best training and save
-    if test_loss < best_test_loss:
-        best_test_loss = test_loss
-        infer_metrics["epoch_best"] = infer_metrics_i
-        infer_metrics["epoch_best"]["epoch"] = i
-        model = eqx.combine(opt_pars["nn"], config.nn_arch)
-        eqx.tree_serialise_leaves(config.model_path + "epoch_best.eqx", model)
-    # save every 10th model to file
-    if i % 10 == 0 and i != 0:
-        epoch_name = f"epoch_{i:005d}"
-        infer_metrics[epoch_name] = infer_metrics_i
-        model = eqx.combine(opt_pars["nn"], config.nn_arch)
-        eqx.tree_serialise_leaves(config.model_path + epoch_name + ".eqx", model)
-
-    if i == (config.num_steps - 1):
-        # save infer metrics
-        with open(config.infer_metrics_file_path, "w") as file:
-            json.dump(tomatos.utils.to_python_lists(infer_metrics), file)
-    tomatos.utils.write_metrics(config, metrics, init=(i == 0))
-
-
 def run(config):
 
     solver, state, opt_pars, batch, best_test_loss = train_init(config)
@@ -273,6 +105,9 @@ def run(config):
     metrics = {}
     # this holds optimization params like cuts for epochs used for deployment
     infer_metrics = {}
+    # check so not mistakenly overwrite
+    tomatos.train_utils.do_metrics_exist(config)
+
     # one step is one batch (not epoch)
     for i in alive_it(range(config.num_steps)):
         start = perf_counter()
@@ -302,23 +137,31 @@ def run(config):
         # apply limitations
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
 
-        ###### excessive logging, turn off as you please
+        ###### excessive logging, turn off as you please ######
+        # expensive is only log_kde and log_sharp_hists
 
         hists = state.aux
-        logging.info(f"bw: {opt_pars['bw']}")
         # logging
         bins = (
             np.array([0, *opt_pars["bins"], 1]) if config.include_bins else config.bins
         )
-        log_bins(config, metrics, bins, infer_metrics_i)
-        log_hists(config, metrics, test_hists, hists)
-        log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins)
+        tomatos.train_utils.log_hists(config, metrics, test_hists, hists)
+        tomatos.train_utils.log_kde(
+            config, metrics, opt_pars, train_data, train_sf, hists, bins
+        )
 
         if "cls" in config.objective:
-            log_cuts(config, opt_pars, metrics, infer_metrics_i)
-            log_sharp_hists(opt_pars, train_data, config, train_sf, hists, metrics)
+            tomatos.train_utils.log_sharp_hists(
+                opt_pars, train_data, config, train_sf, hists, metrics
+            )
+            tomatos.train_utils.log_bins(config, metrics, bins, infer_metrics_i)
+            tomatos.train_utils.log_cuts(config, opt_pars, metrics, infer_metrics_i)
+            logging.info(f"bw: {opt_pars['bw']}")
+            logging.info(f"train loss: {state.value}")
+            logging.info(f"test loss: {test_loss}")
 
-        save_model(
+        tomatos.train_utils.write_metrics(config, metrics, i)
+        tomatos.train_utils.save_model(
             i,
             test_loss,
             best_test_loss,
@@ -335,8 +178,9 @@ def run(config):
         end = perf_counter()
         logging.info(f"update took {end-start:.4f}s")
         logging.info("\n")
+
         # if you want to run locally we need to clear the compilation caches
-        # otherwise memory explodes, need to see how it scales on gpu
+        # otherwise memory explodes, will see how it scales on gpu
         tomatos.utils.clear_caches()
 
     return

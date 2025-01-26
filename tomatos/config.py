@@ -11,7 +11,7 @@ config_handler.set_global(enrich_print=False)
 pyhf.set_backend("jax", default=True, precision="32b")
 
 jax.config.update("jax_enable_x64", True)
-# avoid some printing 
+# avoid some printing
 jax.config.update("jax_platforms", "cpu")
 jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 
@@ -108,14 +108,17 @@ class Setup:
         # sliced array access is a huge speed up when slicing
         # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
         # + 1 to also include the given one when slicing
-        self.nn_inputs_idx_end = self.vars.index("h_m") + 1
+        self.last_nn_input = "h_m"
+        self.nn_inputs_idx_end = self.vars.index(self.last_nn_input) + 1
         # nominal event weight
         self.weight_idx = self.vars.index("weight")
 
         # bce, cls_nn, cls_var (bins, cuts) in some variable
         self.objective = "cls_nn"
-        # you can speed up cls_var, if you only setup var and the cut_vars in self.vars
-        self.cls_var_idx = self.vars.index("h_m")
+        # you can speed up cls_var, if you only setup var and the cut_vars in
+        # self.vars
+        self.cls_var = "h_m"
+        self.cls_var_idx = self.vars.index(self.cls_var)
 
         # cuts on vars to be optimized, keep variables either "above", "below"
         # or below, start somewhere where the cut actually does something to
@@ -144,6 +147,7 @@ class Setup:
 
         self.signal_sample = "ggZH125_vvbb"
         self.fit_region = "SR_btag_2"
+        # datapoints in kde plot
         self.kde_sampling = 1000
 
         # hists that contain these strings will be plotted
@@ -194,6 +198,8 @@ class Setup:
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
         self.preprocess_path = self.results_path + "preprocessed/"
+        self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
+        self.hist_path = self.results_path + "hists/"
 
         self.preprocess_files = {
             "data": self.preprocess_path + "data.h5",
@@ -207,10 +213,14 @@ class Setup:
             os.makedirs(self.results_path)
         if not os.path.isdir(self.model_path):
             os.makedirs(self.model_path)
+        if not os.path.isdir(self.hist_path):
+            os.makedirs(self.hist_path)
 
         self.config_file_path = self.results_path + "config.json"
         self.preprocess_md_file_path = self.results_path + "preprocess_md.json"
         self.metrics_file_path = self.results_path + "metrics.h5"
         self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
 
-        self.best_epoch_results_path = self.results_path + "best_epoch_results.json"
+        # main hist
+        self.fig_size = (6, 5)
+        self.hist_skip_pattern = ["bkg_NOSYS"]
