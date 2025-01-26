@@ -190,7 +190,6 @@ def write_metrics(config, metrics, init):
                 elif isinstance(value, list):
                     shape = (0, len(value))
                     maxshape = (None, len(value))
-
                 h5f.create_dataset(
                     key, shape=shape, maxshape=maxshape, dtype="f4", compression="gzip"
                 )
