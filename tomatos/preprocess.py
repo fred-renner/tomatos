@@ -139,13 +139,13 @@ def fill_splits(config, max_events, preprocess_md, scaler):
         # upsampling, shuffling, scaling nn inputs
         # having them all together here avoids multiple IO
         for i, sample_sys in alive_it(enumerate(config.sample_sys)):
-            # quick and cheap for now and avoids random idx disk IO
+            # quick and cheap for now, avoids random idx disk IO
             # ds=(max_events=1e7, config.vars=20) ~ 1.6 GB for float32
-            # in particular avoids heavy random index read/write
             ds = file["data"][sample_sys][:]
             upsample_sf = ds.shape[0] / max_events
-            # shuffle possibly ordered event correlations (in place)
-            np.random.shuffle(ds)
+            # shuffling here increases data variability per batch a lot as it
+            # removes event correlations between samples
+            np.random.shuffle(ds)  # (in place)
             # this replicates from the beginning, i prefer this to random
             # resampling as duplication only happens if necessary
             ds = np.resize(ds, (max_events, len(config.vars)))

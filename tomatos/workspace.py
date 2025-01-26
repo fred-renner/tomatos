@@ -57,7 +57,7 @@ def zero_protect(hists, thresh=0.001):
 
 def hist_transforms(hists):
 
-    # to also protect for e.g. divisions in the following
+    # protect for e.g. divisions in the following
     hists = zero_protect(hists)
     # aim to scale btag_1 to btag_2 in SR from ratio in CR
     w_CR, stat_err_w_CR = get_abcd_weight(
@@ -119,7 +119,7 @@ def get_modifiers(hists, config):
     # this an ad-hoc hack for stat uncertainty, and nothing more than
     # that until we have the diffable modifier. Blows up the number of fit
     # parameters unnecessarily for stat unc, which instead of having one
-    # parameter per bin, histosys makes a parameter for each bin and each
+    # parameter per bin, histosy makes a parameter for each bin per
     # modifier
     for sample in [*config.samples, "bkg_estimate"]:
         for i in range(len(config.bins) - 1):
@@ -168,7 +168,7 @@ def pyhf_model(hists, config):
     # enforce 1UP, 1DOWN for autosetup here
     modifiers = get_modifiers(hists, config)
 
-    # exclude from autosetup, "bkg" is not
+    # exclude samples from autosetup
     exclude = [config.signal_sample, "bkg"]
     auto_samples = list(set(modifiers.keys()) - set(exclude))
     auto_spec = sample_spec_from_modifiers(hists, config, modifiers, auto_samples)
@@ -186,6 +186,7 @@ def pyhf_model(hists, config):
                         ],
                         "modifiers": [
                             # signal strength modifier (parameter of interest)
+                            # DONT MOVE THIS CURRENTLY
                             {
                                 "name": "mu",
                                 "type": "normfactor",

@@ -15,6 +15,7 @@ import numpy as np
 import uproot
 import matplotlib.pyplot as plt
 import math
+import h5py
 
 
 def plot_inputs(config):
@@ -30,7 +31,7 @@ def plot_inputs(config):
 
     # Determine grid size for combined plot
     n_vars = len(config.vars)
-    
+
     cols = math.ceil(math.sqrt(n_vars))
     rows = math.ceil(n_vars / cols)
 
@@ -54,22 +55,22 @@ def plot_inputs(config):
             filtered_data = data[(data > mean - (3 * std)) & (data < mean + (3 * std))]
 
             # Plot histogram
-            
+
             with np.errstate(divide="ignore", invalid="ignore"):
-                    ax.hist(
-                        filtered_data,
-                        bins=30,
-                        density=True,
-                        histtype="step",
-                        label=sample,
-                    )
-                    plt.hist(
-                        filtered_data,
-                        bins=30,
-                        density=True,
-                        histtype="step",
-                        label=sample,
-                    )
+                ax.hist(
+                    filtered_data,
+                    bins=30,
+                    density=True,
+                    histtype="step",
+                    label=sample,
+                )
+                plt.hist(
+                    filtered_data,
+                    bins=30,
+                    density=True,
+                    histtype="step",
+                    label=sample,
+                )
         ax.set_xlabel(var)
         ax.set_ylabel("Event Density")
         ax.legend()
@@ -111,203 +112,164 @@ def interpolate_gaps(values, limit=None):
     return filled
 
 
-def plot_hist(config, bins, yields, metrics, fig_size):
-    fig = plt.figure(figsize=fig_size)
-    for l, a in zip(yields, jnp.array(list(yields.values()))):
-        # if "JET" in l or "GEN" in l:
-        #     break
-        unwanted_hists = [
-            "bkg_CR_xbb_1",
-            "bkg_CR_xbb_2",
-            "bkg_VR_xbb_1",
-            "bkg_VR_xbb_2",
-            "bkg_stat_up",
-            "bkg_stat_down",
-            "bkg_stat_up",
-            "bkg_stat_down",
-            "NOSYS_stat_up",
-            "NOSYS_stat_down",
-            "ps",
-        ]
-        if any([l == h for h in unwanted_hists]):
+def hist(config, metrics):
+
+    plt.figure(figsize=config.fig_size)
+
+    for key, value in metrics.items():
+        if not key.startswith("h_"):
             continue
 
-        if "GEN" in l:
-            continue
-        if "protect" in l:
+        if any([reg in key for reg in config.hist_skip_pattern]):
             continue
 
-        l = l.replace("_", " ")
+        edges = (
+            metrics["bins"][i]
+            if meta_data["config"]["include_bins"]
+            else meta_data["config"]["bins"]
+        )
+        plt.stairs(
+            edges=edges,
+            values=metrics[key][i],
+            # values=metrics[key + "_test"][i],
+            # with kde!
+            label=label,
+            fill=None,
+            linewidth=1,
+            # align="edge",
+        )
 
-        if "bkg" == l:
-            l = "Background Estimate"
-        if "NOSYS" == l:
-            l = r"$\kappa_\mathrm{2V}=0$ signal"
+    if meta_data["config"]["do_m_hh"]:
+        plt.xlabel("m$_{HH}$ (MeV)")
+    else:
+        plt.xlabel("NN score")
 
-        if config["do_m_hh"]:
-            if config["include_bins"]:
-                bins_unscaled = (np.array(bins) - config["scaler_min"][0]) / config[
-                    "scaler_scale"
-                ][0]
-                plt.stairs(
-                    a,
-                    bins_unscaled,
-                    label=l,
-                    alpha=0.4,
-                    fill=None,
-                    linewidth=2,
-                )
-            else:
-                plt.stairs(
-                    a[1:-1],
-                    bins[1:-1],
-                    label=l,
-                    alpha=0.4,
-                    fill=None,
-                    linewidth=2,
-                )
-            plt.xlabel("m$_{hh}$ (MeV)")
-        else:
-            plt.stairs(
-                edges=bins,
-                values=a,
-                label=l,
-                # alpha=0.4,
-                fill=None,
-                # linewidth=2,
-                # align="edge",
-            )
-            plt.xlabel("NN score")
-        # this makes sig and bkg only
-        # if l == "NOSYS":
-        #     break
-
-    ax = plt.gca()
-    newLim = list(ax.get_ylim())
-    newLim[1] = newLim[1] * 1.3
-    ax.set_ylim(newLim)
-    if config["objective"] == "cls":
+    if meta_data["config"]["objective"] == "cls":
         plt.plot(
-            np.linspace(0, 1, len(metrics["kde_signal"][0])),
-            metrics["kde_signal"][metrics["epoch_best"]],
+            np.linspace(edges[0], edges[-1], len(metrics["kde_signal"][0]))[1:-1],
+            metrics["kde_signal"][i][1:-1],
             label="kde signal",
             color="tab:orange",
         )
         plt.plot(
-            np.linspace(0, 1, len(metrics["kde_bkg"][0])),
-            metrics["kde_bkg"][metrics["epoch_best"]],
+            np.linspace(edges[0], edges[-1], len(metrics["kde_bkg"][0]))[1:-1],
+            metrics["kde_bkg"][i][1:-1],
             label="kde bkg",
             color="tab:blue",
         )
-    plt.legend(fontsize=5, ncol=2, loc="upper center")
 
     plt.stairs(
-        edges=bins,
-        values=(yields["bkg"]),
-        label="Background Estimate",
+        edges=edges,
+        values=metrics["bkg"][i],
         fill=None,
         linewidth=2,
-        # align="edge",
         color="tab:blue",
     )
     plt.stairs(
-        edges=bins,
-        values=yields["NOSYS"],
-        label=r"$\kappa_\mathrm{2V}=0$ signal",
+        edges=edges,
+        values=metrics["NOSYS"][i],
         fill=None,
         linewidth=2,
-        # align="edge",
         color="tab:orange",
     )
 
+    plt.title(f"Epoch {i}")
     plt.ylabel("Events")
-    # ax = plt.gca()
-    # newLim = list(ax.get_ylim())
-    # newLim[1] = newLim[1] * 1.3
-    # ax.set_ylim(newLim)
-    # plt.legend()  # prop={"size": 6})
+
+    if meta_data["config"]["objective"] == "bce":
+        plt.legend(loc="upper right")
+    else:
+        plt.legend(
+            prop={"size": 6.4},
+            ncols=3,
+            loc="upper center",
+            #  loc="center left"
+        )
     plt.tight_layout()
-    print(config["results_path"] + "hist.pdf")
-    plt.savefig(config["results_path"] + "hist.pdf")
+    plt.savefig(
+        image_path + "/" + f"{i:005d}" + ".png",
+        dpi=208,  # divisable by 16 for imageio
+    )
+    plt.close()
 
 
-def plot_cls(metrics, config, epoch_grid, fig_size):
+def cls(metrics, config, batch_grid, fig_size):
     if len(metrics["cls_train"]) > 0:
         metrics["cls_train"] = interpolate_gaps(np.array(metrics["cls_train"]))
         metrics["cls_valid"] = interpolate_gaps(np.array(metrics["cls_valid"]))
         metrics["cls_test"] = interpolate_gaps(np.array(metrics["cls_test"]))
 
         plt.figure(figsize=fig_size)
-        plt.plot(epoch_grid, metrics["cls_train"], label=r"$CL_s$ train")
-        plt.plot(epoch_grid, metrics["cls_valid"], label=r"$CL_s$ valid")
-        plt.plot(epoch_grid, metrics["cls_test"], label=r"$CL_s$ test")
+        plt.plot(batch_grid, metrics["cls_train"], label=r"$CL_s$ train")
+        plt.plot(batch_grid, metrics["cls_valid"], label=r"$CL_s$ valid")
+        plt.plot(batch_grid, metrics["cls_test"], label=r"$CL_s$ test")
 
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.ylim([0, np.max(metrics["cls_train"]) * 1.3])
         plt.tight_layout()
-        plot_path = config["results_path"] + "cls.pdf"
+        plot_path = config.results_path + "cls.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_bw(metrics, config, epoch_grid, fig_size):
+def bw(metrics, config, batch_grid, fig_size):
     if len(metrics["bw"]) > 0:
 
         plt.figure(figsize=fig_size)
-        plt.plot(epoch_grid, metrics["bw"])
+        plt.plot(batch_grid, metrics["bw"])
 
         plt.xlabel("Epoch")
         plt.ylabel("Bandwidth")
         plt.tight_layout()
-        plot_path = config["results_path"] + "bandwidth.pdf"
+        plot_path = config.results_path + "bandwidth.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_bce(metrics, config, epoch_grid, fig_size):
+def bce(metrics, config, batch_grid, fig_size):
     if len(metrics["bce_train"]) > 0:
         plt.figure(figsize=fig_size)
-        plt.plot(epoch_grid, metrics["bce_train"], label=r"bce train")
-        plt.plot(epoch_grid, metrics["bce_valid"], label=r"bce valid")
-        plt.plot(epoch_grid, metrics["bce_test"], label=r"bce test")
+        plt.plot(batch_grid, metrics["bce_train"], label=r"bce train")
+        plt.plot(batch_grid, metrics["bce_valid"], label=r"bce valid")
+        plt.plot(batch_grid, metrics["bce_test"], label=r"bce test")
 
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.tight_layout()
-        plot_path = config["results_path"] + "bce.pdf"
+        plot_path = config.results_path + "bce.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_Z_A(metrics, config, epoch_grid, fig_size, ylim):
+def Z_A(metrics, config, batch_grid, fig_size, ylim):
     if len(metrics["Z_A"]) > 0:
         plt.figure(figsize=fig_size)
-        plt.plot(epoch_grid, metrics["Z_A"])
+        plt.plot(batch_grid, metrics["Z_A"])
         plt.xlabel("Epoch")
         plt.ylabel("Asimov Significance")
         plt.tight_layout()
         plt.ylim(ylim)
-        plot_path = config["results_path"] + "Z_A.pdf"
+        plot_path = config.results_path + "Z_A.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_bins(metrics, config, epoch_grid, fig_size):
+def bins(metrics, config, batch_grid, fig_size):
     if len(metrics["bins"]) > 0:
         plt.figure(figsize=fig_size)
         bins = np.array(metrics["bins"])
         for i in range(len(metrics["bins"][0])):
             plt.plot(bins[:, i], np.arange(len(bins[:, i])), label=f"Bin Edge {i+1}")
             # for i, bins in enumerate(metrics["bins"]):
-            if config["do_m_hh"] and config["include_bins"]:
-                # bins = (np.array(bins) - config["scaler_min"][-3]) / config[
+            if config.do_m_hh and config.include_bins:
+                # bins = (np.array(bins) - config.scaler_min[-3]) / config[
                 #     "scaler_scale"
                 # ][-3]
                 plt.xlabel("m$_{hh}$ (MeV)")
@@ -318,13 +280,13 @@ def plot_bins(metrics, config, epoch_grid, fig_size):
             plt.ylabel("Epoch")
         plt.legend()
         plt.tight_layout()
-        plot_path = config["results_path"] + "bins.pdf"
+        plot_path = config.results_path + "bins.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_cuts(metrics, config, epoch_grid, fig_size):
+def cuts(metrics, config, batch_grid, fig_size):
     if len(np.array(metrics["vbf_cut"])) > 0:
         fig, ax1 = plt.subplots(figsize=fig_size)
         color = "tab:red"
@@ -340,13 +302,13 @@ def plot_cuts(metrics, config, epoch_grid, fig_size):
         ax2.tick_params(axis="y", labelcolor=color)
 
         fig.tight_layout()
-        plot_path = config["results_path"] + "cuts.pdf"
+        plot_path = config.results_path + "cuts.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_rel_error(metrics, err_hist, err_hist_label, nom_hist, config, fig_size, ylim):
+def rel_error(metrics, err_hist, err_hist_label, nom_hist, config, fig_size, ylim):
     if err_hist in metrics.keys() and len(metrics[err_hist]) > 0:
         plt.figure(figsize=fig_size)
         err = np.array(metrics[err_hist])
@@ -368,13 +330,13 @@ def plot_rel_error(metrics, err_hist, err_hist_label, nom_hist, config, fig_size
         plt.legend()
         plt.ylim(ylim)
         plt.tight_layout()
-        plot_path = config["results_path"] + f"{err_hist}_rel_error.pdf"
+        plot_path = config.results_path + f"{err_hist}_rel_error.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_hists(metrics, config, epoch_grid, fig_size):
+def hists(metrics, config, batch_grid, fig_size):
     for k, m in metrics.items():
         if "kde" in k:
             continue
@@ -396,13 +358,13 @@ def plot_hists(metrics, config, epoch_grid, fig_size):
             plt.ylabel(y_label)
             plt.legend()
             plt.tight_layout()
-            plot_path = config["results_path"] + f"hists/{k}.pdf"
+            plot_path = config.results_path + f"hists/{k}.pdf"
             print(plot_path)
             plt.savefig(plot_path)
             plt.close()
 
 
-def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
+def signal_approximation(metrics, config, batch_grid, fig_size):
     if len(metrics["signal_approximation_diff"]) > 0:
         plt.figure(figsize=(8, 4))
         diff = np.array(metrics["signal_approximation_diff"])
@@ -414,13 +376,13 @@ def plot_signal_approximation(metrics, config, epoch_grid, fig_size):
         plt.ylim([0.9, 1.1])
         plt.legend(loc="upper left")
         plt.tight_layout()
-        plot_path = config["results_path"] + "signal_approximation_diff.pdf"
+        plot_path = config.results_path + "signal_approximation_diff.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
+def bkg_approximation(metrics, config, batch_grid, fig_size):
     if len(metrics["bkg_approximation_diff"]) > 0:
         plt.figure(figsize=(8, 4))
         diff = np.array(metrics["bkg_approximation_diff"])
@@ -433,15 +395,15 @@ def plot_bkg_approximation(metrics, config, epoch_grid, fig_size):
         plt.ylim([0.9, 1.1])
         plt.legend(loc="upper left")
         plt.tight_layout()
-        plot_path = config["results_path"] + "bkg_approximation_diff.pdf"
+        plot_path = config.results_path + "bkg_approximation_diff.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-def plot_total_diff(metrics, config, fig_size):
+def total_diff(metrics, config, fig_size):
     if len(metrics["signal_approximation_diff"]) > 0:
-        n_bins = len(config["bins"]) - 1
+        n_bins = len(config.bins) - 1
 
         plt.figure(figsize=fig_size)
 
@@ -463,71 +425,80 @@ def plot_total_diff(metrics, config, fig_size):
         plt.ylim([0, 10])
         plt.legend()
         plt.tight_layout()
-        plot_path = config["results_path"] + "summed_diff.pdf"
+        plot_path = config.results_path + "summed_diff.pdf"
         print(plot_path)
         plt.savefig(plot_path)
         plt.close()
 
 
-# Main function to call the plots
-def main(config, bins, yields, metrics):
+def plots(config):
+    with h5py.File(config.metrics_file_path, "r") as metrics:
+        # plt.rcParams.update({"font.size": 16})
+        # plt.rcParams["lines.linewidth"] = 1
 
-    if not os.path.isdir(config["results_path"] + "/hists/"):
-        os.makedirs(config["results_path"] + "/hists/")
+        hist(config, metrics)
 
-    plt.rcParams.update({"font.size": 16})
-    plt.rcParams["lines.linewidth"] = 1
-    epoch_grid = range(1, config["num_steps"] + 1)
-    fig_size = (6, 5)
+        rel_error(
+            metrics,
+            "xbb_pt_bin_3__1up",
+            "xbb pt bin 3 up",
+            "NOSYS",
+            config,
+            fig_size,
+            ylim=[1, 2.0],
+        )
+        rel_error(
+            metrics,
+            "gen_up",
+            "Scale Variations up",
+            "NOSYS",
+            config,
+            fig_size,
+            ylim=[1.1, 1.225],
+        )
+        rel_error(
+            metrics,
+            "ps_up",
+            "Parton Shower up",
+            "NOSYS",
+            config,
+            fig_size,
+            ylim=[1, 1.35],
+        )
+        rel_error(
+            metrics,
+            "bkg_shape_sys_up",
+            "bkg shape up",
+            "bkg",
+            config,
+            fig_size,
+            ylim=[1, 4],
+        )
+        if config.objective == "cls":
+            hists(metrics, config, batch_grid, fig_size)
+            cls(metrics, config, batch_grid, fig_size)
+            bw(metrics, config, batch_grid, fig_size)
+            bins(metrics, config, batch_grid, fig_size)
+            cuts(metrics, config, batch_grid, fig_size)
+            signal_approximation(metrics, config, batch_grid, fig_size)
+            bkg_approximation(metrics, config, batch_grid, fig_size)
+            total_diff(metrics, config, fig_size)
+        elif config.objective == "bce":
+            hists(metrics, config, batch_grid, fig_size)
+            bce(metrics, config, batch_grid, fig_size)
 
-    plot_hist(config, bins, yields, metrics, fig_size)
-    plot_Z_A(metrics, config, epoch_grid, fig_size, ylim=[3, 12])
 
-    plot_rel_error(
-        metrics,
-        "xbb_pt_bin_3__1up",
-        "xbb pt bin 3 up",
-        "NOSYS",
-        config,
-        fig_size,
-        ylim=[1, 2.0],
-    )
-    plot_rel_error(
-        metrics,
-        "gen_up",
-        "Scale Variations up",
-        "NOSYS",
-        config,
-        fig_size,
-        ylim=[1.1, 1.225],
-    )
-    plot_rel_error(
-        metrics,
-        "ps_up",
-        "Parton Shower up",
-        "NOSYS",
-        config,
-        fig_size,
-        ylim=[1, 1.35],
-    )
-    plot_rel_error(
-        metrics,
-        "bkg_shape_sys_up",
-        "bkg shape up",
-        "bkg",
-        config,
-        fig_size,
-        ylim=[1, 4],
-    )
-    if config["objective"] == "cls":
-        plot_hists(metrics, config, epoch_grid, fig_size)
-        plot_cls(metrics, config, epoch_grid, fig_size)
-        plot_bw(metrics, config, epoch_grid, fig_size)
-        plot_bins(metrics, config, epoch_grid, fig_size)
-        plot_cuts(metrics, config, epoch_grid, fig_size)
-        plot_signal_approximation(metrics, config, epoch_grid, fig_size)
-        plot_bkg_approximation(metrics, config, epoch_grid, fig_size)
-        plot_total_diff(metrics, config, fig_size)
-    elif config["objective"] == "bce":
-        plot_hists(metrics, config, epoch_grid, fig_size)
-        plot_bce(metrics, config, epoch_grid, fig_size)
+# def plot():
+#     config = tomatos.configuration.Setup(args)
+#     results = {}
+#     with open(config.metadata_file_path, "r") as file:
+#         results = json.load(file)
+
+#     with open(config.metrics_file_path, "r") as file:
+#         metrics = json.load(file)
+#     tomatos.plotting.main(
+#         results["config"],
+#         results["bins"],
+#         results["yields"],
+#         metrics,
+#     )

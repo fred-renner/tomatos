@@ -35,7 +35,6 @@ dependencies = [
 find = {} # Scan the project directory with the default parameters
 
 [project.scripts]
-tomatos = "tomatos.main:run"
-tomatos-plot = "tomatos.main:plot"
+tomatos = "tomatos.cli:main"
 
 # pip install jaxlib==0.3.14+cuda11.cudnn82 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
