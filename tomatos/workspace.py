@@ -71,11 +71,11 @@ def hist_transforms(hists):
     )
 
     # current hack until proper diffable norm/stat modifier
-    hists["SR_btag_2"]["bkg_estimate"]["NOSYS_STAT_1UP"] = (
-        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] * w_CR
+    hists["SR_btag_2"]["bkg_estimate"]["STAT_1UP"] = (
+        hists["SR_btag_1"]["bkg"]["STAT_1UP"] * w_CR
     )
-    hists["SR_btag_2"]["bkg_estimate"]["NOSYS_STAT_1DOWN"] = (
-        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] * w_CR
+    hists["SR_btag_2"]["bkg_estimate"]["STAT_1DOWN"] = (
+        hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] * w_CR
     )
 
     # norm uncertainty background estimate
@@ -102,7 +102,7 @@ def get_modifiers(hists, config):
     for sample in hists[config.fit_region]:
         for sys in hists[config.fit_region][sample]:
             if "1UP" in sys:
-                if "NOSYS_STAT" in sys:
+                if "STAT" in sys:
                     continue
                 sys = sys.replace("_1UP", "")
                 modifiers[sample] += (
@@ -126,11 +126,11 @@ def get_modifiers(hists, config):
             nom = hists[config.fit_region][sample][config.nominal]
             nom_up = jnp.copy(nom)
             stat_up_i = nom_up.at[i].set(
-                hists[config.fit_region][sample][config.nominal + "_STAT_1UP"][i]
+                hists[config.fit_region][sample]["STAT_1UP"][i]
             )
             nom_down = jnp.copy(nom)
             stat_down_i = nom_down.at[i].set(
-                hists[config.fit_region][sample][config.nominal + "_STAT_1DOWN"][i]
+                hists[config.fit_region][sample]["STAT_1DOWN"][i]
             )
             modifiers[sample] += (
                 {

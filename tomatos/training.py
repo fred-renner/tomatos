@@ -41,7 +41,7 @@ def init_opt_pars(config, nn_pars):
         init = config.opt_cuts[key]["init"]
         init *= config.scaler_scale[var_idx]
         init += config.scaler_min[var_idx]
-        opt_pars[key + "_cut"] = init
+        opt_pars["cut_" + key] = init
 
     return opt_pars
 
@@ -156,31 +156,32 @@ def run(config):
             )
             tomatos.train_utils.log_bins(config, metrics, bins, infer_metrics_i)
             tomatos.train_utils.log_cuts(config, opt_pars, metrics, infer_metrics_i)
-            logging.info(f"bw: {opt_pars['bw']}")
-            logging.info(f"train loss: {state.value}")
-            logging.info(f"test loss: {test_loss}")
-
-        tomatos.train_utils.write_metrics(config, metrics, i)
+            tomatos.train_utils.log_bw(metrics, opt_pars)
         tomatos.train_utils.save_model(
             i,
             test_loss,
             best_test_loss,
             config,
             opt_pars,
-            metrics,
             infer_metrics,
             infer_metrics_i,
         )
 
         if test_loss < best_test_loss:
             best_test_loss = test_loss
+            metrics["best_test_batch"] = i
 
-        end = perf_counter()
-        logging.info(f"update took {end-start:.4f}s")
-        logging.info("\n")
+        tomatos.train_utils.write_metrics(config, metrics, i)
 
         # if you want to run locally we need to clear the compilation caches
         # otherwise memory explodes, will see how it scales on gpu
         tomatos.utils.clear_caches()
 
+        end = perf_counter()
+        logging.info(f"train loss: {state.value}")
+        logging.info(f"test loss: {test_loss}")
+        logging.info(f"update took {end-start:.4f}s")
+        logging.info("\n")
+
+    logging.info("Training Done!")
     return

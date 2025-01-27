@@ -15,20 +15,19 @@ from functools import partial
 
 def make_hists(pars, data, config, scale, validate_only=False, filter_hists=False):
     # event manipulations are done via weights to the base weights
-
     base_weights = data[:, :, config.weight_idx]
     cut_weights = tomatos.select.cuts(pars, data, config, validate_only)
     # apply cuts
     base_weights = jnp.multiply(base_weights, cut_weights)
     # get event selections
     sel_weights = tomatos.select.events(data, config, base_weights)
-
+    # fill
     hists = tomatos.histograms.fill_hists(
         pars, data, config, sel_weights, scale, validate_only
     )
     # calculate additional hists based on existing hists
     hists = tomatos.workspace.hist_transforms(hists)
-    # flatten and reduces to the configured filter
+    # flatten and filter if desired
     hists = tomatos.utils.filter_hists(config, hists) if filter_hists else hists
     return hists
 

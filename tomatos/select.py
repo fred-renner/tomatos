@@ -21,7 +21,7 @@ def cuts(pars, data, config, validate_only):
         # get the sigmoid weights for var_cut
         cut_weights *= relaxed.cut(
             data=data[:, :, var_dict["idx"]],
-            cut_val=pars[var + "_cut"],
+            cut_val=pars["cut_" + var],
             slope=slope,
             keep=var_dict["keep"],
         )

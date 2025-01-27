@@ -47,6 +47,8 @@ def main():
         logging.info("Training...")
         tomatos.training.run(config)
     # if args.plot:
+    logging.info(f"Plotting... Here: {config.plot_path}")
+
     tomatos.plotting.plots(config)
 
     # plot()

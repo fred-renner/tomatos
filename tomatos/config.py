@@ -149,9 +149,7 @@ class Setup:
         self.fit_region = "SR_btag_2"
         # datapoints in kde plot
         self.kde_sampling = 1000
-
-        # hists that contain these strings will be plotted
-        self.plot_hists_filter = [self.fit_region, "bkg_estimate"]
+        self.kde_bins = np.linspace(0, 1, self.kde_sampling)
 
         # with all systs 0.001 seems too small
         self.lr = args.lr
@@ -198,8 +196,7 @@ class Setup:
         self.results_path += results_folder
         self.model_path = self.results_path + "models/"
         self.preprocess_path = self.results_path + "preprocessed/"
-        self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
-        self.hist_path = self.results_path + "hists/"
+        self.plot_path = self.results_path + "plots/"
 
         self.preprocess_files = {
             "data": self.preprocess_path + "data.h5",
@@ -213,8 +210,8 @@ class Setup:
             os.makedirs(self.results_path)
         if not os.path.isdir(self.model_path):
             os.makedirs(self.model_path)
-        if not os.path.isdir(self.hist_path):
-            os.makedirs(self.hist_path)
+        if not os.path.isdir(self.plot_path):
+            os.makedirs(self.plot_path)
 
         self.config_file_path = self.results_path + "config.json"
         self.preprocess_md_file_path = self.results_path + "preprocess_md.json"
@@ -222,5 +219,11 @@ class Setup:
         self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
 
         # main hist
-        self.fig_size = (6, 5)
-        self.hist_skip_pattern = ["bkg_NOSYS"]
+
+        # hists that contain these strings will be plotted
+        self.plot_hists_filter = [self.signal_sample, "bkg_estimate"]
+        self.giffer_fig_size = (9, 5)
+        # self.hist_skip_pattern = ["bkg_NOSYS"]
+
+        # plt.rcParams.update({"font.size": 16})
+        # plt.rcParams["lines.linewidth"] = 1

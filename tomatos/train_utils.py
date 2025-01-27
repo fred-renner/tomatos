@@ -38,17 +38,22 @@ def bce(ones, zeros):
     return binary_cross_entropy(preds, labels)
 
 
+def log_bw(metrics, opt_pars):
+    metrics["bw"] = opt_pars["bw"]
+    logging.info(f"bw: {opt_pars['bw']}")
+
+
 def log_cuts(config, opt_pars, metrics, infer_metrics_i):
     for var, cut_dict in config.opt_cuts.items():
-        var_cut = f"{var}_cut"
+        cut_var = f"cut_{var}"
         opt_cut = tomatos.utils.inverse_min_max_scale(
-            config, opt_pars[var_cut], cut_dict["idx"]
+            config, opt_pars[cut_var], cut_dict["idx"]
         )
-        logging.info(f"{var_cut}: {opt_cut}")
-        if var_cut not in metrics:
-            metrics[var_cut] = []
-        metrics[var_cut] = opt_cut
-        infer_metrics_i[var_cut] = opt_cut
+        logging.info(f"{cut_var}: {opt_cut}")
+        if cut_var not in metrics:
+            metrics[cut_var] = []
+        metrics[cut_var] = opt_cut
+        infer_metrics_i[cut_var] = opt_cut
 
 
 def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins):
@@ -129,9 +134,9 @@ def sample_kde_distribution(
     # enough to get kde only from the nominal ones
     sample_indices = np.arange(len(config.samples))
     nominal_data = data[sample_indices, :, :]
+    # make a custom config
     kde_config = copy.deepcopy(config)
-    kde_bins = np.linspace(0, 1, config.kde_sampling)
-    kde_config.bins = kde_bins
+    kde_config.bins = config.kde_bins
     kde_config.include_bins = False
 
     # to also collect the background estimate
@@ -159,6 +164,9 @@ def log_sharp_hists(
     hists,
     metrics,
 ):
+    # actually might be enough to compare to test hists, depends a bit on the
+    # uncertainty behavior...
+
     # sharp evaluation train data hists
     sharp_hists = tomatos.pipeline.make_hists(
         opt_pars,
@@ -168,19 +176,19 @@ def log_sharp_hists(
         validate_only=True,  # sharp hists
         filter_hists=True,
     )
-    logging.info("--- (Nominal hist) / (Sharp hist) Ratios ---")
+    logging.info("--- Nominal (hist) / (Sharp hist) Ratios ---")
     for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
         if config.nominal in h_key and not "STAT" in h_key:
             # hist approx ratio
             metrics["h_" + h_key + "_sharp"] = sharp_h
-            logging.info(f"{h_key.ljust(25)}:  {h/sharp_h}")
+            logging.info(f"{h_key.ljust(25)}: {h/sharp_h}")
 
 
 def do_metrics_exist(config):
     if os.path.exists(config.metrics_file_path) and not config.debug:
         user_input = input(
             f"{config.metrics_file_path} exists. \n"
-            f"Did you train this already? \n"
+            f"Seems like you trained this already \n"
             f"Overwrite and Proceed? (y/n):"
         )
         if user_input.lower() != "y":
@@ -193,9 +201,14 @@ def init_metrics(config, metrics):
         for key, value in metrics.items():
             if isinstance(value, float):
                 shape = (config.num_steps,)
+                dtype = "f4"
+            elif isinstance(value, int):
+                shape = (config.num_steps,)
+                dtype = "i"
             elif isinstance(value, list):
                 shape = (config.num_steps, len(value))
-            h5f.create_dataset(key, shape=shape, dtype="f4", compression="gzip")
+                dtype = "f4"
+            h5f.create_dataset(key, shape=shape, dtype=dtype, compression="gzip")
             h5f[key][0] = value
 
 
@@ -207,7 +220,7 @@ def write_metrics(config, metrics, i):
         with h5py.File(config.metrics_file_path, "r+") as h5f:
             for key, value in metrics.items():
                 dataset = h5f[key]
-                if isinstance(value, float):
+                if isinstance(value, (float, int)):
                     dataset[i] = value
                 else:
                     dataset[i, :] = value
@@ -219,7 +232,6 @@ def save_model(
     best_test_loss,
     config,
     opt_pars,
-    metrics,
     infer_metrics,
     infer_metrics_i,
 ):
