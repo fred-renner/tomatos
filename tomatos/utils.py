@@ -126,7 +126,7 @@ def filter_hists(config, hists):
 
     filtered_hists = {}
     for h_key, h in hists.items():
-        if any([filter_key in h_key for filter_key in config.plot_hists_filter]):
+        if any([f in h_key for f in config.plot_hists_filter]):
             h_key = h_key.replace(f"{config.fit_region}_", "")
             filtered_hists[h_key] = h
 
@@ -143,8 +143,8 @@ def init_metrics(
     metrics["bins"] = []
 
     for var, cut_dict in config.opt_cuts.items():
-        var_cut = f"{var}_cut"
-        metrics[var_cut] = -1.0
+        cut_var = f"cut_{var}"
+        metrics[cut_var] = -1.0
     hists = state.aux
 
     for k in hists.keys():
@@ -229,4 +229,3 @@ def to_python_lists(obj):
     else:
         # Return other objects as is
         return obj
-

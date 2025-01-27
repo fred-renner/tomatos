@@ -203,10 +203,10 @@ def fill_hists(
         # workaround stat up and down hists
         for sample, h_w2 in zip(config.samples, hists_nominal_w2_vector):
             sigma = jnp.sqrt(h_w2)
-            hists["SR_btag_2"][sample][config.nominal + "_STAT_1UP"] = (
+            hists["SR_btag_2"][sample]["STAT_1UP"] = (
                 hists["SR_btag_2"][sample][config.nominal] + sigma
             )
-            hists["SR_btag_2"][sample][config.nominal + "_STAT_1DOWN"] = (
+            hists["SR_btag_2"][sample]["STAT_1DOWN"] = (
                 hists["SR_btag_2"][sample][config.nominal] - sigma
             )
 
@@ -220,8 +220,8 @@ def fill_hists(
             i=bkg_idx, weights=sel_weights["SR_btag_1"], w2=True
         )
         sigma = jnp.sqrt(h_w2_SR_btag_1)
-        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1UP"] = h_w2_SR_btag_1 + sigma
-        hists["SR_btag_1"]["bkg"]["NOSYS_STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
+        hists["SR_btag_1"]["bkg"]["STAT_1UP"] = h_w2_SR_btag_1 + sigma
+        hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
 
         hists["CR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
             i=bkg_idx, weights=sel_weights["CR_btag_2"]
