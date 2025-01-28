@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import math
 import h5py
 import json
+from alive_progress import alive_it
+import imageio
+import glob
 
 
 def plot_inputs(config):
@@ -56,16 +59,8 @@ def plot_inputs(config):
             filtered_data = data[(data > mean - (3 * std)) & (data < mean + (3 * std))]
 
             # Plot histogram
-
             with np.errstate(divide="ignore", invalid="ignore"):
                 ax.hist(
-                    filtered_data,
-                    bins=30,
-                    density=True,
-                    histtype="step",
-                    label=sample,
-                )
-                plt.hist(
                     filtered_data,
                     bins=30,
                     density=True,
@@ -76,15 +71,11 @@ def plot_inputs(config):
         ax.set_ylabel("Event Density")
         ax.legend()
 
-        # Save individual plot
-        plt.xlabel(var)
-        plt.ylabel("Event Density")
-        plt.legend()
         plt.tight_layout()
         plt.savefig(f"{plot_path}/{var}.pdf")
         plt.close()
 
-    # Turn off any unused axes
+    # remove unfilled plot templates
     for ax in axes[n_vars:]:
         ax.axis("off")
 
@@ -96,7 +87,7 @@ def plot_inputs(config):
 
 def interpolate_gaps(values, limit=None):
     """
-    Fill gaps using linear interpolation, optionally only fill gaps up to a
+    Fill gaps using linear interpolation, datasetally only fill gaps up to a
     size of `limit`.
     """
     values = np.asarray(values)
@@ -171,7 +162,30 @@ def sharp_hist_deviation(config, metrics):
             fig_finalize(config, f"{key_NOSYS}_largest_bin_deviation.pdf")
 
 
-def hist(config, metrics, h_key, batch_i, add_kde):
+def up_development(config, metrics):
+    for key in metrics.keys():
+        if (
+            key.startswith("h_")
+            and not key.endswith("_test")
+            and not key.endswith("_sharp")
+            and config.nominal in key
+        ):
+            # NOSYS
+            nosys = metrics[key][:]
+            base_key = key.replace(config.nominal, "")
+            for key_ in metrics.keys():
+                if base_key in key_ and "1UP" in key_ and not "_test" in key_:
+                    err_1UP = metrics[key_][:]
+                    ratio = err_1UP / nosys
+                    for i in range(nosys.shape[1]):
+                        plt.plot(ratio[:, i], label=f"Bin {i+1}")
+
+                    plt.ylabel(f'({key_.replace("_"," ")}) / ({key.replace("_"," ")})')
+                    plt.xlabel("Batch")
+                    fig_finalize(config, f"{key_}_relative.pdf")
+
+
+def plot_hist(config, metrics, h_key, batch_i, add_kde):
     key = h_key.replace("h_", "")
     label = key.replace("_", " ")
     edges = metrics["bins"][batch_i] if config.include_bins else config.bins
@@ -188,7 +202,7 @@ def hist(config, metrics, h_key, batch_i, add_kde):
     else:
         plt.xlabel("Neural Network Score")
 
-    if add_kde and "NOSYS" in key:
+    if add_kde and config.nominal in key:
         try:
             kde = metrics["kde_" + key][batch_i]
             plt.plot(
@@ -201,7 +215,7 @@ def hist(config, metrics, h_key, batch_i, add_kde):
             pass
 
 
-def fig_finalize(config, name, legend_outside=False):
+def fig_finalize(config, name, legend_outside=False, dpi=300):
     # Scale x-axis
     # with open(config.preprocess_md_file_path, "r") as json_file:
     #     config.preprocess_md = json.load(json_file)
@@ -219,62 +233,59 @@ def fig_finalize(config, name, legend_outside=False):
 
     plt.tight_layout()
     plt.savefig(
-        config.plot_path + "/" + name, bbox_inches="tight"
+        config.plot_path + "/" + name, dpi=dpi
     )  # Ensure all elements are within the saved figure
     plt.close()
 
 
-def test_hist(config, metrics):
-    plt.figure(figsize=config.giffer_fig_size)
+def collect_hist_keys(metrics, dataset):
+    keys = []
     for key in metrics.keys():
         # make sure we have a test hist and avoid sharp train data
-        if (
-            key.startswith("h_")
-            and not key.endswith("_test")
-            and not key.endswith("_sharp")
-        ):
-            hist(
-                config,
-                metrics,
-                key,
-                batch_i=metrics["best_test_batch"][-1],
-                add_kde=True,
-            )
-    fig_finalize(config, "test_hist_best_batch.pdf", legend_outside=True)
+        if dataset == "test":
+            if (
+                key.startswith("h_")
+                and key.endswith("_test")
+                and not key.endswith("_sharp")
+            ):
+                keys.append(key)
+        if dataset == "train":
+            if (
+                key.startswith("h_")
+                and not key.endswith("_test")
+                and not key.endswith("_sharp")
+            ):
+                keys.append(key)
+    return keys
 
 
-def batch_plot(config, metrics, key, label):
-    plt.plot(metrics[key])
-    plt.xlabel("Batch")
+def assemble_hist(config, metrics, h_keys, batch_i):
+    for k in h_keys:
+        plot_hist(
+            config,
+            metrics,
+            k,
+            batch_i=batch_i,
+            add_kde=True,
+        )
 
 
-def up_development(config, metrics):
-    for key in metrics.keys():
-        # make sure we have a test hist and avoid sharp evaluated train data
-        if (
-            key.startswith("h_")
-            and not key.endswith("_test")
-            and not key.endswith("_sharp")
-            and "NOSYS" in key
-        ):
-            # NOSYS
-            NOSYS = metrics[key][:]
-            base_key = key.replace("NOSYS", "")
-            for key_ in metrics.keys():
-                if base_key in key_ and "1UP" in key_ and not "_test" in key_:
-                    err_1UP = metrics[key_][:]
-                    ratio = err_1UP / NOSYS
-                    for i in range(NOSYS.shape[1]):
-                        plt.plot(ratio[:, i], label=f"Bin {i+1}")
-
-                    plt.ylabel(f'({key_.replace("_"," ")}) / ({key.replace("_"," ")})')
-                    plt.xlabel("Batch")
-                    fig_finalize(config, f"{key_}_relative.pdf")
+def best_hist(config, metrics, dataset):
+    plt.figure(figsize=config.fig_size)
+    h_keys = collect_hist_keys(metrics, dataset)
+    assemble_hist(
+        config,
+        metrics,
+        h_keys,
+        batch_i=metrics["best_test_batch"][-1],
+    )
+    fig_finalize(config, name=f"{dataset}_hist_best_batch.pdf", legend_outside=True)
 
 
-def plots(config):
+def model_plots(config):
     with h5py.File(config.metrics_file_path, "r") as metrics:
-        test_hist(config, metrics)
+        best_hist(config, metrics, dataset="test")
+        best_hist(config, metrics, dataset="train")
         loss(config, metrics)
         if "cls" in config.objective:
             bw(config, metrics)
@@ -283,3 +294,46 @@ def plots(config):
                 bins(metrics, config)
             cuts(config, metrics)
             sharp_hist_deviation(config, metrics)
+        movie(config, metrics)
+
+
+def movie(config, metrics):
+    logging.info("Making Movie")
+    h_keys = collect_hist_keys(metrics, dataset="train")
+    ymax = 0
+
+    with h5py.File(config.metrics_file_path, "r") as metrics:
+        for i in alive_it(range(len(metrics["best_test_batch"]))):
+            if i % config.movie_batch_modulo != 0:
+                continue
+
+            # dpi ideally divisable by 16 otherwise imageio resizes them
+            plt.figure(figsize=(9, 5))
+
+            assemble_hist(
+                config,
+                metrics,
+                h_keys,
+                batch_i=metrics["best_test_batch"][-1],
+            )
+
+            # fix the yscale, otherwise it wiggles a lot
+            ax = plt.gca()
+            ylim = ax.get_ylim()
+            current_max_up = np.max(ylim) * 1.3
+            if current_max_up > ymax:
+                ymax = current_max_up
+            ax.set_ylim([0, ymax])
+
+            fig_finalize(
+                config,
+                name="gif_images/" + f"{i:005d}" + ".png",
+                legend_outside=True,
+                dpi=208,  # divisable by 16, otherwise imageio resizes
+            )
+
+        # movie
+        writer = imageio.get_writer(config.results_path + "hist_evolution.mp4", fps=20)
+        for file in sorted(glob.glob(os.path.join(config.gif_path, f"*.png"))):
+            im = imageio.imread(file)
+            writer.append_data(im)

@@ -109,7 +109,7 @@ def init_splits(config, preprocess_md):
                 chunks=(
                     len(config.sample_sys),
                     np.minimum(
-                        config.chunk_size, preprocess_md[split]["events"] / 2
+                        config.chunk_size, preprocess_md[split]["events"] / config.n_chunk_combine
                     ),  # / 2 see batcher
                     len(config.vars),
                 ),

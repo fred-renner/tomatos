@@ -34,7 +34,7 @@ def setup(config, pars):
     plt.xlabel("Batch")
     plt.ylabel("Learning Rate")
     plt.tight_layout()
-    plt.savefig(config.results_path + "lr_schedule.pdf")
+    plt.savefig(config.plot_path + "lr_schedule.pdf")
     plt.close()
 
     # successively apply gradient updates for gradient transformations with

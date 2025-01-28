@@ -12,7 +12,9 @@ def get_generator(config, split):
         # load the combinations together to avoid tiny rest batch, more data
         # variability
         # r slice combinations of the memory layout on disk
-        batch_combi = list(itertools.combinations(list(ds.iter_chunks()), r=2))
+        batch_combi = list(
+            itertools.combinations(list(ds.iter_chunks()), r=config.n_chunk_combine)
+        )
         while True:
             for batch in batch_combi:
                 # shape is (n_sample_sys, n_events, n_vars)

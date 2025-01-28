@@ -3,7 +3,6 @@ import numpy as np
 import pathlib
 import pyhf
 import jax
-
 from alive_progress import config_handler
 
 config_handler.set_global(enrich_print=False)
@@ -65,9 +64,11 @@ class Setup:
         }
         # total events that are batched in training from all samplesys combined
         self.batch_size = 1e6
-        # memory layout on disk per sample_sys, not in yaml, see batcher for
-        # factor 2
-        self.chunk_size = int(self.batch_size / len(self.sample_sys) / 2)
+        # memory layout on disk per sample_sys, not in yaml
+        self.n_chunk_combine = 2  # see batcher for this
+        self.chunk_size = int(
+            self.batch_size / len(self.sample_sys) / self.n_chunk_combine
+        )
         # slows down I/O, but saves disk memory
         self.compress_input_files = False
         # ratio need to add up to one
@@ -157,12 +158,8 @@ class Setup:
         # one step is one batch, not epoch
         self.num_steps = args.steps
 
-        # fixed bw
-        # self.bw = np.full(self.bw.shape, 0.15)
-
         if args.debug:
             self.num_steps = 10 if args.steps == 200 else args.steps
-            # self.bw = np.full(self.num_steps, 0.15)
 
         # cuts scaled to parameter range [0,1]
         self.cuts_init = 0.01
@@ -176,17 +173,14 @@ class Setup:
             self.n_k_folds / (self.n_k_folds - 1) if self.n_k_folds > 1 else 1
         )
 
-        # simple transfer factor or binned transferfactor
-        self.binned_w_CR = False
-
         # paths
         self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
 
         # k_fold at end!
         if args.suffix != "":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}_k_{args.k_fold}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}/"
         else:
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_k_{args.k_fold}/"
+            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}/"
 
         # results_folder = "tomatos_cls_5_500_slope_16000_lr_0p001_bw_0p16_k_1/"
         results_folder = results_folder.replace(".", "p")
@@ -197,13 +191,8 @@ class Setup:
         self.model_path = self.results_path + "models/"
         self.preprocess_path = self.results_path + "preprocessed/"
         self.plot_path = self.results_path + "plots/"
+        self.gif_path = self.plot_path + "gif_images/"
 
-        self.preprocess_files = {
-            "data": self.preprocess_path + "data.h5",
-            "train": self.preprocess_path + "train.h5",
-            "valid": self.preprocess_path + "valid.h5",
-            "test": self.preprocess_path + "test.h5",
-        }
         if not os.path.isdir(self.preprocess_path):
             os.makedirs(self.preprocess_path)
         if not os.path.isdir(self.results_path):
@@ -212,18 +201,22 @@ class Setup:
             os.makedirs(self.model_path)
         if not os.path.isdir(self.plot_path):
             os.makedirs(self.plot_path)
+        if not os.path.isdir(self.gif_path):
+            os.makedirs(self.gif_path)
 
+        self.preprocess_files = {
+            "data": self.preprocess_path + "data.h5",
+            "train": self.preprocess_path + "train.h5",
+            "valid": self.preprocess_path + "valid.h5",
+            "test": self.preprocess_path + "test.h5",
+        }
         self.config_file_path = self.results_path + "config.json"
         self.preprocess_md_file_path = self.results_path + "preprocess_md.json"
         self.metrics_file_path = self.results_path + "metrics.h5"
         self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
 
-        # main hist
-
         # hists that contain these strings will be plotted
         self.plot_hists_filter = [self.signal_sample, "bkg_estimate"]
-        self.giffer_fig_size = (9, 5)
-        # self.hist_skip_pattern = ["bkg_NOSYS"]
-
-        # plt.rcParams.update({"font.size": 16})
-        # plt.rcParams["lines.linewidth"] = 1
+        # skip frames by modulo for movie
+        self.movie_batch_modulo = 1
+        self.fig_size = (9, 5)
