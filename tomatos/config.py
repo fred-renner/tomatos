@@ -24,11 +24,10 @@ jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 
 class Setup:
     def __init__(self, args):
-        self.run_bkg_init = False
 
         self.include_bins = True
 
-        self.input_path = "/lustre/fs22/group/atlas/freder/hh/tomatos_inputs/"
+        self.input_path = "/Users/fred/dev/tomatos/tests/files"
         self.tree_name = "FilteredTree"
         # collect input files
         self.input_paths = [
@@ -174,11 +173,13 @@ class Setup:
         )
 
         # paths
-        self.results_path = "/lustre/fs22/group/atlas/freder/hh/run/tomatos/"
+        self.results_path = "/Users/fred/dev/run/"
 
         # k_fold at end!
         if args.suffix != "":
-            results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}/"
+            results_folder = (
+                f"tomatos_{self.objective}_{args.bins}_{self.num_steps}_{args.suffix}/"
+            )
         else:
             results_folder = f"tomatos_{self.objective}_{args.bins}_{self.num_steps}/"
 
