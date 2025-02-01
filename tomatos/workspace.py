@@ -186,7 +186,6 @@ def pyhf_model(hists, config):
                         ],
                         "modifiers": [
                             # signal strength modifier (parameter of interest)
-                            # DONT MOVE THIS CURRENTLY
                             {
                                 "name": "mu",
                                 "type": "normfactor",
