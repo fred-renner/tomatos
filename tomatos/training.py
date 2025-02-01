@@ -14,7 +14,6 @@ import tomatos.utils
 import tomatos.workspace
 import tomatos.pipeline
 import tomatos.solver
-import tomatos.initialize
 import equinox as eqx
 import tomatos.batcher
 import tomatos.constraints

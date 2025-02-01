@@ -1,0 +1,77 @@
+# top folder where ntuples live with the structure
+# ntuple_path/SAMPLE/SYSTEMATIC.root
+ntuple_path: "/Users/fred/dev/tomatos/tests/files/"
+results_path: "/Users/fred/dev/run/"
+
+# name of NOSYS.root holding the nominal non-systematic values
+nominal: NOSYS
+tree_name: FilteredTree
+signal_sample: "ggZH125_vvbb"
+# total events that are batched in training from all sample_sys combined
+batch_size: 100_000
+# slows down I/O, but saves disk memory
+compress_input_files: False
+# the main data array is defined by (n_samples, n_events, vars)
+nn_input_vars:
+  - "j1_pt"
+  - "j1_eta"
+  - "j1_phi"
+  - "j1_m"
+  - "j2_pt"
+  - "j2_eta"
+  - "j2_phi"
+  - "j2_m"
+  - "h_pt"
+  - "h_eta"
+  - "h_phi"
+  - "h_m"
+event_weight_var: weight
+aux_vars:
+  - "bool_btag_1"
+  - "bool_btag_2"
+  - "my_sf_unc_up"
+  - "my_sf_unc_down"
+
+# ratio need to add up to one
+train_ratio: 0.8
+valid_ratio: 0.1
+test_ratio: 0.1
+
+plot_inputs: True
+
+# bce, cls_nn, cls_var (bins, cuts) in some variable
+# might drop bce, needs some attention currently
+objective: "cls_nn"
+# you can speed up cls_var, if you only setup the var and the cut_vars in
+cls_var: "h_m"
+
+bins: 5
+# includes bin edges in optimization
+include_bins: true
+# results folder suffix
+suffix: "demo"
+# train steps
+num_steps: 200
+# learning rate
+lr: 0.01
+# start and minimum value for the bandwidth reduction
+bw_init: 0.2
+bw_min: 0.01
+# slope value in the sigmoid
+slope: 20_000
+
+# cuts on vars to be optimized, keep variables either "above", "below"
+# or below, start somewhere where the cut actually does something to
+# find a gradient
+opt_cuts:
+  j1_pt:
+    keep: "above" # or below
+    init: 20_000
+  j2_pt:
+    keep: "above"
+    init: 20_000
+
+# applies a scale factor to the histograms accordingly
+n_k_folds: 1
+# wonder if this should be here, this defines the selection region, however this is super manual...
+fit_region: "SR_btag_2"

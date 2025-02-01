@@ -20,8 +20,11 @@ pip install --editable .
 # gpu
 # pip install jaxlib==0.3.14+cuda11.cudnn82 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
-
-tomatos
 ```
 
+# run 
 
+```bash
+source ./tomatos_env/bin/activate
+tomatos --demo
+```
