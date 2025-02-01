@@ -51,7 +51,7 @@ include_bins: true
 # results folder suffix
 suffix: "demo"
 # train steps
-num_steps: 200
+num_steps: 50
 # learning rate
 lr: 0.01
 # start and minimum value for the bandwidth reduction
@@ -59,6 +59,9 @@ bw_init: 0.2
 bw_min: 0.01
 # slope value in the sigmoid
 slope: 20_000
+# need to limit these updates to avoid gradient explosion
+update_limit_bw: 0.01
+update_limit_cuts: 0.001 # for min max scaled between (0,1)
 
 # cuts on vars to be optimized, keep variables either "above", "below"
 # or below, start somewhere where the cut actually does something to
@@ -73,5 +76,5 @@ opt_cuts:
 
 # applies a scale factor to the histograms accordingly
 n_k_folds: 1
-# wonder if this should be here, this defines the selection region, however this is super manual...
+# This is super manual and probaly shouldn't be here as it depends on the user defined event selection
 fit_region: "SR_btag_2"

@@ -51,11 +51,11 @@ def setup(config, pars):
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
         optax.masked(
-            optax.clip(max_delta=0.001),
+            optax.clip(max_delta=config.update_limit_bw),
             mask(pars, ["bw"]),
         ),
         optax.masked(
-            optax.clip(max_delta=0.0001),
+            optax.clip(max_delta=config.update_limit_cuts),
             mask(pars, config.opt_cuts.keys()),
         ),
     )
