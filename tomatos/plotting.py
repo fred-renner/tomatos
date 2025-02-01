@@ -296,7 +296,7 @@ def model_plots(config):
             sharp_hist_deviation(config, metrics)
         movie(config, metrics)
 
-
+from matplotlib.patches import StepPatch
 def movie(config, metrics):
     logging.info("Making Movie")
     h_keys = collect_hist_keys(metrics, dataset="train")
@@ -308,23 +308,23 @@ def movie(config, metrics):
                 continue
 
             # dpi ideally divisable by 16 otherwise imageio resizes them
-            plt.figure(figsize=(9, 5))
-
+            fig, ax = plt.subplots(figsize=(9, 5))
             assemble_hist(
                 config,
                 metrics,
                 h_keys,
-                batch_i=metrics["best_test_batch"][-1],
+                batch_i=i,
             )
 
-            # fix the yscale, otherwise it wiggles a lot
-            ax = plt.gca()
-            ylim = ax.get_ylim()
-            current_max_up = np.max(ylim) * 1.3
-            if current_max_up > ymax:
-                ymax = current_max_up
-            ax.set_ylim([0, ymax])
+           # ymax scale only for the hists, as kde might be super large
+            for patch in ax.patches:
+                if isinstance(patch, StepPatch):
+                    vertices = patch.get_path().vertices
+                    y_values = vertices[:, 1]  # Extract y-values from vertices
+                    current_max = np.max(y_values)
+                    ymax = max(ymax, current_max * 1.3)  # Add margin
 
+            ax.set_ylim([0, ymax])
             fig_finalize(
                 config,
                 name="gif_images/" + f"{i:005d}" + ".png",
