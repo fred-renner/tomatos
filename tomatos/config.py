@@ -31,29 +31,6 @@ class Setup:
         with open(args.config, "r") as f:
             yml = yaml.safe_load(f)
 
-        # # just copy some config
-        # simple_values = [
-        #     "ntuple_path",
-        #     "results_path",
-        #     "batch_size",
-        #     "nominal",
-        #     "tree_name",
-        #     "signal_sample",
-        #     "compress_input_files",
-        #     "train_ratio",
-        #     "valid_ratio",
-        #     "test_ratio",
-        #     "plot_inputs",
-        #     "objective",
-        #     "cls_var",
-        #     "num_steps",
-        #     "bw_init",
-        #     "bw_min",
-        #     "slope",
-        #     "signal_sample",
-        #     "fit_region",
-        #     "suffix",
-        # ]
         for k, v in yml.items():
             setattr(self, k, v)
 
@@ -88,7 +65,6 @@ class Setup:
         self.chunk_size = int(
             yml["batch_size"] / len(self.sample_sys) / self.n_chunk_combine
         )
-        self.debug = args.debug
 
         # jax likes predefined arrays.
         # self.vars defines the main data array of dimension (n_samples, n_events, self.vars).
