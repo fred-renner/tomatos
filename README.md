@@ -24,5 +24,5 @@ pip install --editable ./tomatos
 After assigning the two paths at the beginning of the config/demo.yaml you can do
 ```bash
 source ./tomatos_env/bin/activate
-tomatos --demo
+tomatos --config /Users/fred/dev/tomatos/configs/demo.yaml --prep --train --plot
 ```

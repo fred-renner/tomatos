@@ -55,7 +55,7 @@ num_steps: 50
 # learning rate
 lr: 0.01
 # start and minimum value for the bandwidth reduction
-bw_init: 0.2
+bw_init: 0.15
 bw_min: 0.01
 # slope value in the sigmoid
 slope: 20_000

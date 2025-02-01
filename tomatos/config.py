@@ -97,8 +97,10 @@ class Setup:
         self.kde_sampling = 1000  # its smooth, but can be expensive
         self.kde_bins = np.linspace(0, 1, self.kde_sampling)
 
+        self.debug = args.debug
         if args.debug:
-            self.num_steps = 5 if yml["num_steps"] == 200 else yml["num_steps"]
+            self.debug = True
+            self.num_steps = 5
 
         # nr of k-folds used for scaling the weights
         self.k_fold_sf = (
