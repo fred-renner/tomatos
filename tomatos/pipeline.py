@@ -1,19 +1,22 @@
-import jax.numpy as jnp
-import jax
-import neos
-import pyhf
-import tomatos.histograms
-import tomatos.select
-import tomatos.utils
-import tomatos.train_utils
-import tomatos.workspace
-import tomatos.constraints
 import pprint
-
 from functools import partial
 
+import jax
+import jax.numpy as jnp
+import neos
+import pyhf
 
-def make_hists(pars, data, config, scale, validate_only=False, filter_hists=False):
+import tomatos.constraints
+import tomatos.histograms
+import tomatos.select
+import tomatos.train_utils
+import tomatos.utils
+import tomatos.workspace
+
+
+def make_hists(
+    pars, data, config, scale, validate_only=False, filter_return_hists=False
+):
     # event manipulations are done via weights to the base weights
     base_weights = data[:, :, config.weight_idx]
     cut_weights = tomatos.select.cuts(pars, data, config, validate_only)
@@ -26,9 +29,9 @@ def make_hists(pars, data, config, scale, validate_only=False, filter_hists=Fals
         pars, data, config, sel_weights, scale, validate_only
     )
     # calculate additional hists based on existing hists
-    hists = tomatos.workspace.hist_transforms(hists)
+    hists = tomatos.workspace.hist_transforms(hists, validate_only)
     # flatten and filter if desired
-    hists = tomatos.utils.filter_hists(config, hists) if filter_hists else hists
+    hists = tomatos.utils.filter_hists(config, hists) if filter_return_hists else hists
     return hists
 
 
@@ -38,9 +41,10 @@ def loss_fn(
     config,
     scale,
     validate_only=False,
-    filter_hists=True,
+    filter_return_hists=True,
 ):
-
+    # the main reason why not everything in here is not jitted, is that the
+    # config is not a jax compatible type (pytree), this is a bit tedious to do
     hists = make_hists(pars, data, config, scale, validate_only)
     model, hists = tomatos.workspace.pyhf_model(hists, config)
 
@@ -55,5 +59,5 @@ def loss_fn(
             loss_value = tomatos.constraints.penalize_loss(loss_value, hists)
 
     # flatten and reduces to the configured filter
-    hists = tomatos.utils.filter_hists(config, hists) if filter_hists else hists
+    hists = tomatos.utils.filter_hists(config, hists) if filter_return_hists else hists
     return loss_value, hists

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import logging
+
 import equinox as eqx
 import jax
+import numpy as np
+
 import tomatos.config
-import tomatos.training
 import tomatos.plotting
 import tomatos.preprocess
+import tomatos.training
 import tomatos.utils
-import json
-import numpy as np
-import tomatos.config
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", type=str, default="")

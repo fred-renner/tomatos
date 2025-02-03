@@ -1,28 +1,29 @@
+import copy
+import json
 import logging
+import os
 import sys
 from functools import partial
 from time import perf_counter
-import matplotlib.pyplot as plt
+
+import equinox as eqx
+import h5py
+import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
-import jax
+from alive_progress import alive_it
 from jaxopt import OptaxSolver
 
-import tomatos.histograms
-import tomatos.utils
-import tomatos.workspace
-import tomatos.pipeline
-import tomatos.solver
-import equinox as eqx
 import tomatos.batcher
 import tomatos.constraints
-import copy
-import json
+import tomatos.histograms
 import tomatos.nn
-from alive_progress import alive_it
-import h5py
-import os
+import tomatos.pipeline
+import tomatos.solver
+import tomatos.utils
+import tomatos.workspace
 
 
 def binary_cross_entropy(preds, labels):
@@ -74,7 +75,7 @@ def log_hists(config, metrics, test_hists, hists):
         metrics["h_" + h_key + "_test"] = h
 
         # nominal hists
-    logging.info("--- Nominal Hists ---")
+    logging.info("--- Nominal (binned KDE) ---")
     for key, h in hists.items():
         if config.nominal in key and not "STAT" in key:
             logging.info(f"{key.ljust(25)}: {h}")
@@ -144,7 +145,7 @@ def sample_kde_distribution(
         nominal_data,
         kde_config,
         scale,
-        filter_hists=True,
+        filter_return_hists=True,
     )
 
     kde_dist = {
@@ -173,9 +174,9 @@ def log_sharp_hists(
         config,
         train_sf,
         validate_only=True,  # sharp hists
-        filter_hists=True,
+        filter_return_hists=True,
     )
-    logging.info("--- Nominal (hist) / (Sharp hist) Ratios ---")
+    logging.info("--- Nominal (binned KDE) / (True hist) ---")
     for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
         if config.nominal in h_key and not "STAT" in h_key:
             # hist approx ratio
@@ -187,8 +188,8 @@ def do_metrics_exist(config):
     if os.path.exists(config.metrics_file_path) and not config.debug:
         user_input = input(
             f"{config.metrics_file_path} exists. \n"
-            f"Seems like you trained this already \n"
-            f"Overwrite and Proceed? (y/n):"
+            "Seems like you trained this already \n"
+            "Overwrite and Proceed? (y/n):"
         )
         if user_input.lower() != "y":
             logging.info("OK, Bye!")

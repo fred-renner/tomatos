@@ -1,11 +1,13 @@
+import json
+import logging
+
 import h5py
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-import logging
 import uproot
-import json
-import tomatos.utils
 from alive_progress import alive_it
+from sklearn.preprocessing import MinMaxScaler
+
+import tomatos.utils
 
 
 def init_2d_data(config):
@@ -18,13 +20,13 @@ def init_2d_data(config):
                     None,  # allows resize, makes appending easy, instead of idx tracking
                     len(config.vars),
                 ),
-                compression="gzip" if config.compress_input_files else None,
+                compression="lzf",
                 dtype="f4",
                 chunks=True,  # autochunking, since resizing
             )
 
 
-def fill(
+def fill_2d_and_find_scale(
     config,
     sample_sys,
     data,
@@ -52,10 +54,10 @@ def fill_2d_data(config, scaler):
             tree = file[config.tree_name]
             for data in tree.iterate(step_size=config.chunk_size, library="np"):
                 #######
-                # pre/analysis-selection could be here
+                # preselection could be here
                 # ...transfer generate test files code
                 #######
-                fill(config, sample_sys, data, scaler)
+                fill_2d_and_find_scale(config, sample_sys, data, scaler)
 
 
 def init_preprocess_md(config, max_events):
@@ -104,12 +106,13 @@ def init_splits(config, preprocess_md):
                     preprocess_md[split]["events"],
                     len(config.vars),
                 ),
-                compression="gzip" if config.compress_input_files else None,
+                compression="lzf",
                 dtype="f4",
                 chunks=(
                     len(config.sample_sys),
                     np.minimum(
-                        config.chunk_size, preprocess_md[split]["events"] / config.n_chunk_combine
+                        config.chunk_size,
+                        preprocess_md[split]["events"] / config.n_chunk_combine,
                     ),  # / 2 see batcher
                     len(config.vars),
                 ),

@@ -1,10 +1,14 @@
+import json
 import os
-import numpy as np
 import pathlib
-import pyhf
+
 import jax
-from alive_progress import config_handler
+import numpy as np
+import pyhf
 import yaml
+from alive_progress import config_handler
+
+import tomatos.utils
 
 config_handler.set_global(enrich_print=False)
 
@@ -14,7 +18,7 @@ jax.config.update("jax_enable_x64", True)
 # avoid some warnings on cpu
 jax.config.update("jax_platforms", "cpu")
 # more readable logging
-jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
+jax.numpy.set_printoptions(precision=1, suppress=True, floatmode="fixed")
 
 # some debugging options, these can be very useful!
 # jax.numpy.set_printoptions(suppress=True)
@@ -24,7 +28,6 @@ jax.numpy.set_printoptions(precision=5, suppress=True, floatmode="fixed")
 # jax.config.update("jax_debug_nans", True)
 
 
-# analysis_path = pathlib.Path(__file__).parent / "../tests/demo.yaml"
 class Setup:
     def __init__(self, args):
 
@@ -33,6 +36,68 @@ class Setup:
 
         for k, v in yml.items():
             setattr(self, k, v)
+
+        self._configure_samples(yml)
+        # jax likes predefined arrays.
+        # self.vars defines the main data array of dimension (n_samples, n_events, self.vars).
+        # Need to keep event correspondence for weights, preprocessing,
+        # batching,...
+        # keeping them all together simplifies the program workflow a lot even
+        # though it comes with something to care. order matters, see below.
+        self.vars = [
+            *yml["nn_input_vars"],
+            yml["event_weight_var"],
+            *yml["aux_vars"],
+        ]
+        # the last nn variable, in that order defines the nn inputs and also
+        # the last variable that will be min max scaled
+        # sliced array access is a huge speed up when slicing
+        # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
+        # + 1 to also include the given one when slicing
+        self.nn_inputs_idx_end = len(yml["nn_input_vars"])
+        self.weight_idx = self.vars.index(yml["event_weight_var"])
+        self.cls_var_idx = self.vars.index(yml["cls_var"])
+
+        # memory layout on disk per sample_sys, not in yaml
+        self.n_chunk_combine = 2  # see batcher for this
+        self.chunk_size = int(
+            yml["batch_size"] / len(self.sample_sys) / self.n_chunk_combine
+        )
+
+        # add the var index
+        for cut_var in yml["opt_cuts"]:
+            yml["opt_cuts"][cut_var]["idx"] = self.vars.index(cut_var)
+        self.opt_cuts = yml["opt_cuts"]
+
+        self.bins = np.linspace(0, 1, yml["n_bins"] + 1)
+
+        # datapoints in kde plot
+        self.kde_sampling = 100 
+        self.kde_bins = np.linspace(0, 1, self.kde_sampling)
+
+        self.debug = args.debug
+        if args.debug:
+            self.debug = True
+            self.num_steps = 20
+
+        # nr of k-folds used for scaling the weights
+        self.k_fold_sf = (
+            yml["n_k_folds"] / (yml["n_k_folds"] - 1) if yml["n_k_folds"] > 1 else 1
+        )
+
+        # some global settings
+        self.fit_region = "SR_btag_2"
+        # hists that contain these strings will be plotted
+        self.plot_hists_filter = [self.signal_sample, "bkg_estimate"]
+
+        # Create output directories
+        self._setup_paths(args, yml)
+
+        # save config
+        with open(self.config_file_path, "w") as json_file:
+            json.dump(tomatos.utils.to_python_lists(self.__dict__), json_file, indent=4)
+
+    def _configure_samples(self, yml):
 
         # collect input files
         self.ntuple_paths = [
@@ -60,68 +125,13 @@ class Setup:
         self.sample_files_dict = {
             k: v for k, v in zip(self.sample_sys, self.ntuple_paths)
         }
-        # memory layout on disk per sample_sys, not in yaml
-        self.n_chunk_combine = 2  # see batcher for this
-        self.chunk_size = int(
-            yml["batch_size"] / len(self.sample_sys) / self.n_chunk_combine
-        )
-
-        # jax likes predefined arrays.
-        # self.vars defines the main data array of dimension (n_samples, n_events, self.vars).
-        # Need to keep event correspondence for weights, preprocessing,
-        # batching,...
-        # keeping them all together simplifies the program workflow a lot even
-        # though it comes with something to care. order matters, see below.
-        self.vars = [
-            *yml["nn_input_vars"],
-            yml["event_weight_var"],
-            *yml["aux_vars"],
-        ]
-        # the last nn variable, in that order defines the nn inputs and also
-        # the last variable that will be min max scaled
-        # sliced array access is a huge speed up when slicing
-        # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
-        # + 1 to also include the given one when slicing
-        self.nn_inputs_idx_end = len(yml["nn_input_vars"])
-        self.weight_idx = self.vars.index(yml["event_weight_var"])
-        self.cls_var_idx = self.vars.index(yml["cls_var"])
-
-        # add the var index
-        for cut_var in yml["opt_cuts"]:
-            yml["opt_cuts"][cut_var]["idx"] = self.vars.index(cut_var)
-        self.opt_cuts = yml["opt_cuts"]
-
-        self.bins = np.linspace(0, 1, yml["bins"] + 1)
-
-        # datapoints in kde plot
-        self.kde_sampling = 1000  # its smooth, but can be expensive
-        self.kde_bins = np.linspace(0, 1, self.kde_sampling)
-
-        self.debug = args.debug
-        if args.debug:
-            self.debug = True
-            self.num_steps = 5
-
-        # nr of k-folds used for scaling the weights
-        self.k_fold_sf = (
-            yml["n_k_folds"] / (yml["n_k_folds"] - 1) if yml["n_k_folds"] > 1 else 1
-        )
-
-        # hists that contain these strings will be plotted
-        self.plot_hists_filter = [self.signal_sample, "bkg_estimate"]
-        # skip frames by modulo for movie
-        self.movie_batch_modulo = 1
-        self.fig_size = (9, 5)
-
-        # Create output directories
-        self._setup_paths(args, yml)
 
     def _setup_paths(self, args, yml):
         if self.suffix != "":
-            results_folder = f"tomatos_{self.objective}_bins_{yml['bins']}_steps_{self.num_steps}_{self.suffix}/"
+            results_folder = f"tomatos_{self.objective}_steps_{self.num_steps}_bins_{yml['n_bins']}_{self.suffix}/"
         else:
             results_folder = (
-                f"tomatos_{self.objective}_bins_{self.bins}_steps_{self.num_steps}/"
+                f"tomatos_{self.objective}_steps_{self.num_steps}_bins_{self.bins}/"
             )
         results_folder = results_folder.replace(".", "p")
         if args.debug:

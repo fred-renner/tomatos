@@ -2,11 +2,9 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
-import tomatos.utils
-
 import relaxed
-import equinox as eqx
+
+import tomatos.utils
 
 
 # @partial(jax.jit, static_argnames=["config", "validate_only"])
@@ -46,13 +44,13 @@ def events(data, config, base_weights):
     btag_1 = data[:, :, config.vars.index("bool_btag_1")]
     btag_2 = data[:, :, config.vars.index("bool_btag_2")]
     h_m_idx = config.vars.index("h_m")
-    h_m = tomatos.utils.inverse_min_max_scale(
-        config,
-        data[:, :, h_m_idx],
-        h_m_idx,
-    )
-
-    # clear caches each update other
+    # if the var is also an input vars
+    # h_m = tomatos.utils.inverse_min_max_scale(
+    #     config,
+    #     data[:, :, h_m_idx],
+    #     h_m_idx,
+    # )
+    h_m = data[:, :, h_m_idx]
     SR = (110e3 < h_m) & (h_m < 130e3)
     VR = (100e3 < h_m) & (h_m < 110e3) | (130e3 < h_m) & (h_m < 150e3)
     CR = (80e3 < h_m) & (h_m < 100e3) | (150e3 < h_m) & (h_m < 170e3)
@@ -61,8 +59,8 @@ def events(data, config, base_weights):
         # "base_weights": base_weights,
         "SR_btag_1": base_weights * SR * btag_1,
         "SR_btag_2": base_weights * SR * btag_2,
-        # "VR_btag_1": base_weights * VR * btag_1,
-        # "VR_btag_2": base_weights * VR * btag_2,
+        "VR_btag_1": base_weights * VR * btag_1,
+        "VR_btag_2": base_weights * VR * btag_2,
         "CR_btag_1": base_weights * CR * btag_1,
         "CR_btag_2": base_weights * CR * btag_2,
         "SR_btag_2_my_sf_unc_up": base_weights

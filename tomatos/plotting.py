@@ -1,25 +1,22 @@
+import glob
+import json
+import logging
+import math
+import os
+
+import h5py
+import imageio
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import pyhf
 import relaxed
-import os
+import uproot
+from alive_progress import alive_it
+
 import tomatos.histograms
 import tomatos.utils
 import tomatos.workspace
-import logging
-import uproot
-
-import os
-import numpy as np
-import uproot
-import matplotlib.pyplot as plt
-import math
-import h5py
-import json
-from alive_progress import alive_it
-import imageio
-import glob
 
 
 def plot_inputs(config):
@@ -58,9 +55,15 @@ def plot_inputs(config):
             # Filter data within 3 standard deviations
             filtered_data = data[(data > mean - (3 * std)) & (data < mean + (3 * std))]
 
-            # Plot histogram
             with np.errstate(divide="ignore", invalid="ignore"):
                 ax.hist(
+                    filtered_data,
+                    bins=30,
+                    density=True,
+                    histtype="step",
+                    label=sample,
+                )
+                plt.hist(
                     filtered_data,
                     bins=30,
                     density=True,
@@ -71,6 +74,10 @@ def plot_inputs(config):
         ax.set_ylabel("Event Density")
         ax.legend()
 
+        # Save individual plot
+        plt.xlabel(var)
+        plt.ylabel("Event Density")
+        plt.legend()
         plt.tight_layout()
         plt.savefig(f"{plot_path}/{var}.pdf")
         plt.close()
@@ -111,6 +118,7 @@ def loss(config, metrics):
     plt.xlabel("Batch")
     loss = r"$CL_s$" if "cls" in config.objective else "BCE"
     plt.ylabel(f"{loss} Loss")
+    plt.ylim(top=np.max(metrics["train_loss"][1:]))
     fig_finalize(config, "loss.pdf")
 
 
@@ -271,7 +279,7 @@ def assemble_hist(config, metrics, h_keys, batch_i):
 
 
 def best_hist(config, metrics, dataset):
-    plt.figure(figsize=config.fig_size)
+    plt.figure(figsize=(9, 5))
     h_keys = collect_hist_keys(metrics, dataset)
     assemble_hist(
         config,
@@ -296,7 +304,10 @@ def model_plots(config):
             sharp_hist_deviation(config, metrics)
         movie(config, metrics)
 
+
 from matplotlib.patches import StepPatch
+
+
 def movie(config, metrics):
     logging.info("Making Movie")
     h_keys = collect_hist_keys(metrics, dataset="train")
@@ -309,6 +320,7 @@ def movie(config, metrics):
 
             # dpi ideally divisable by 16 otherwise imageio resizes them
             fig, ax = plt.subplots(figsize=(9, 5))
+            ax.set_title(f"Batch {i}")
             assemble_hist(
                 config,
                 metrics,
@@ -316,13 +328,13 @@ def movie(config, metrics):
                 batch_i=i,
             )
 
-           # ymax scale only for the hists, as kde might be super large
+            # ymax scale only for the hists, as kde might be super large
             for patch in ax.patches:
                 if isinstance(patch, StepPatch):
                     vertices = patch.get_path().vertices
                     y_values = vertices[:, 1]  # Extract y-values from vertices
                     current_max = np.max(y_values)
-                    ymax = max(ymax, current_max * 1.3)  # Add margin
+                    ymax = max(ymax, current_max * 1.1)  # Add margin
 
             ax.set_ylim([0, ymax])
             fig_finalize(
@@ -333,7 +345,9 @@ def movie(config, metrics):
             )
 
         # movie
-        writer = imageio.get_writer(config.results_path + "hist_evolution.mp4", fps=20)
+        movie_path = config.results_path + "hist_evolution.mp4"
+        logging.info(f"movie here: {movie_path}")
+        writer = imageio.get_writer(movie_path, fps=20)
         for file in sorted(glob.glob(os.path.join(config.gif_path, f"*.png"))):
             im = imageio.imread(file)
             writer.append_data(im)

@@ -1,12 +1,12 @@
 from functools import partial
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import tomatos.utils
-
 import relaxed
-import equinox as eqx
+
+import tomatos.utils
 
 
 # modified from relaxed and added weights, its nice to have it here to see
@@ -223,11 +223,19 @@ def fill_hists(
         hists["SR_btag_1"]["bkg"]["STAT_1UP"] = h_w2_SR_btag_1 + sigma
         hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
 
+        # for bkg estimate
         hists["CR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
             i=bkg_idx, weights=sel_weights["CR_btag_2"]
         )
         hists["CR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
             i=bkg_idx, weights=sel_weights["CR_btag_1"]
+        )
+        
+        hists["VR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
+            i=bkg_idx, weights=sel_weights["VR_btag_2"]
+        )
+        hists["VR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
+            i=bkg_idx, weights=sel_weights["VR_btag_1"]
         )
 
         # some special signal weight unc, e.g. btag sf

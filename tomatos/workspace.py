@@ -1,8 +1,8 @@
+import pprint
+
 import jax.numpy as jnp
 import numpy as np
 import pyhf
-
-import pprint
 
 
 def get_generator_weight_envelope(hists):
@@ -55,7 +55,7 @@ def zero_protect(hists, thresh=0.001):
         return jnp.where(hists < thresh, thresh, hists)
 
 
-def hist_transforms(hists):
+def hist_transforms(hists, validate_only):
 
     # protect for e.g. divisions in the following
     hists = zero_protect(hists)
@@ -87,6 +87,25 @@ def hist_transforms(hists):
         hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * w_CR_stat_down
     )
 
+    # i leave this as its illustrative to what you could do
+    # Backround Shape Uncertainty
+    # don't use this when optimizing --> sculpting
+    if validate_only:
+        hists["VR_btag_2"]["bkg_estimate"] = {}
+
+        hists["VR_btag_2"]["bkg_estimate"]["NOSYS"] = (
+            hists["VR_btag_1"]["bkg"]["NOSYS"] * w_CR
+        )
+        bkg_shapesys_up, bkg_shapesys_down = symmetric_up_down_sf(
+            hists["VR_btag_2"]["bkg_estimate"]["NOSYS"],
+            hists["VR_btag_2"]["bkg"]["NOSYS"],
+        )
+        hists["SR_btag_2"]["bkg_estimate"]["BKG_SHAPE_1UP"] = (
+            hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * bkg_shapesys_up
+        )
+        hists["SR_btag_2"]["bkg_estimate"]["BKG_SHAPE_1DOWN"] = (
+            hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * bkg_shapesys_down
+        )
     # e.g. if generator weights are available
     # hists["gen_up"], hists["gen_down"] = get_generator_weight_envelope(hists)
 
@@ -162,16 +181,15 @@ def sample_spec_from_modifiers(hists, config, modifiers, samples):
 
 
 def pyhf_model(hists, config):
-    # attentive user action needed here
+    # here you builds the json worspace structure with hists
 
     # standard uncerainty modifiers per sample
     # enforce 1UP, 1DOWN for autosetup here
     modifiers = get_modifiers(hists, config)
 
-    # exclude samples from autosetup
-    exclude = [config.signal_sample, "bkg"]
-    auto_samples = list(set(modifiers.keys()) - set(exclude))
-    auto_spec = sample_spec_from_modifiers(hists, config, modifiers, auto_samples)
+    sample_spec = sample_spec_from_modifiers(
+        hists, config, modifiers, samples=["bkg_estimate"]
+    )
     # this is the workspace jsons
     spec = {
         "channels": [
@@ -207,7 +225,7 @@ def pyhf_model(hists, config):
                             *modifiers[config.signal_sample],
                         ],
                     },
-                    *auto_spec,
+                    *sample_spec,
                 ],
             }
         ],
