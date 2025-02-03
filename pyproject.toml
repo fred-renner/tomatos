@@ -27,6 +27,7 @@ dependencies = [
     "uproot",
     "alive-progress",
     "vector",
+    "isort",
 ]
 
 [tool.setuptools.packages]

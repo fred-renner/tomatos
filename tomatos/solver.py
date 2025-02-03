@@ -1,8 +1,10 @@
+from functools import partial
+
 import matplotlib.pyplot as plt
 import optax
 from jaxopt import OptaxSolver
+
 import tomatos.pipeline
-from functools import partial
 import tomatos.utils
 
 
@@ -56,7 +58,7 @@ def setup(config, pars):
         ),
         optax.masked(
             optax.clip(max_delta=config.update_limit_cuts),
-            mask(pars, config.opt_cuts.keys()),
+            mask(pars, [key for key in pars.keys() if "cut_" in key]),
         ),
     )
 

@@ -8,9 +8,9 @@ nominal: NOSYS
 tree_name: FilteredTree
 signal_sample: "ggZH125_vvbb"
 # total events that are batched in training from all sample_sys combined
-batch_size: 100_000
-# slows down I/O, but saves disk memory
-compress_input_files: False
+# 1e7 with 20 vars ~1.6 GB in memory
+batch_size: 1_000_000
+
 # the main data array is defined by (n_samples, n_events, vars)
 nn_input_vars:
   - "j1_pt"
@@ -24,9 +24,9 @@ nn_input_vars:
   - "h_pt"
   - "h_eta"
   - "h_phi"
-  - "h_m"
 event_weight_var: weight
 aux_vars:
+  - "h_m"
   - "bool_btag_1"
   - "bool_btag_2"
   - "my_sf_unc_up"
@@ -45,19 +45,19 @@ objective: "cls_nn"
 # you can speed up cls_var, if you only setup the var and the cut_vars in
 cls_var: "h_m"
 
-bins: 5
-# includes bin edges in optimization
-include_bins: true
+n_bins: 5
+# includes bin edges in optimization, not necessary for cls_nn
+include_bins: false
 # results folder suffix
 suffix: "demo"
 # train steps
-num_steps: 50
+num_steps: 20
 # learning rate
 lr: 0.01
-# start and minimum value for the bandwidth reduction
-bw_init: 0.15
+# start and minimum value for the bandwidth adaptation
+bw_init: 0.2
 bw_min: 0.01
-# slope value in the sigmoid
+# slope value in the sigmoid, this pretty sharp!
 slope: 20_000
 # need to limit these updates to avoid gradient explosion
 update_limit_bw: 0.01
@@ -69,12 +69,13 @@ update_limit_cuts: 0.001 # for min max scaled between (0,1)
 opt_cuts:
   j1_pt:
     keep: "above" # or below
-    init: 20_000
+    init: 30_000
   j2_pt:
     keep: "above"
     init: 20_000
 
 # applies a scale factor to the histograms accordingly
 n_k_folds: 1
-# This is super manual and probaly shouldn't be here as it depends on the user defined event selection
-fit_region: "SR_btag_2"
+
+# skip frames by modulo for movie
+movie_batch_modulo: 1

@@ -1,27 +1,28 @@
+import copy
+import json
 import logging
 import sys
 from functools import partial
 from time import perf_counter
-import matplotlib.pyplot as plt
+
+import equinox as eqx
+import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
-import jax
+from alive_progress import alive_it
 from jaxopt import OptaxSolver
 
-import tomatos.histograms
-import tomatos.utils
-import tomatos.workspace
-import tomatos.pipeline
-import tomatos.solver
-import equinox as eqx
 import tomatos.batcher
 import tomatos.constraints
-import copy
-import json
+import tomatos.histograms
 import tomatos.nn
-from alive_progress import alive_it
+import tomatos.pipeline
+import tomatos.solver
 import tomatos.train_utils
+import tomatos.utils
+import tomatos.workspace
 
 
 def init_opt_pars(config, nn_pars):
@@ -98,13 +99,14 @@ def evaluate_losses(opt_pars, config, batch):
 
 
 def run(config):
+    # expensive in here is evaluate_losses and solver.update
 
     solver, state, opt_pars, batch, best_test_loss = train_init(config)
 
     metrics = {}
     # this holds optimization params like cuts for epochs used for deployment
     infer_metrics = {}
-    # check so not mistakenly overwrite
+    # don't overwrite by mistake
     tomatos.train_utils.do_metrics_exist(config)
 
     # one step is one batch (not epoch)
@@ -137,10 +139,7 @@ def run(config):
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
 
         ###### excessive logging, turn off as you please ######
-        # expensive is only log_kde and log_sharp_hists
-
         hists = state.aux
-        # logging
         bins = (
             np.array([0, *opt_pars["bins"], 1]) if config.include_bins else config.bins
         )
@@ -150,9 +149,9 @@ def run(config):
         )
 
         if "cls" in config.objective:
-            tomatos.train_utils.log_sharp_hists(
-                opt_pars, train_data, config, train_sf, hists, metrics
-            )
+            # tomatos.train_utils.log_sharp_hists(
+            #     opt_pars, train_data, config, train_sf, hists, metrics
+            # )
             tomatos.train_utils.log_bins(config, metrics, bins, infer_metrics_i)
             tomatos.train_utils.log_cuts(config, opt_pars, metrics, infer_metrics_i)
             tomatos.train_utils.log_bw(metrics, opt_pars)
@@ -172,9 +171,8 @@ def run(config):
 
         tomatos.train_utils.write_metrics(config, metrics, i)
 
-        # if you want to run locally we need to clear the compilation caches
-        # otherwise memory explodes, will see how it scales on gpu
-        tomatos.utils.clear_caches()
+        # if your memory explodes, clear jax compilation caches
+        # tomatos.utils.clear_caches()
 
         end = perf_counter()
         logging.info(f"train loss: {state.value}")

@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def min_events_per_bin(h, thresh, intensity=0.01):
+def min_events_per_bin(h, thresh, intensity=0.001):
     # check where the hist is smaller than thresh and use the relative
     # deviation per bin to penalize
     bin_penalty = jnp.where(h < thresh, (thresh - h) / h, 0)
@@ -12,10 +12,12 @@ def min_events_per_bin(h, thresh, intensity=0.01):
 
 def penalize_loss(loss_value, hists):
 
-    # reasonable for fitting, also critical to distribute events with bandwidth
+    # reasonable for fitting + critical to distribute events with bandwidth
     # reduction mechansim
     loss_value += min_events_per_bin(
-        hists["SR_btag_2"]["bkg_estimate"]["NOSYS"], thresh=5, intensity=0.01
+        hists["SR_btag_2"]["bkg_estimate"]["NOSYS"],
+        thresh=10,
+        intensity=0.001,
     )
 
     return loss_value

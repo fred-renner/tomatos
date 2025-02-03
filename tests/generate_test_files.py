@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import uproot
-import numpy as np
-import vector
-import subprocess
-import os
 import csv
+import os
+import subprocess
+
+import numpy as np
+import uproot
+import vector
 
 files = {
     "mc20_13TeV_MC_PowhegPythia8EvtGen_NNPDF3_AZNLO_ggZH125_vvbb.root": "https://opendata.cern.ch/record/80012/files/mc20_13TeV_MC_PowhegPythia8EvtGen_NNPDF3_AZNLO_ggZH125_vvbb_file_index.json_0",

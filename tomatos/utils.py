@@ -1,23 +1,22 @@
+import gc
+import json
 import logging
+import os
+import pprint
+import sys
+from collections import namedtuple
 from functools import partial
+
+import h5py
 import jax
 import jax.numpy as jnp
 import numpy as np
+import psutil
 import pyhf
-import gc
-import sys
+
 import tomatos.histograms
 import tomatos.training
 import tomatos.workspace
-import psutil
-from collections import namedtuple
-
-import h5py
-import numpy as np
-import json
-import os
-
-import pprint
 
 
 def setup_logger(config):
@@ -179,7 +178,7 @@ def clear_caches():
     # clear caches each update otherwise memory explodes
     # https://github.com/google/jax/issues/10828
     process = psutil.Process()
-    if process.memory_info().vms > 4 * 2**30:  # >4GB memory usage
+    if process.memory_info().vms > 8 * 2**30:  # >8GB memory usage
         for module_name, module in sys.modules.items():
             if module_name.startswith("jax"):
                 for obj_name in dir(module):
