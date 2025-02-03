@@ -1,13 +1,12 @@
 import json
 import os
 import pathlib
-
 import jax
 import numpy as np
 import pyhf
 import yaml
 from alive_progress import config_handler
-
+import psutil
 import tomatos.utils
 
 config_handler.set_global(enrich_print=False)
@@ -18,7 +17,7 @@ jax.config.update("jax_enable_x64", True)
 # avoid some warnings on cpu
 jax.config.update("jax_platforms", "cpu")
 # more readable logging
-jax.numpy.set_printoptions(precision=1, suppress=True, floatmode="fixed")
+jax.numpy.set_printoptions(precision=3, suppress=True, floatmode="fixed")
 
 # some debugging options, these can be very useful!
 # jax.numpy.set_printoptions(suppress=True)
@@ -72,13 +71,10 @@ class Setup:
         self.bins = np.linspace(0, 1, yml["n_bins"] + 1)
 
         # datapoints in kde plot
-        self.kde_sampling = 100 
+        self.kde_sampling = 100
         self.kde_bins = np.linspace(0, 1, self.kde_sampling)
 
         self.debug = args.debug
-        if args.debug:
-            self.debug = True
-            self.num_steps = 20
 
         # nr of k-folds used for scaling the weights
         self.k_fold_sf = (
@@ -96,6 +92,9 @@ class Setup:
         # save config
         with open(self.config_file_path, "w") as json_file:
             json.dump(tomatos.utils.to_python_lists(self.__dict__), json_file, indent=4)
+
+        # initial memory usage in GB
+        self.initial_vms_gb = psutil.Process().memory_info().vms / (2**30)
 
     def _configure_samples(self, yml):
 

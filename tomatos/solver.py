@@ -14,17 +14,16 @@ def setup(config, pars):
 
     # this has worked particularly well and has a strong regularization effect
     # due to in between large lr
-    # lr_schedule = optax.linear_onecycle_schedule(
-    #     transition_steps=config.num_steps,
-    #     peak_value=config.lr,
-    #     pct_start=0.3,
-    #     div_factor=25,
-    #     final_div_factor=10000,
-    #     pct_final=0.85,
-    # )
-    lr_schedule = optax.constant_schedule(config.lr)
-
-    if config.debug:
+    if "linear_cycle" in config.lr_schedule:
+        lr_schedule = optax.linear_onecycle_schedule(
+            transition_steps=config.num_steps,
+            peak_value=config.lr,
+            pct_start=0.3,
+            div_factor=5,
+            final_div_factor=10,
+            pct_final=0.85,
+        )
+    elif "constant" in config.lr_schedule:
         lr_schedule = optax.constant_schedule(config.lr)
 
     learning_rates = [lr_schedule(i) for i in range(config.num_steps)]

@@ -13,6 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 import psutil
 import pyhf
+import h5py
 
 import tomatos.histograms
 import tomatos.training
@@ -171,14 +172,13 @@ def init_metrics(
     return metrics
 
 
-import h5py
-
-
-def clear_caches():
-    # clear caches each update otherwise memory explodes
+def clear_caches(config):
+    # clear jax compilation cache for larger than 16 GB, note that this does
+    # not easily translate to rss
     # https://github.com/google/jax/issues/10828
     process = psutil.Process()
-    if process.memory_info().vms > 8 * 2**30:  # >8GB memory usage
+    vms_gb = process.memory_info().vms / (2**30)
+    if (vms_gb - config.initial_vms_gb) > 16:  # >16GB memory usage
         for module_name, module in sys.modules.items():
             if module_name.startswith("jax"):
                 for obj_name in dir(module):

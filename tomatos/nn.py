@@ -9,19 +9,14 @@ class NeuralNetwork(eqx.Module):
     layers: list
 
     def __init__(self, n_features):
-        rng_state = 0
-        key = jax.random.PRNGKey(rng_state)
-        key1, key2, key3, key4, key5 = jax.random.split(key, 5)
+        key = jax.random.PRNGKey(seed=0)
+        key1, key2, key3 = jax.random.split(key, 3)
         self.layers = [
             eqx.nn.Linear(n_features, 100, key=key1),
             jax.nn.relu,
             eqx.nn.Linear(100, 100, key=key2),
             jax.nn.relu,
-            eqx.nn.Linear(100, 100, key=key3),
-            jax.nn.relu,
-            eqx.nn.Linear(100, 100, key=key4),
-            jax.nn.relu,
-            eqx.nn.Linear(100, 1, key=key5),
+            eqx.nn.Linear(100, 1, key=key3),
             jax.nn.sigmoid,
         ]
 

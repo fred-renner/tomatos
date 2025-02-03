@@ -45,11 +45,11 @@ def events(data, config, base_weights):
     btag_2 = data[:, :, config.vars.index("bool_btag_2")]
     h_m_idx = config.vars.index("h_m")
     # if the var is also an input vars
-    # h_m = tomatos.utils.inverse_min_max_scale(
-    #     config,
-    #     data[:, :, h_m_idx],
-    #     h_m_idx,
-    # )
+    h_m = tomatos.utils.inverse_min_max_scale(
+        config,
+        data[:, :, 2],
+        2,
+    )
     h_m = data[:, :, h_m_idx]
     SR = (110e3 < h_m) & (h_m < 130e3)
     VR = (100e3 < h_m) & (h_m < 110e3) | (130e3 < h_m) & (h_m < 150e3)

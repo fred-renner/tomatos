@@ -72,6 +72,7 @@ def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins):
 def log_hists(config, metrics, test_hists, hists):
     for h_key, h in hists.items():
         metrics["h_" + h_key] = h
+    for h_key, h in test_hists.items():
         metrics["h_" + h_key + "_test"] = h
 
         # nominal hists
