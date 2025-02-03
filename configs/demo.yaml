@@ -51,13 +51,16 @@ include_bins: false
 # results folder suffix
 suffix: "demo"
 # train steps
-num_steps: 20
+num_steps: 200
 # learning rate
-lr: 0.01
+lr: 0.005
+# can choose from linear_cycle, constant
+lr_schedule: "linear_cycle"
 # start and minimum value for the bandwidth adaptation
-bw_init: 0.2
-bw_min: 0.01
-# slope value in the sigmoid, this pretty sharp!
+# this needs to become a density measurement
+bw_init: 0.25
+bw_min: 0.001 
+# slope value in the sigmoid, this is pretty sharp!
 slope: 20_000
 # need to limit these updates to avoid gradient explosion
 update_limit_bw: 0.01

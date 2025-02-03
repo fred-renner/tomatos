@@ -149,9 +149,9 @@ def run(config):
         )
 
         if "cls" in config.objective:
-            # tomatos.train_utils.log_sharp_hists(
-            #     opt_pars, train_data, config, train_sf, hists, metrics
-            # )
+            tomatos.train_utils.log_sharp_hists(
+                opt_pars, train_data, config, train_sf, hists, metrics
+            )
             tomatos.train_utils.log_bins(config, metrics, bins, infer_metrics_i)
             tomatos.train_utils.log_cuts(config, opt_pars, metrics, infer_metrics_i)
             tomatos.train_utils.log_bw(metrics, opt_pars)
@@ -172,7 +172,7 @@ def run(config):
         tomatos.train_utils.write_metrics(config, metrics, i)
 
         # if your memory explodes, clear jax compilation caches
-        # tomatos.utils.clear_caches()
+        tomatos.utils.clear_caches(config)
 
         end = perf_counter()
         logging.info(f"train loss: {state.value}")

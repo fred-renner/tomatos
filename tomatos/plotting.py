@@ -118,7 +118,7 @@ def loss(config, metrics):
     plt.xlabel("Batch")
     loss = r"$CL_s$" if "cls" in config.objective else "BCE"
     plt.ylabel(f"{loss} Loss")
-    plt.ylim(top=np.max(metrics["train_loss"][1:]))
+    plt.ylim(top=np.max(metrics["train_loss"][1:] * 1.1))
     fig_finalize(config, "loss.pdf")
 
 
@@ -334,7 +334,7 @@ def movie(config, metrics):
                     vertices = patch.get_path().vertices
                     y_values = vertices[:, 1]  # Extract y-values from vertices
                     current_max = np.max(y_values)
-                    ymax = max(ymax, current_max * 1.1)  # Add margin
+                    ymax = max(ymax, current_max) 
 
             ax.set_ylim([0, ymax])
             fig_finalize(
