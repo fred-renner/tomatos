@@ -1,0 +1,75 @@
+# top folder where ntuples live with the structure
+# ntuple_path/SAMPLE/SYSTEMATIC.root
+ntuple_path: "/Users/fred/dev/tomatos/tests/files/"
+results_path: "/Users/fred/dev/run/"
+
+# name of NOSYS.root holding the nominal non-systematic values
+nominal: NOSYS
+tree_name: FilteredTree
+signal_sample: "ggZH125_vvbb"
+# total events that are batched in training from all sample_sys combined
+# 1e7 with 20 vars ~1.6 GB in memory
+batch_size: 10_000_000
+
+# the main data array is defined by (n_samples, n_events, vars)
+vars:
+  - "j1_pt"
+  - "j2_pt"
+  - "h_m"
+event_weight_var: weight
+aux_vars:
+  - "bool_btag_1"
+  - "bool_btag_2"
+  - "my_sf_unc_up"
+  - "my_sf_unc_down"
+
+# ratio need to add up to one
+train_ratio: 0.8
+valid_ratio: 0.1
+test_ratio: 0.1
+
+plot_inputs: True
+
+# bce, cls_nn, cls_var (bins, cuts) in some variable
+# might drop bce, needs some attention currently
+objective: "cls_var"
+# you can speed up cls_var, if you only setup the var and the cut_vars in vars
+# this variable needs to be part of vars not aux_vars!
+cls_var: "h_m"
+
+n_bins: 5
+# includes bin edges in optimization, not necessary for cls_nn
+include_bins: true
+# results folder suffix
+suffix: "demo"
+# train steps
+num_steps: 500
+# learning rate
+lr: 0.005
+# can choose from linear_cycle, constant
+lr_schedule: "linear_cycle"
+# start and minimum value for the bandwidth adaptation
+bw_init: 0.4
+bw_min: 0.001
+# slope value in the sigmoid, this is pretty sharp!
+slope: 20_000
+# need to limit these updates to avoid gradient explosion
+update_limit_bw: 0.01
+update_limit_cuts: 0.001 # for min max scaled between (0,1)
+
+# cuts on vars to be optimized, keep variables either "above", "below"
+# or below, start somewhere where the cut actually does something to
+# find a gradient
+opt_cuts:
+  j1_pt:
+    keep: "above" # or below
+    init: 30_000
+  j2_pt:
+    keep: "above"
+    init: 20_000
+
+# applies a scale factor to the histograms accordingly
+n_k_folds: 1
+
+# skip frames by modulo for movie
+movie_batch_modulo: 1

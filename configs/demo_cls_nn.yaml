@@ -9,10 +9,10 @@ tree_name: FilteredTree
 signal_sample: "ggZH125_vvbb"
 # total events that are batched in training from all sample_sys combined
 # 1e7 with 20 vars ~1.6 GB in memory
-batch_size: 1_000_000
+batch_size: 10_000_000
 
 # the main data array is defined by (n_samples, n_events, vars)
-nn_input_vars:
+vars:
   - "j1_pt"
   - "j1_eta"
   - "j1_phi"
@@ -51,15 +51,14 @@ include_bins: false
 # results folder suffix
 suffix: "demo"
 # train steps
-num_steps: 200
+num_steps: 500
 # learning rate
 lr: 0.005
 # can choose from linear_cycle, constant
 lr_schedule: "linear_cycle"
 # start and minimum value for the bandwidth adaptation
-# this needs to become a density measurement
-bw_init: 0.25
-bw_min: 0.001 
+bw_init: 0.4
+bw_min: 0.001
 # slope value in the sigmoid, this is pretty sharp!
 slope: 20_000
 # need to limit these updates to avoid gradient explosion

@@ -44,7 +44,7 @@ class Setup:
         # keeping them all together simplifies the program workflow a lot even
         # though it comes with something to care. order matters, see below.
         self.vars = [
-            *yml["nn_input_vars"],
+            *yml["vars"],
             yml["event_weight_var"],
             *yml["aux_vars"],
         ]
@@ -53,7 +53,7 @@ class Setup:
         # sliced array access is a huge speed up when slicing
         # array[:, :nn_inputs_idx_end] much faster than array[:, np.arange(nn_inputs_idx_end)]
         # + 1 to also include the given one when slicing
-        self.nn_inputs_idx_end = len(yml["nn_input_vars"])
+        self.nn_inputs_idx_end = len(yml["vars"])
         self.weight_idx = self.vars.index(yml["event_weight_var"])
         self.cls_var_idx = self.vars.index(yml["cls_var"])
 
@@ -71,7 +71,7 @@ class Setup:
         self.bins = np.linspace(0, 1, yml["n_bins"] + 1)
 
         # datapoints in kde plot
-        self.kde_sampling = 100
+        self.kde_sampling = 1000  # smooth, but lots of metadata though
         self.kde_bins = np.linspace(0, 1, self.kde_sampling)
 
         self.debug = args.debug
@@ -95,6 +95,8 @@ class Setup:
 
         # initial memory usage in GB
         self.initial_vms_gb = psutil.Process().memory_info().vms / (2**30)
+        # empties jax jit compilation cache when above
+        self.memory_limit_gb = 16
 
     def _configure_samples(self, yml):
 

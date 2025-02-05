@@ -11,10 +11,9 @@ pip install --upgrade pip
 export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
 # install dependencies
 pip install --editable ./tomatos
-
-# need to install them by hand from google servers, as they don't maintain older versions on PyPI
+# install jaxlib from google servers
 # cpu
-# pip install jaxlib==0.3.14 -f https://storage.googleapis.com/jax-releases/jax_releases.html
+pip install jaxlib==0.3.14 -f https://storage.googleapis.com/jax-releases/jax_releases.html
 # gpu
 # pip install jaxlib==0.3.14+cuda11.cudnn82 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
@@ -24,5 +23,5 @@ pip install --editable ./tomatos
 After assigning the two paths at the beginning of the config/demo.yaml you can do
 ```bash
 source ./tomatos_env/bin/activate
-tomatos --config /Users/fred/dev/tomatos/configs/demo.yaml --prep --train --plot
+tomatos --config ./tomatos/configs/demo_cls_nn.yaml --prep --train --plot
 ```

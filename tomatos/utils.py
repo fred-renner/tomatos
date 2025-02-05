@@ -176,9 +176,8 @@ def clear_caches(config):
     # clear jax compilation cache for larger than 16 GB, note that this does
     # not easily translate to rss
     # https://github.com/google/jax/issues/10828
-    process = psutil.Process()
-    vms_gb = process.memory_info().vms / (2**30)
-    if (vms_gb - config.initial_vms_gb) > 16:  # >16GB memory usage
+    vms_gb = psutil.Process().memory_info().vms / (2**30)
+    if (vms_gb - config.initial_vms_gb) > config.memory_limit_gb:
         for module_name, module in sys.modules.items():
             if module_name.startswith("jax"):
                 for obj_name in dir(module):

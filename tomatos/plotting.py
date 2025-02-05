@@ -112,13 +112,14 @@ def interpolate_gaps(values, limit=None):
 
 
 def loss(config, metrics):
-    plt.plot(interpolate_gaps(metrics["train_loss"]), label=r"train")
-    plt.plot(interpolate_gaps(metrics["valid_loss"]), label=r"valid")
-    plt.plot(interpolate_gaps(metrics["test_loss"]), label=r"test")
+    plt.plot(interpolate_gaps(metrics["train_loss"]), label=r"train", linewidth=0.75)
+    plt.plot(interpolate_gaps(metrics["valid_loss"]), label=r"valid", linewidth=0.75)
+    plt.plot(interpolate_gaps(metrics["test_loss"]), label=r"test", linewidth=0.75)
     plt.xlabel("Batch")
     loss = r"$CL_s$" if "cls" in config.objective else "BCE"
     plt.ylabel(f"{loss} Loss")
-    plt.ylim(top=np.max(metrics["train_loss"][1:] * 1.1))
+    train_loss_finite = metrics["train_loss"][np.isfinite(metrics["train_loss"][:])]
+    plt.ylim(top=np.max(train_loss_finite * 1.1))
     fig_finalize(config, "loss.pdf")
 
 
@@ -334,7 +335,7 @@ def movie(config, metrics):
                     vertices = patch.get_path().vertices
                     y_values = vertices[:, 1]  # Extract y-values from vertices
                     current_max = np.max(y_values)
-                    ymax = max(ymax, current_max) 
+                    ymax = max(ymax, current_max)
 
             ax.set_ylim([0, ymax])
             fig_finalize(
