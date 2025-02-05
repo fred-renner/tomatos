@@ -177,7 +177,7 @@ def log_sharp_hists(
         validate_only=True,  # sharp hists
         filter_return_hists=True,
     )
-    logging.info("--- Nominal (binned KDE) / (True hist) ---")
+    logging.info("--- Nominal (binned KDE) / (Sharp hist) ---")
     for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
         if config.nominal in h_key and not "STAT" in h_key:
             # hist approx ratio

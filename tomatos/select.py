@@ -36,21 +36,19 @@ def cuts(pars, data, config, validate_only):
 # @jax.jit
 def events(data, config, base_weights):
     # apply selections via weights
-    # on the fly here increases the effective events that can be
-    # processed per batch, if selections are written at the preselection it
-    # would double the input vars for each selection, e.g. j1_pt_btag_1,
-    # j1_pt_btag_2, etc.
-
+    # you can also put the computation of selections at the preselection stage
     btag_1 = data[:, :, config.vars.index("bool_btag_1")]
     btag_2 = data[:, :, config.vars.index("bool_btag_2")]
     h_m_idx = config.vars.index("h_m")
-    # if the var is also an input vars
-    h_m = tomatos.utils.inverse_min_max_scale(
-        config,
-        data[:, :, 2],
-        2,
-    )
-    h_m = data[:, :, h_m_idx]
+    if config.objective == "cls_var":
+        h_m = tomatos.utils.inverse_min_max_scale(
+            config,
+            data[:, :, h_m_idx],
+            h_m_idx,
+        )
+    elif config.objective == "cls_nn":
+        h_m = data[:, :, h_m_idx]
+
     SR = (110e3 < h_m) & (h_m < 130e3)
     VR = (100e3 < h_m) & (h_m < 110e3) | (130e3 < h_m) & (h_m < 150e3)
     CR = (80e3 < h_m) & (h_m < 100e3) | (150e3 < h_m) & (h_m < 170e3)

@@ -19,9 +19,9 @@ def setup(config, pars):
             transition_steps=config.num_steps,
             peak_value=config.lr,
             pct_start=0.3,
-            div_factor=5,
-            final_div_factor=10,
-            pct_final=0.85,
+            div_factor=50,
+            final_div_factor=1,
+            pct_final=0.9,
         )
     elif "constant" in config.lr_schedule:
         lr_schedule = optax.constant_schedule(config.lr)
@@ -51,6 +51,7 @@ def setup(config, pars):
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
+        # optax.add_noise(eta=0.001, gamma=0.5, seed=0),
         optax.masked(
             optax.clip(max_delta=config.update_limit_bw),
             mask(pars, ["bw"]),
