@@ -1,5 +1,5 @@
 # auTOMATed Optimization on Sensitivity
-Based on [neos](https://github.com/gradhep/neos) and [relaxed]. I strongly recommend to read the [jax introduction](https://jax.readthedocs.io/en/latest/tutorials.html) if you want to contribute.
+TOMATOS is a fully differentiable HEP-analysis optimization framework. It includes the statistical test and can therefore consider the influence of uncertainties simultaneously to the optimization of variable cuts, bins or a Neural Network. Based on [neos](https://github.com/gradhep/neos) and [relaxed] and jax. I strongly recommend to read the [jax introduction](https://jax.readthedocs.io/en/latest/tutorials.html).
 
 # Installation
 ```bash
@@ -20,7 +20,7 @@ pip install jaxlib==0.3.14 -f https://storage.googleapis.com/jax-releases/jax_re
 ```
 
 # run 
-After assigning the two paths at the beginning of the config/demo.yaml you can do
+After assigning the two paths at the beginning of the config/demo_*.yaml you can do for example
 ```bash
 source ./tomatos_env/bin/activate
 tomatos --config ./tomatos/configs/demo_cls_nn.yaml --prep --train --plot
