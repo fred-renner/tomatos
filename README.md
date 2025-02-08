@@ -1,5 +1,8 @@
 # auTOMATed Optimization on Sensitivity
-TOMATOS is a fully differentiable HEP-analysis optimization framework. It includes the statistical test and can therefore consider the influence of uncertainties simultaneously to the optimization of variable cuts, bins or a Neural Network. Based on [neos](https://github.com/gradhep/neos) and [relaxed] and jax. I strongly recommend to read the [jax introduction](https://jax.readthedocs.io/en/latest/tutorials.html).
+TOMATOS is a fully differentiable HEP-analysis optimization framework. It includes the statistical test and can therefore consider the influence of uncertainties. It supports the simultaneous optimization of variable cuts, bin edges and a Neural Network. 
+
+# Documentation
+https://tomatos.readthedocs.io
 
 # Installation
 ```bash

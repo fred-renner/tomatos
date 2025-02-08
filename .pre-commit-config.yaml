@@ -12,7 +12,7 @@ repos:
         args: [
             "--max-line-length=88",
             "--extend-ignore=E203,E501",
-            "--exclude=pyhh/plotter/*,pyhh/fitting/*", # eclude for now
+            # "--exclude=pyhh/plotter/*,pyhh/fitting/*", # eclude for now
           ]
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.30.0
