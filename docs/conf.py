@@ -7,13 +7,16 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "tomatos"
-copyright = "2025, Frederic Renner"
+copyright = "2023, Frederic Renner"
 author = "Frederic Renner"
 release = "0.3.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+import sys
+from pathlib import Path
 
+sys.path.insert(0, str(Path("..", "tomatos").resolve()))
 extensions = [
     "sphinx.ext.autodoc",
 ]
