@@ -35,3 +35,5 @@ html_theme_options = {
     "repository_url": "https://github.com/fred-renner/tomatos",
     "use_repository_button": True,
 }
+
+# html_logo = "/Users/fred/dev/tomatos/docs/_static/logo.jpeg"

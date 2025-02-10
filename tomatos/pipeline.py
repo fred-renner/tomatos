@@ -44,8 +44,8 @@ def loss_fn(
     filter_return_hists=True,
 ):
     # the main reason why not everything in here is jitted, is that the
-    # config is not a jax compatible type (pytree), this is a bit tedious to
-    # do, in partiular you have to get rid of all strings
+    # config is not a jax compatible type (pytree), this will be a bit tedious
+    # as in particular you have to get rid of all strings
     hists = make_hists(pars, data, config, scale, validate_only)
     model, hists = tomatos.workspace.pyhf_model(hists, config)
 
