@@ -27,7 +27,6 @@ args = parser.parse_args()
 
 def main():
     config = tomatos.config.Setup(args)
-    tomatos.utils.setup_logger(config)
 
     if config.plot_inputs:
         logging.info("Plotting Inputs...")
