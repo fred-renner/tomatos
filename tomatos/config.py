@@ -8,6 +8,7 @@ import yaml
 from alive_progress import config_handler
 import psutil
 import tomatos.utils
+import logging
 
 config_handler.set_global(enrich_print=False)
 
@@ -89,9 +90,16 @@ class Setup:
         # Create output directories
         self._setup_paths(args, yml)
 
-        # save config
-        with open(self.config_file_path, "w") as json_file:
-            json.dump(tomatos.utils.to_python_lists(self.__dict__), json_file, indent=4)
+        self._setup_logger()
+
+        # save config only when training
+        if args.train:
+            with open(self.config_file_path, "w") as json_file:
+                json.dump(
+                    tomatos.utils.to_python_lists(self.__dict__),
+                    json_file,
+                    indent=4,
+                )
 
         # initial memory usage in GB
         self.initial_vms_gb = psutil.Process().memory_info().vms / (2**30)
@@ -160,7 +168,25 @@ class Setup:
             "valid": self.preprocess_path + "valid.h5",
             "test": self.preprocess_path + "test.h5",
         }
-        self.config_file_path = self.results_path + "config.json"
+        self.config_file_path = self.results_path + "train_config.json"
         self.preprocess_md_file_path = self.results_path + "preprocess_md.json"
         self.metrics_file_path = self.results_path + "metrics.h5"
         self.infer_metrics_file_path = self.results_path + "infer_metrics.json"
+
+    def _setup_logger(self):
+
+        # need this as equinox interferes somehow
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+
+        logging.basicConfig(
+            filename=self.results_path + "log.txt",
+            filemode="w",
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)-8s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        logging.getLogger().addHandler(logging.StreamHandler())
+        logging.getLogger("pyhf").setLevel(logging.WARNING)
+        logging.getLogger("relaxed").setLevel(logging.WARNING)

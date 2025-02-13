@@ -20,19 +20,6 @@ import tomatos.training
 import tomatos.workspace
 
 
-def setup_logger(config):
-    logging.basicConfig(
-        filename=config.results_path + "log.txt",
-        filemode="w",
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    logging.getLogger().addHandler(logging.StreamHandler())
-    logging.getLogger("pyhf").setLevel(logging.WARNING)
-    logging.getLogger("relaxed").setLevel(logging.WARNING)
-
-
 def inverse_min_max_scale(config, arr, var_idx):
     unscaled_arr = (arr - config.scaler_min[var_idx]) / config.scaler_scale[var_idx]
     return unscaled_arr
