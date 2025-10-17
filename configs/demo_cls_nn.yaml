@@ -51,7 +51,7 @@ include_bins: false
 # results folder suffix
 suffix: "demo"
 # train steps
-num_steps: 500
+num_steps: 300
 # learning rate
 lr: 0.005
 # can choose from linear_cycle, constant

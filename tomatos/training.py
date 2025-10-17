@@ -48,7 +48,7 @@ def init_opt_pars(config, nn_pars):
 
 def train_init(config):
     # init nn and opt pars
-    nn_model = tomatos.nn.NeuralNetwork(n_features=config.nn_inputs_idx_end)
+    nn_model = tomatos.nn.NeuralNetworkFeatureAttention(n_features=config.nn_inputs_idx_end)
     # split model into parameters to optimize and the nn architecture
     nn_pars, nn_arch = eqx.partition(nn_model, eqx.is_array)
     config.nn_arch = nn_arch
@@ -68,7 +68,6 @@ def train_init(config):
         batch[split] = tomatos.batcher.get_generator(config, split)
 
     # solver
-
     solver = tomatos.solver.setup(config, opt_pars)
     train_data, train_sf = next(batch["train"])
     state = solver.init_state(

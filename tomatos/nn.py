@@ -40,11 +40,11 @@ class NeuralNetworkFeatureAttention(eqx.Module):
     def __init__(
         self,
         n_features: int,
-        # embed_dim: int = 10,
+        embed_dim: int = 32,
         num_heads: int = 1,
         key: "jax.random.PRNGKey" = jax.random.PRNGKey(0),
     ):
-        embed_dim = 2 * n_features
+        # embed_dim = 2 * n_features
         k1, k2, k3 = jax.random.split(key, 3)
         # Map each scalar feature to a vector of length `embed_dim`.
         self.feature_embed = eqx.nn.Linear(1, embed_dim, key=k1)
