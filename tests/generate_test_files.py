@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 
+import argparse
 import csv
 import os
-import subprocess
+import urllib.request
 
 import numpy as np
 import uproot
 import vector
+
+# downloads go next to this script, ntuples into tests/files/SAMPLE/SYSTEMATIC.root
+here = os.path.dirname(os.path.abspath(__file__))
+out_dir = os.path.join(here, "files")
 
 files = {
     "mc20_13TeV_MC_PowhegPythia8EvtGen_NNPDF3_AZNLO_ggZH125_vvbb.root": "https://opendata.cern.ch/record/80012/files/mc20_13TeV_MC_PowhegPythia8EvtGen_NNPDF3_AZNLO_ggZH125_vvbb_file_index.json_0",
@@ -46,19 +51,13 @@ files = {
 
 def download_files():
     """
-    Downloads required ROOT files using wget and saves them with specified names.
-    Suppresses wget output.
+    Downloads required ROOT files from CERN Open Data (several GB).
     """
     for filename, url in files.items():
-        if not os.path.exists(filename):
+        path = os.path.join(here, filename)
+        if not os.path.exists(path):
             print(f"Downloading {filename}...")
-            with open(os.devnull, "w") as devnull:  # Suppress output
-                subprocess.run(
-                    ["wget", "-O", filename, url],
-                    stdout=devnull,
-                    stderr=devnull,
-                    check=True,
-                )
+            urllib.request.urlretrieve(url, path)
         else:
             print(f"{filename} already exists, skipping download.")
 
@@ -182,22 +181,33 @@ def merge_jetjet_files(output_files, merged_file):
 
 
 if __name__ == "__main__":
-    # turn on if you really want to do this
-    # download_files()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--download", action="store_true", help="fetch the CERN Open Data inputs first"
+    )
+    args = parser.parse_args()
+    if args.download:
+        download_files()
+
+    sig_dir = os.path.join(out_dir, "ggZH125_vvbb")
+    bkg_dir = os.path.join(out_dir, "bkg")
+    os.makedirs(sig_dir, exist_ok=True)
+    os.makedirs(bkg_dir, exist_ok=True)
 
     output_files = []
     for f_name in files:
+        in_file = os.path.join(here, f_name)
         if "ggZH125" in f_name:
-            make_ntuple(f_name, "/Users/fred/dev/tomatos/tests/files/ggZH125_vvbb/NOSYS.root", weight=1e-2, unc=1.0)
+            make_ntuple(in_file, os.path.join(sig_dir, "NOSYS.root"), weight=1e-2, unc=1.0)
             make_ntuple(
-                f_name, "/Users/fred/dev/tomatos/tests/files/ggZH125_vvbb/JET_PT_1UP.root", weight=1e-2, unc=1.1
+                in_file, os.path.join(sig_dir, "JET_PT_1UP.root"), weight=1e-2, unc=1.1
             )
             make_ntuple(
-                f_name, "/Users/fred/dev/tomatos/tests/files/ggZH125_vvbb/JET_PT_1DOWN.root", weight=1e-2, unc=0.9
+                in_file, os.path.join(sig_dir, "JET_PT_1DOWN.root"), weight=1e-2, unc=0.9
             )
         else:
-            output_file = f"jetjet_{f_name.split('_')[-1]}"
-            make_ntuple(f_name, output_file, weight=1)
+            output_file = os.path.join(here, f"jetjet_{f_name.split('_')[-1]}")
+            make_ntuple(in_file, output_file, weight=1)
             output_files.append(output_file)
 
-    merge_jetjet_files(output_files, "/Users/fred/dev/tomatos/tests/files/bkg/NOSYS.root")
+    merge_jetjet_files(output_files, os.path.join(bkg_dir, "NOSYS.root"))

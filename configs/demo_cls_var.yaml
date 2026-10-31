@@ -1,7 +1,7 @@
 # top folder where ntuples live with the structure
-# ntuple_path/SAMPLE/SYSTEMATIC.root
-ntuple_path: "/Users/fred/dev/tomatos/tests/files/"
-results_path: "/Users/fred/dev/run/"
+# ntuple_path/SAMPLE/SYSTEMATIC.root (paths relative to the repo root)
+ntuple_path: "tests/files/"
+results_path: "results/"
 
 # name of NOSYS.root holding the nominal non-systematic values
 nominal: NOSYS

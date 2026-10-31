@@ -12,3 +12,6 @@ tests/data*.root
 tests/mc20*.root
 tests/jetjet*.root
 docs/_build
+# local env and run outputs
+.venv/
+results/
