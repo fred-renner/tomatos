@@ -7,7 +7,7 @@ import pyhf
 
 def get_generator_weight_envelope(hists):
     # adapt to the way you've set this up
-    nominal = hists["blah"]
+    nominal = hists["NOSYS"]
     gens = [
         "GEN_MUR05_MUF05_PDF260000",
         "GEN_MUR05_MUF10_PDF260000",
