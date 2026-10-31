@@ -20,6 +20,8 @@ dependencies = [
     "pyhf @ git+https://github.com/fred-renner/pyhf.git@fix_jax",
     "relaxed @ git+https://github.com/fred-renner/relaxed.git@mle_fix",
     "neos==0.3.0",
+    # newer jaxopt releases need jax>=0.4 despite their metadata
+    "jaxopt==0.8.3",
     "jupyter",
     "h5py",
     "imageio",
