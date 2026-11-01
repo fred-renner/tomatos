@@ -56,7 +56,7 @@ def log_cuts(config, opt_pars, metrics, infer_metrics_i):
         infer_metrics_i[cut_var] = opt_cut
 
 
-def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins):
+def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins, kde_hists_fn):
     kde = sample_kde_distribution(
         config=config,
         opt_pars=opt_pars,
@@ -64,6 +64,7 @@ def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins):
         scale=train_sf,
         hists=hists,
         bins=bins,
+        kde_hists_fn=kde_hists_fn,
     )
     for key, h in kde.items():
         metrics["kde_" + key] = h
@@ -83,11 +84,15 @@ def log_hists(config, metrics, test_hists, hists):
 
 
 def log_bins(config, metrics, bins, infer_metrics_i):
-    scaled_bins = (
-        tomatos.utils.inverse_min_max_scale(config, np.copy(bins), config.cls_var_idx)
-        if config.objective == "cls_var"
-        else bins
-    )
+    if config.objective == "cls_var" and config.fit_range is not None:
+        lo, hi = config.fit_range
+        scaled_bins = np.asarray(bins) * (hi - lo) + lo
+    elif config.objective == "cls_var":
+        scaled_bins = tomatos.utils.inverse_min_max_scale(
+            config, np.copy(bins), config.cls_var_idx
+        )
+    else:
+        scaled_bins = bins
     metrics["bins"] = scaled_bins
     infer_metrics_i["bins"] = scaled_bins
 
@@ -130,24 +135,15 @@ def sample_kde_distribution(
     scale,
     hists,
     bins,
+    kde_hists_fn,
 ):
     # get kde distribution by sampling with a many bin histogram
     # enough to get kde only from the nominal ones
     sample_indices = np.arange(len(config.samples))
     nominal_data = data[sample_indices, :, :]
-    # make a custom config
-    kde_config = copy.deepcopy(config)
-    kde_config.bins = config.kde_bins
-    kde_config.include_bins = False
 
     # to also collect the background estimate
-    kde_dist = tomatos.pipeline.make_hists(
-        opt_pars,
-        nominal_data,
-        kde_config,
-        scale,
-        filter_return_hists=True,
-    )
+    kde_dist = kde_hists_fn(opt_pars, nominal_data, scale)
 
     kde_dist = {
         h_key: rescale_kde(config, hists[h_key], kde_dist[h_key], bins)
@@ -157,6 +153,18 @@ def sample_kde_distribution(
     return kde_dist
 
 
+def jit_kde_hists(config):
+    # make a custom config, many bin hists sample the kde
+    kde_config = copy.deepcopy(config)
+    kde_config.bins = config.kde_bins
+    kde_config.include_bins = False
+    return jax.jit(
+        lambda pars, data, scale: tomatos.pipeline.make_hists(
+            pars, data, kde_config, scale, filter_return_hists=True
+        )
+    )
+
+
 def log_sharp_hists(
     opt_pars,
     train_data,
@@ -164,19 +172,13 @@ def log_sharp_hists(
     train_sf,
     hists,
     metrics,
+    sharp_hists_fn,
 ):
     # actually might be enough to compare to test hists, depends a bit on the
     # uncertainty behavior...
 
     # sharp evaluation train data hists
-    sharp_hists = tomatos.pipeline.make_hists(
-        opt_pars,
-        train_data,
-        config,
-        train_sf,
-        validate_only=True,  # sharp hists
-        filter_return_hists=True,
-    )
+    sharp_hists = sharp_hists_fn(opt_pars, train_data, train_sf)
     logging.info("--- Nominal (binned KDE) / (Sharp hist) ---")
     for (h_key, h), (_, sharp_h) in zip(hists.items(), sharp_hists.items()):
         if config.nominal in h_key and not "STAT" in h_key:

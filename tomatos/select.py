@@ -49,9 +49,15 @@ def events(data, config, base_weights):
     elif config.objective == "cls_nn":
         h_m = data[:, :, h_m_idx]
 
-    SR = (110e3 < h_m) & (h_m < 130e3)
-    VR = (100e3 < h_m) & (h_m < 110e3) | (130e3 < h_m) & (h_m < 150e3)
-    CR = (80e3 < h_m) & (h_m < 100e3) | (150e3 < h_m) & (h_m < 170e3)
+    def in_windows(windows):
+        mask = jnp.zeros_like(h_m, dtype=bool)
+        for lo, hi in windows:
+            mask = mask | ((lo < h_m) & (h_m < hi))
+        return mask
+
+    SR = in_windows(config.regions["SR"])
+    VR = in_windows(config.regions["VR"])
+    CR = in_windows(config.regions["CR"])
 
     weights = {
         # "base_weights": base_weights,
@@ -70,5 +76,15 @@ def events(data, config, base_weights):
         * btag_2
         * data[:, :, config.vars.index("my_sf_unc_down")],
     }
+
+    # bkg modelling weight unc (toy), enters the estimate via SR_btag_1
+    if "bkg_mod_up" in config.vars:
+        for direction in ["up", "down"]:
+            weights[f"SR_btag_1_bkg_mod_{direction}"] = (
+                base_weights
+                * SR
+                * btag_1
+                * data[:, :, config.vars.index(f"bkg_mod_{direction}")]
+            )
 
     return weights

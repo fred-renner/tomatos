@@ -48,14 +48,18 @@ def setup(config, pars):
 
     # limiting bandwidth and cut updates is important to avoid gradient
     # explosion for these
+    # with the controller, bw is set from outside (constraints.bw_controller)
+    # and must not move with gradients
+    bw_update = (
+        optax.set_to_zero()
+        if getattr(config, "bw_controller", False)
+        else optax.clip(max_delta=config.update_limit_bw)
+    )
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
         # optax.add_noise(eta=0.001, gamma=0.5, seed=0),
-        optax.masked(
-            optax.clip(max_delta=config.update_limit_bw),
-            mask(pars, ["bw"]),
-        ),
+        optax.masked(bw_update, mask(pars, ["bw"])),
         optax.masked(
             optax.clip(max_delta=config.update_limit_cuts),
             mask(pars, [key for key in pars.keys() if "cut_" in key]),
@@ -64,6 +68,12 @@ def setup(config, pars):
 
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
-    # dont jit the tomatos.pipeline.loss_fn, only literally jits this function
-    # and will fail in the current setup
-    return OptaxSolver(tomatos.pipeline.loss_fn, opt=optimizer, has_aux=True, jit=False)
+    # config is not a jax type (pytree), so it can't be an argument of a
+    # jitted function. Closing over it instead makes it a constant at trace
+    # time, all python logic on it (strings, dicts, ifs) runs once while
+    # tracing and the whole loss compiles into one function. ~100x faster
+    # than op by op execution
+    def loss(pars, data, scale):
+        return tomatos.pipeline.loss_fn(pars, data, config, scale)
+
+    return OptaxSolver(loss, opt=optimizer, has_aux=True, jit=True)

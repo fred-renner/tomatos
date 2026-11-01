@@ -34,7 +34,27 @@ class Setup:
         with open(args.config, "r") as f:
             yml = yaml.safe_load(f)
 
-        for k, v in yml.items():
+        # optional keys, defaults keep the original behaviour
+        defaults = {
+            "test": "cls",
+            "train_systematics": True,
+            "bw_controller": False,
+            "bw_rates": [0.97, 1.08],  # shrink, grow
+            "bw_max": 0.4,
+            "max_mismatch": 0.025,
+            "min_bkg": 10,
+            "penalty_intensity": 0.1,
+            # mass windows of the regions (same units as the ntuples)
+            "regions": {
+                "SR": [[110e3, 130e3]],
+                "VR": [[100e3, 110e3], [130e3, 150e3]],
+                "CR": [[80e3, 100e3], [150e3, 170e3]],
+            },
+            # cls_var: range mapped onto the [0, 1] binning, default is the
+            # full min max range, which leaves bins outside of the SR empty
+            "fit_range": None,
+        }
+        for k, v in {**defaults, **yml}.items():
             setattr(self, k, v)
 
         self._configure_samples(yml)
@@ -72,7 +92,7 @@ class Setup:
         self.bins = np.linspace(0, 1, yml["n_bins"] + 1)
 
         # datapoints in kde plot
-        self.kde_sampling = 1000  # smooth, but lots of metadata though
+        self.kde_sampling = yml.get("kde_sampling", 1000)  # smooth, but lots of metadata and the most expensive logging
         self.kde_bins = np.linspace(0, 1, self.kde_sampling)
 
         self.debug = args.debug

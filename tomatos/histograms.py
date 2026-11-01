@@ -112,7 +112,8 @@ def compute_hist_wrapper(
     # lots of args due to the pure function paradigm
     # these ifs only work because of static_argnames
     if objective == "cls_var":
-        sample_data = data[i, :, cls_var_idx]
+        # nn_output holds the var mapped onto the fit range, if configured
+        sample_data = data[i, :, cls_var_idx] if nn_output is None else nn_output[i, :]
     elif objective == "cls_nn":
         sample_data = nn_output[i, :]
 
@@ -159,6 +160,14 @@ def fill_hists(
             config.nn_arch,
             config.nn_inputs_idx_end,
         )
+    elif config.fit_range is not None:
+        # bins live in [0, 1] of the fit range instead of the full min max
+        # range, so all of them see events
+        lo, hi = config.fit_range
+        var = tomatos.utils.inverse_min_max_scale(
+            config, data[:, :, config.cls_var_idx], config.cls_var_idx
+        )
+        nn_output = (var - lo) / (hi - lo)
     else:
         nn_output = None
 
@@ -220,8 +229,10 @@ def fill_hists(
             i=bkg_idx, weights=sel_weights["SR_btag_1"], w2=True
         )
         sigma = jnp.sqrt(h_w2_SR_btag_1)
-        hists["SR_btag_1"]["bkg"]["STAT_1UP"] = h_w2_SR_btag_1 + sigma
-        hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] = h_w2_SR_btag_1 - sigma
+        # around the nominal, not the w2 hist, both are the same only for
+        # unit weights (data)
+        hists["SR_btag_1"]["bkg"]["STAT_1UP"] = hists["SR_btag_1"]["bkg"]["NOSYS"] + sigma
+        hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] = hists["SR_btag_1"]["bkg"]["NOSYS"] - sigma
 
         # for bkg estimate
         hists["CR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
@@ -245,6 +256,15 @@ def fill_hists(
         hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1DOWN"] = compute_hist(
             i=signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
         )
+
+        # bkg modelling weight unc, propagated to the estimate in workspace
+        if "SR_btag_1_bkg_mod_up" in sel_weights:
+            hists["SR_btag_1"]["bkg"]["BKG_MOD_1UP"] = compute_hist(
+                i=bkg_idx, weights=sel_weights["SR_btag_1_bkg_mod_up"]
+            )
+            hists["SR_btag_1"]["bkg"]["BKG_MOD_1DOWN"] = compute_hist(
+                i=bkg_idx, weights=sel_weights["SR_btag_1_bkg_mod_down"]
+            )
 
         return hists
 

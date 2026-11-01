@@ -30,10 +30,10 @@ def init_opt_pars(config, nn_pars):
     # build opt_pars
     opt_pars = {}
     opt_pars["nn"] = nn_pars
-    opt_pars["bw"] = config.bw_init
+    opt_pars["bw"] = jnp.array(config.bw_init)
     if config.include_bins:
         # exclude boundaries
-        opt_pars["bins"] = config.bins[1:-1]
+        opt_pars["bins"] = jnp.array(config.bins[1:-1])
 
     for key in config.opt_cuts:
         var_idx = config.vars.index(key)
@@ -41,7 +41,7 @@ def init_opt_pars(config, nn_pars):
         init = config.opt_cuts[key]["init"]
         init *= config.scaler_scale[var_idx]
         init += config.scaler_min[var_idx]
-        opt_pars["cut_" + key] = init
+        opt_pars["cut_" + key] = jnp.array(init)
 
     return opt_pars
 
@@ -73,7 +73,6 @@ def train_init(config):
     state = solver.init_state(
         opt_pars,
         data=train_data,
-        config=config,
         scale=train_sf,
     )
 
@@ -82,17 +81,13 @@ def train_init(config):
     return solver, state, opt_pars, batch, best_test_loss
 
 
-def evaluate_losses(opt_pars, config, batch):
+def evaluate_losses(opt_pars, batch, eval_fn):
     """Evaluates validation and test losses."""
     valid_data, valid_sf = next(batch["valid"])
-    valid_loss, valid_hists = tomatos.pipeline.loss_fn(
-        opt_pars, valid_data, config, valid_sf, validate_only=True
-    )
+    valid_loss, valid_hists = eval_fn(opt_pars, valid_data, valid_sf)
 
     test_data, test_sf = next(batch["test"])
-    test_loss, test_hists = tomatos.pipeline.loss_fn(
-        opt_pars, test_data, config, test_sf, validate_only=True
-    )
+    test_loss, test_hists = eval_fn(opt_pars, test_data, test_sf)
 
     return valid_loss, valid_hists, test_loss, test_hists
 
@@ -101,6 +96,14 @@ def run(config):
     # expensive in here is evaluate_losses and solver.update
 
     solver, state, opt_pars, batch, best_test_loss = train_init(config)
+    # sharp evaluation and kde sampling, compiled once
+    eval_fn = tomatos.pipeline.jit_loss_fn(config, validate_only=True)
+    # what an analysis ignoring the systematics would claim on the test set
+    eval_stat_only_fn = tomatos.pipeline.jit_loss_fn(
+        config, validate_only=True, stat_only=True
+    )
+    sharp_hists_fn = tomatos.pipeline.jit_make_hists(config, validate_only=True)
+    kde_hists_fn = tomatos.train_utils.jit_kde_hists(config)
 
     metrics = {}
     # this holds optimization params like cuts for epochs used for deployment
@@ -119,23 +122,35 @@ def run(config):
         # this has to be here
         # since the optaxsolver holds step i-1, train evaluation is expensive
         valid_loss, valid_hists, test_loss, test_hists = evaluate_losses(
-            opt_pars, config, batch
+            opt_pars, batch, eval_fn
         )
+        test_data, test_sf = next(batch["test"])
+        metrics["test_loss_stat_only"] = eval_stat_only_fn(opt_pars, test_data, test_sf)[0]
         metrics["train_loss"] = state.value
         metrics["valid_loss"] = valid_loss
         metrics["test_loss"] = test_loss
 
         # gradient update
         train_data, train_sf = next(batch["train"])
+        if config.bw_controller:
+            # counted hists before the update, state.aux after it holds the
+            # kde hists of the same parameters and batch
+            sharp_train = sharp_hists_fn(opt_pars, train_data, train_sf)
+            bw_before = opt_pars["bw"]
         opt_pars, state = solver.update(
             opt_pars,
             state,
             data=train_data,
-            config=config,
             scale=train_sf,
         )
         # apply limitations
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
+        if config.bw_controller:
+            opt_pars["bw"], bw_state, mismatch = tomatos.constraints.bw_controller(
+                config, bw_before, state.aux, sharp_train
+            )
+            metrics["bw_mismatch"] = mismatch
+            logging.info(f"bw controller: {bw_state}, kde mismatch {mismatch:.3f}")
 
         ###### excessive logging, turn off as you please ######
         hists = state.aux
@@ -143,13 +158,16 @@ def run(config):
             np.array([0, *opt_pars["bins"], 1]) if config.include_bins else config.bins
         )
         tomatos.train_utils.log_hists(config, metrics, test_hists, hists)
-        tomatos.train_utils.log_kde(
-            config, metrics, opt_pars, train_data, train_sf, hists, bins
-        )
+        # kde sampling is the most expensive part of a step, only needed for
+        # the frames the movie actually shows
+        if i % config.movie_batch_modulo == 0:
+            tomatos.train_utils.log_kde(
+                config, metrics, opt_pars, train_data, train_sf, hists, bins, kde_hists_fn
+            )
 
         if "cls" in config.objective:
             tomatos.train_utils.log_sharp_hists(
-                opt_pars, train_data, config, train_sf, hists, metrics
+                opt_pars, train_data, config, train_sf, hists, metrics, sharp_hists_fn
             )
             tomatos.train_utils.log_bins(config, metrics, bins, infer_metrics_i)
             tomatos.train_utils.log_cuts(config, opt_pars, metrics, infer_metrics_i)

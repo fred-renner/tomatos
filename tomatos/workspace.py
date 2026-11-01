@@ -87,6 +87,13 @@ def hist_transforms(hists, validate_only):
         hists["SR_btag_2"]["bkg_estimate"]["NOSYS"] * w_CR_stat_down
     )
 
+    # bkg modelling unc, scaled into the estimate like the nominal
+    if "BKG_MOD_1UP" in hists["SR_btag_1"]["bkg"]:
+        for sys in ["BKG_MOD_1UP", "BKG_MOD_1DOWN"]:
+            hists["SR_btag_2"]["bkg_estimate"][sys] = (
+                hists["SR_btag_1"]["bkg"][sys] * w_CR
+            )
+
     # i leave this as its illustrative to what you could do
     # Backround Shape Uncertainty
     # don't use this when optimizing --> sculpting
@@ -180,7 +187,7 @@ def sample_spec_from_modifiers(hists, config, modifiers, samples):
     return sample_spec
 
 
-def pyhf_model(hists, config):
+def pyhf_model(hists, config, validate_only=False, stat_only=None):
     # here you builds the json worspace structure with hists
 
     # standard uncerainty modifiers per sample
@@ -234,5 +241,17 @@ def pyhf_model(hists, config):
     # # this is very handy for debugging when you turn off jit in the main.py
     # if config.debug:
     #     pprint.pprint(spec)
+
+    # A/B check: train on stat uncertainties only, but always validate with
+    # the full model, to see what ignoring the systematics costs
+    if stat_only is None:
+        stat_only = not validate_only and not config.train_systematics
+    if stat_only:
+        for sample in spec["channels"][0]["samples"]:
+            sample["modifiers"] = [
+                m
+                for m in sample["modifiers"]
+                if m["name"] == "mu" or m["name"].startswith("STAT_")
+            ]
 
     return pyhf.Model(spec, validate=False), hists

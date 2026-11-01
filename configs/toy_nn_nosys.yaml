@@ -1,0 +1,91 @@
+# top folder where ntuples live with the structure
+# ntuple_path/SAMPLE/SYSTEMATIC.root (paths relative to the repo root)
+ntuple_path: "tests/toy_files/"
+results_path: "results/"
+
+# name of NOSYS.root holding the nominal non-systematic values
+nominal: NOSYS
+tree_name: FilteredTree
+signal_sample: "ggZH125_vvbb"
+# total events that are batched in training from all sample_sys combined
+# 1e7 with 20 vars ~1.6 GB in memory
+batch_size: 10_000_000
+
+# the main data array is defined by (n_samples, n_events, vars)
+vars:
+  - "j1_pt"
+  - "j2_pt"
+  - "h_dphi"
+event_weight_var: weight
+aux_vars:
+  - "h_m"
+  - "bool_btag_1"
+  - "bool_btag_2"
+  - "my_sf_unc_up"
+  - "my_sf_unc_down"
+  # toy only: bkg modelling weight unc
+  - "bkg_mod_up"
+  - "bkg_mod_down"
+
+# ratio need to add up to one
+train_ratio: 0.8
+valid_ratio: 0.1
+test_ratio: 0.1
+
+plot_inputs: True
+
+# bce, cls_nn, cls_var (bins, cuts) in some variable
+# might drop bce, needs some attention currently
+objective: "cls_nn"
+# you can speed up cls_var, if you only setup the var and the cut_vars in
+cls_var: "h_m"
+
+n_bins: 5
+# includes bin edges in optimization, not necessary for cls_nn
+include_bins: false
+# results folder suffix
+suffix: "nn_nosys"
+# train steps
+num_steps: 300
+# learning rate
+lr: 0.005
+# can choose from linear_cycle, constant
+lr_schedule: "linear_cycle"
+# slope value in the sigmoid, this is pretty sharp!
+slope: 20_000
+update_limit_cuts: 0.001 # for min max scaled between (0,1)
+
+# no cuts: the nn learns the selection itself
+# cuts on vars to be optimized, keep variables either "above", "below"
+# or below, start somewhere where the cut actually does something to
+# find a gradient
+opt_cuts: {}
+
+# applies a scale factor to the histograms accordingly
+n_k_folds: 1
+
+# skip frames by modulo for movie
+movie_batch_modulo: 5
+# points to sample the kde for the movie
+kde_sampling: 200
+
+# hypothesis test in the loss: cls (exclusion) or discovery (Z)
+test: "discovery"
+# false: train on stat uncertainties only, valid/test always use all
+train_systematics: false
+
+# toy mass windows, a wide SR around the peak, sidebands for the estimate
+regions:
+  SR: [[80_000, 170_000]]
+  VR: [[70_000, 80_000], [170_000, 185_000]]
+  CR: [[55_000, 70_000], [185_000, 210_000]]
+
+# bandwidth set from outside, see constraints.bw_controller
+bw_controller: true
+bw_init: 0.2
+bw_min: 0.002
+bw_max: 0.3
+bw_rates: [0.97, 1.08] # shrink, grow
+max_mismatch: 0.025 # tolerated kde vs counted difference per bin
+min_bkg: 10 # bkg events wanted in every bin
+penalty_intensity: 0.5
