@@ -15,3 +15,4 @@ docs/_build
 # local env and run outputs
 .venv/
 results/
+tests/toy_files/

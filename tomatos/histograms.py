@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import relaxed
 
-import tomatos.utils
 
 
 # modified from relaxed and added weights, its nice to have it here to see
@@ -112,8 +111,7 @@ def compute_hist_wrapper(
     # lots of args due to the pure function paradigm
     # these ifs only work because of static_argnames
     if objective == "cls_var":
-        # nn_output holds the var mapped onto the fit range, if configured
-        sample_data = data[i, :, cls_var_idx] if nn_output is None else nn_output[i, :]
+        sample_data = data[i, :, cls_var_idx]
     elif objective == "cls_nn":
         sample_data = nn_output[i, :]
 
@@ -149,8 +147,8 @@ def fill_hists(
     # make hists sharp if validation
     bw = 1e-20 if validate_only else pars["bw"]
 
-    # this will hold: hists[sel][sample][sys]
-    hists = {sel: {sample: {} for sample in config.samples} for sel in sel_weights}
+    # this will hold: hists[sample][sys]
+    hists = {sample: {} for sample in config.samples}
 
     # get nn output
     if config.objective == "cls_nn":
@@ -160,14 +158,6 @@ def fill_hists(
             config.nn_arch,
             config.nn_inputs_idx_end,
         )
-    elif config.fit_range is not None:
-        # bins live in [0, 1] of the fit range instead of the full min max
-        # range, so all of them see events
-        lo, hi = config.fit_range
-        var = tomatos.utils.inverse_min_max_scale(
-            config, data[:, :, config.cls_var_idx], config.cls_var_idx
-        )
-        nn_output = (var - lo) / (hi - lo)
     else:
         nn_output = None
 
@@ -181,93 +171,40 @@ def fill_hists(
         bw=bw,
         bins=bins,
     )
-    # calc all hists for all samples in fit region
-    hists_vector = jax.vmap(
-        lambda i: compute_hist(i, weights=sel_weights[config.fit_region])
-    )(jnp.arange(len(config.sample_sys)))
+    # calc all hists for all samples
+    hists_vector = jax.vmap(lambda i: compute_hist(i, weights=sel_weights["nominal"]))(
+        jnp.arange(len(config.sample_sys))
+    )
 
     # this is the sequential version
     # hists_vector = []
     # for i in range(len(config.sample_sys)):
-    #     hist = compute_hist(i, weights=sel_weights[config.fit_region])
+    #     hist = compute_hist(i, weights=sel_weights["nominal"])
     #     hists_vector.append(hist)
 
     for sample_sys, h in zip(config.sample_sys, hists_vector):
         sample, sys = config.sample_sys_dict[sample_sys]
-        hists[config.fit_region][sample][sys] = h
+        hists[sample][sys] = h
 
-    def extra_hists(hists):
+    # Compute w2 histograms only for the ones we need
+    # going over len(config.samples) works because NOSYS are the first ones per
+    # sample, see config
+    hists_nominal_w2_vector = jax.vmap(
+        lambda i: compute_hist(i, weights=sel_weights["nominal"], w2=True)
+    )(jnp.arange(len(config.samples)))
 
-        # Compute w2 histograms only for the ones we need
-        # going over len(config.samples) works because NOSYS are the first ones per
-        # sample, see config
-        hists_nominal_w2_vector = jax.vmap(
-            lambda i: compute_hist(
-                i,
-                weights=sel_weights["SR_btag_2"],
-                w2=True,
+    # workaround stat up and down hists, see workspace
+    for sample, h_w2 in zip(config.samples, hists_nominal_w2_vector):
+        sigma = jnp.sqrt(h_w2)
+        hists[sample]["STAT_1UP"] = hists[sample][config.nominal] + sigma
+        hists[sample]["STAT_1DOWN"] = hists[sample][config.nominal] - sigma
+
+    # weight based systematics, e.g. scale factors or modelling
+    for sys, sys_dict in config.weight_systematics.items():
+        i = config.sample_sys.index(f"{sys_dict['sample']}_{config.nominal}")
+        for direction in ["up", "down"]:
+            hists[sys_dict["sample"]][f"{sys}_1{direction.upper()}"] = compute_hist(
+                i, weights=sel_weights[f"{sys}_{direction}"]
             )
-        )(jnp.arange(len(config.samples)))
-
-        # workaround stat up and down hists
-        for sample, h_w2 in zip(config.samples, hists_nominal_w2_vector):
-            sigma = jnp.sqrt(h_w2)
-            hists["SR_btag_2"][sample]["STAT_1UP"] = (
-                hists["SR_btag_2"][sample][config.nominal] + sigma
-            )
-            hists["SR_btag_2"][sample]["STAT_1DOWN"] = (
-                hists["SR_btag_2"][sample][config.nominal] - sigma
-            )
-
-        signal_idx = config.sample_sys.index("ggZH125_vvbb_NOSYS")
-        bkg_idx = config.sample_sys.index("bkg_NOSYS")
-        # dedicated stat error calc for bkg estimate
-        hists["SR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
-            i=bkg_idx, weights=sel_weights["SR_btag_1"]
-        )
-        h_w2_SR_btag_1 = compute_hist(
-            i=bkg_idx, weights=sel_weights["SR_btag_1"], w2=True
-        )
-        sigma = jnp.sqrt(h_w2_SR_btag_1)
-        # around the nominal, not the w2 hist, both are the same only for
-        # unit weights (data)
-        hists["SR_btag_1"]["bkg"]["STAT_1UP"] = hists["SR_btag_1"]["bkg"]["NOSYS"] + sigma
-        hists["SR_btag_1"]["bkg"]["STAT_1DOWN"] = hists["SR_btag_1"]["bkg"]["NOSYS"] - sigma
-
-        # for bkg estimate
-        hists["CR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
-            i=bkg_idx, weights=sel_weights["CR_btag_2"]
-        )
-        hists["CR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
-            i=bkg_idx, weights=sel_weights["CR_btag_1"]
-        )
-        
-        hists["VR_btag_2"]["bkg"]["NOSYS"] = compute_hist(
-            i=bkg_idx, weights=sel_weights["VR_btag_2"]
-        )
-        hists["VR_btag_1"]["bkg"]["NOSYS"] = compute_hist(
-            i=bkg_idx, weights=sel_weights["VR_btag_1"]
-        )
-
-        # some special signal weight unc, e.g. btag sf
-        hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1UP"] = compute_hist(
-            i=signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_up"]
-        )
-        hists["SR_btag_2"]["ggZH125_vvbb"]["MY_SF_UNC_1DOWN"] = compute_hist(
-            i=signal_idx, weights=sel_weights["SR_btag_2_my_sf_unc_down"]
-        )
-
-        # bkg modelling weight unc, propagated to the estimate in workspace
-        if "SR_btag_1_bkg_mod_up" in sel_weights:
-            hists["SR_btag_1"]["bkg"]["BKG_MOD_1UP"] = compute_hist(
-                i=bkg_idx, weights=sel_weights["SR_btag_1_bkg_mod_up"]
-            )
-            hists["SR_btag_1"]["bkg"]["BKG_MOD_1DOWN"] = compute_hist(
-                i=bkg_idx, weights=sel_weights["SR_btag_1_bkg_mod_down"]
-            )
-
-        return hists
-
-    hists = extra_hists(hists)
 
     return hists

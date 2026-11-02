@@ -4,7 +4,7 @@
 # (memory) and print one summary line per run.
 #
 #   python scripts/sweep.py configs/toy_mass.yaml configs/toy_mass_nosys.yaml \
-#       --set lr=0.002,0.005 penalty_intensity=0.5 --steps 300
+#       --set lr=0.002,0.005 --steps 300
 
 import argparse
 import itertools
@@ -28,22 +28,20 @@ def parse_sets(sets):
     return grid
 
 
-def summarize(path, test):
+def summarize(path):
     with h5py.File(os.path.join(path, "metrics.h5"), "r") as m:
         # step 0 is the solver init
         test_loss = m["test_loss"][1:]
         train_loss = m["train_loss"][1:]
         bw = m["bw"][-1]
-        cuts = {k: m[k][-1] / 1e3 for k in m if k.startswith("cut_")}
-    # loss is -Z for discovery
-    sign = -1 if test == "discovery" else 1
-    test_metric, train_metric = sign * test_loss, sign * train_loss
-    tail = test_metric[-30:]
-    # step to step noise of the test metric, relative to its level
-    noise = np.median(np.abs(np.diff(test_metric[-100:]))) / max(abs(np.median(tail)), 1e-12)
+        cuts = {k: m[k][-1] for k in m if k.startswith("cut_")}
+    # expected CLs, lower is better
+    tail = test_loss[-30:]
+    # step to step noise of the test CLs, relative to its level
+    noise = np.median(np.abs(np.diff(test_loss[-100:]))) / max(abs(np.median(tail)), 1e-12)
     out = (
-        f"test {np.median(tail):7.3f} (best {test_metric.max() if sign < 0 else test_metric.min():7.3f}) "
-        f"train {train_metric[-1]:7.3f}  noise {noise:5.3f}  bw {bw:.4f}"
+        f"test {np.median(tail):9.2e} (best {test_loss.min():9.2e}) "
+        f"train {train_loss[-1]:9.2e}  noise {noise:5.3f}  bw {bw:.4f}"
     )
     out += "".join(f"  {k[4:]} {v:5.1f}" for k, v in cuts.items())
     return out
@@ -88,7 +86,7 @@ if __name__ == "__main__":
                 line = f"{name:45s} FAILED, see {log}"
             else:
                 run_dir = [d for d in os.listdir(yml["results_path"]) if d.startswith("tomatos_")][0]
-                line = f"{name:45s} " + summarize(os.path.join(yml["results_path"], run_dir), yml.get("test", "cls"))
+                line = f"{name:45s} " + summarize(os.path.join(yml["results_path"], run_dir))
             print(line, flush=True)
             lines.append(line)
     print("\n".join(["", "summary:"] + lines))

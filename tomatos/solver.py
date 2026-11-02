@@ -46,20 +46,14 @@ def setup(config, pars):
     def mask(pars: dict, vars: list):
         return {key: key in vars for key in pars}
 
-    # limiting bandwidth and cut updates is important to avoid gradient
-    # explosion for these
-    # with the controller, bw is set from outside (constraints.bw_controller)
-    # and must not move with gradients
-    bw_update = (
-        optax.set_to_zero()
-        if getattr(config, "bw_controller", False)
-        else optax.clip(max_delta=config.update_limit_bw)
-    )
+    # limiting cut updates is important to avoid gradient explosion
+    # bw is set from outside (constraints.bw_controller) and must not move
+    # with gradients
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
         # optax.add_noise(eta=0.001, gamma=0.5, seed=0),
-        optax.masked(bw_update, mask(pars, ["bw"])),
+        optax.masked(optax.set_to_zero(), mask(pars, ["bw"])),
         optax.masked(
             optax.clip(max_delta=config.update_limit_cuts),
             mask(pars, [key for key in pars.keys() if "cut_" in key]),

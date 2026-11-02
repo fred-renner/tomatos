@@ -1,5 +1,7 @@
 import argparse
 import os
+import subprocess
+import sys
 
 import h5py
 import numpy as np
@@ -13,10 +15,12 @@ import tomatos.training
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-@pytest.mark.parametrize("demo", ["demo_cls_var", "demo_cls_nn"])
+@pytest.mark.parametrize("demo", ["toy_mass", "toy_nn"])
 def test_few_training_steps(demo, tmp_path, monkeypatch):
     # configs use paths relative to the repo root
     monkeypatch.chdir(REPO)
+    if not os.path.exists(os.path.join(REPO, "tests", "toy_files")):
+        subprocess.run([sys.executable, os.path.join(REPO, "tests", "generate_toy_files.py")], check=True)
     with open(os.path.join(REPO, "configs", f"{demo}.yaml")) as f:
         yml = yaml.safe_load(f)
     # the one-cycle lr schedule needs >= 5 steps

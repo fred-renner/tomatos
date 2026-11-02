@@ -2,13 +2,13 @@
 """README figures for the toy demos, from finished runs.
 
 inputs.png      the problem: a small peak on a large, partly unknown background
-mass.gif        mass fit: selected events, Z of both trainings, the pt cuts
-nn.gif          nn: score distribution, Z of both trainings
-comparison.png  claimed vs delivered Z, with and without systematics
+mass.gif        mass fit: selected events, CLs of both trainings, the pt1 cut
+nn.gif          nn: score distribution, CLs of both trainings
+comparison.png  claimed vs delivered CLs, with and without systematics
 
     python scripts/readme_plots.py \
-        --mass results/.../tomatos_cls_var_..._mass results/.../tomatos_cls_var_..._mass_nosys \
-        --nn results/.../tomatos_cls_nn_..._nn results/.../tomatos_cls_nn_..._nn_nosys
+        --mass results/tomatos_cls_var_..._mass results/tomatos_cls_var_..._mass_nosys \
+        --nn results/tomatos_cls_nn_..._nn results/tomatos_cls_nn_..._nn_nosys
 """
 import argparse
 import json
@@ -31,8 +31,9 @@ import generate_toy_files as toy  # noqa: E402
 TOMATO, BKG, INK, BLUE = "#e5533d", "#8fb0d6", "#2b2b2b", "#4a78b5"
 RUNS = {"sys": ("trained with uncertainties", TOMATO), "nosys": ("trained without uncertainties", BLUE)}
 TITLES = {"mass": "Mass-fit analysis", "nn": "Neural-network analysis"}
-SIG, EST = "ggZH125_vvbb_NOSYS", "bkg_estimate_NOSYS"
-CUT_LABELS = {"j1_pt": "$p_{T,1}$ [GeV]", "j2_pt": "$p_{T,2}$ [GeV]"}
+SIG, BKG_KEY = "sig_NOSYS", "bkg_NOSYS"
+LABELS = {"m": "$m$ [GeV]", "pt1": "leading-jet $p_T$ [GeV]"}
+EXCLUSION = 0.05
 
 plt.rcParams.update(
     {
@@ -59,114 +60,137 @@ class Run:
     def __init__(self, path):
         with open(os.path.join(path, "train_config.json")) as f:
             self.config = json.load(f)
+        with open(os.path.join(path, "preprocess_md.json")) as f:
+            self.md = json.load(f)
         with h5py.File(os.path.join(path, "metrics.h5"), "r") as m:
             self.m = {k: m[k][:] for k in m}
-        # losses are -Z for the discovery test, step 0 holds the solver init
-        self.z = -self.m["test_loss"]
-        self.z_claimed = -self.m["test_loss_stat_only"]
-        self.steps = len(self.z)
-        self.frames = list(range(0, self.steps, self.config["movie_batch_modulo"]))
-
-    def edges(self, step):
-        # physical units for mass (see train_utils.log_bins), score for nn
-        return np.asarray(self.m["bins"][step])
+        # step 0 holds the solver init
+        self.cls = self.m["test_loss"]
+        self.cls_claimed = self.m["test_loss_stat_only"]
+        self.steps = len(self.cls)
+        self.modulo = self.config["movie_batch_modulo"]
+        self.frames = list(range(0, self.steps, self.modulo))
+        self.is_var = self.config["objective"] == "cls_var"
+        self.width_kde = {}
 
     def to_x(self, u):
-        # kde grid lives in [0, 1] of the binning range
-        if self.config["objective"] == "cls_var":
-            lo, hi = self.config["fit_range"]
-            return (lo + u * (hi - lo)) / 1e3
-        return u
+        # kde grid and bins live in the min max scaled [0, 1]
+        if self.is_var:
+            i = self.config["cls_var_idx"]
+            return (np.asarray(u) - self.md["scaler_min"][i]) / self.md["scaler_scale"][i]
+        return np.asarray(u)
 
-    def final(self, z, n=20):
-        return float(np.median(z[-n:]))
+    def edges(self, step):
+        # bins are logged in physical units for cls_var, see train_utils.log_bins
+        return np.asarray(self.m["bins"][step])
+
+    def densities(self, step):
+        """Test counts and kde curves per unit x, at one step."""
+        edges = self.edges(step)
+        width = np.diff(edges)
+        b = self.m["h_" + BKG_KEY + "_test"][step] / width
+        s = self.m["h_" + SIG + "_test"][step] / width
+        # kde of the closest logged frame, scaled like train_utils.rescale_kde:
+        # matched to the largest train bin, so divide by that bin's width
+        k = step - step % self.modulo
+        kde = {}
+        for key in (BKG_KEY, SIG):
+            w = width[np.argmax(self.m["h_" + key][k])]
+            kde[key] = self.m["kde_" + key][k] / w
+        return edges, b, s, kde
+
+    def ylim(self):
+        # fixed over the whole movie, so the plot moves and not the axis
+        top = 0
+        for step in self.frames:
+            _, b, s, kde = self.densities(step)
+            top = max(top, np.max(b + s), np.max(kde[BKG_KEY]))
+        top *= 3
+        return top / 3e4, top
+
+    def final(self, cls, n=20):
+        return float(np.median(cls[-n:]))
 
 
-def selection_panel(ax, run, step, mode):
+def selection_panel(ax, run, step, ylim):
     """Counted test events per bin (stacked) and the smooth kde the optimizer sees."""
-    edges = run.edges(step)
-    if mode == "mass":
-        edges = edges / 1e3
+    edges, b, s, kde = run.densities(step)
     width = np.diff(edges)
-    b = run.m["h_" + EST + "_test"][step]
-    s = run.m["h_" + SIG + "_test"][step]
-    ax.bar(edges[:-1], b / width, width, align="edge", color=BKG, label="background estimate")
-    ax.bar(edges[:-1], s / width, width, bottom=b / width, align="edge", color=TOMATO, label="signal")
-    # kde of the closest logged frame, scaled like train_utils.rescale_kde:
-    # matched to the largest train bin, hence divide by that bin's width
-    kde_step = step - step % run.config["movie_batch_modulo"]
-    grid = run.to_x(np.asarray(run.config["kde_bins"][:-1]))
-    for key, color in ((EST, INK), (SIG, TOMATO)):
-        h_train = run.m["h_" + key][kde_step]
-        kde = run.m["kde_" + key][kde_step]
-        ax.plot(grid, kde / width[np.argmax(h_train)], color=color, lw=1.3, ls="--",
-                label="smooth (KDE) " + ("background" if key == EST else "signal"))
+    ax.bar(edges[:-1], b, width, align="edge", color=BKG, label="background")
+    ax.bar(edges[:-1], s, width, bottom=b, align="edge", color=TOMATO, label="signal")
+    grid = run.to_x(run.config["kde_bins"][:-1])
+    ax.plot(grid, kde[BKG_KEY], color=INK, lw=1.3, ls="--", label="smooth (KDE) background")
+    ax.plot(grid, kde[SIG], color=TOMATO, lw=1.3, ls="--", label="smooth (KDE) signal")
     for e in edges[1:-1]:
         ax.axvline(e, color=INK, lw=0.6, alpha=0.35)
-    if mode == "mass":
-        ax.set(xlim=(edges[0], edges[-1]), xlabel="$m_{bb}$ [GeV]", ylabel="events / GeV")
+    if run.is_var:
+        ax.set(xlim=(edges[0], edges[-1]), xlabel=LABELS["m"], ylabel="events / GeV")
     else:
         ax.set(xlim=(0, 1), xlabel="NN score", ylabel="events / unit score")
-    ax.set_yscale("log")
-    top = max((b + s) / width) * 8
-    ax.set_ylim(top / 1e4, top)
+    ax.set(yscale="log", ylim=ylim)
     ax.set_title("Selected events (test set)")
     ax.legend(loc="upper right", ncol=2)
 
 
-def z_panel(ax, runs, step):
+def cls_panel(ax, runs, step, ylim):
     for name, run in runs.items():
         label, color = RUNS[name]
         x = np.arange(1, step + 1)
-        ax.plot(x, run.z[1 : step + 1], color=color, lw=2, label=label)
+        ax.plot(x, run.cls[1 : step + 1], color=color, lw=2, label=label)
         if step >= 1:
-            ax.plot(step, run.z[step], "o", color=color, ms=4)
-    ymax = 1.15 * max(np.nanmax(r.z[1:]) for r in runs.values())
-    ax.set(xlim=(0, runs["sys"].steps), ylim=(0, ymax), xlabel="training step", ylabel="Z  [σ]")
-    ax.set_title("Discovery significance (test set, all uncertainties)")
-    ax.legend(loc="lower right")
+            ax.plot(step, run.cls[step], "o", color=color, ms=4)
+    ax.axhline(EXCLUSION, color=INK, lw=0.8, ls="--")
+    ax.text(runs["sys"].steps, EXCLUSION, "95% exclusion ", ha="right", va="bottom", fontsize=8.5, color=INK)
+    ax.set(xlim=(0, runs["sys"].steps), ylim=ylim, yscale="log", xlabel="training step",
+           ylabel="expected $CL_s$ (lower = more sensitive)")
+    ax.set_title("Sensitivity (test set, all uncertainties)")
+    ax.legend(loc="upper right")
 
 
 def cut_panel(ax, runs, step, var, events):
     bins = np.linspace(30, 300, 55)
     for sample, color, label in (("bkg", BKG, "background"), ("sig", TOMATO, "signal")):
-        x, w = events[sample][var] / 1e3, events[sample]["weight"]
+        x, w = events[sample][var], events[sample]["weight"]
         style = dict(color=color, label=label, density=True)
         style |= dict(alpha=0.8) if sample == "bkg" else dict(histtype="step", lw=2)
         ax.hist(x, bins, weights=w, **style)
+    onset = toy.bkg_mod_pars[1]
+    ax.axvspan(onset, bins[-1], color=INK, alpha=0.07, lw=0)
     for name, run in runs.items():
         label, color = RUNS[name]
-        cut = run.m["cut_" + var][step] / 1e3
-        ax.axvline(cut, color=color, lw=2.2, label=f"cut, {label}")
-        if name == "sys":
-            ax.axvspan(bins[0], cut, color="white", alpha=0.6, lw=0)
-    ax.set(yscale="log", xlim=(bins[0], bins[-1]), ylim=(1e-5, 0.1), xlabel=CUT_LABELS[var], ylabel="a.u.")
-    ax.set_title(f"Cut on {CUT_LABELS[var].split(' ')[0]}")
+        ax.axvline(run.m["cut_" + var][step], color=color, lw=2.2, label=f"cut, {label}")
+    ax.set(yscale="log", xlim=(bins[0], bins[-1]), ylim=(1e-5, 0.1), xlabel=LABELS[var], ylabel="a.u.")
+    ax.set_title("Cut on the leading jet (keep events right of it)")
     ax.legend(loc="upper right")
 
 
 def load_events(ntuples):
     events = {}
-    for sample, folder in (("sig", "ggZH125_vvbb"), ("bkg", "bkg")):
-        with uproot.open(os.path.join(ntuples, folder, "NOSYS.root")) as f:
+    for sample in ("sig", "bkg"):
+        with uproot.open(os.path.join(ntuples, sample, "NOSYS.root")) as f:
             events[sample] = f["FilteredTree"].arrays(library="np")
     return events
+
+
+def cls_ylim(runs):
+    lo = min(np.min(r.cls[1:]) for r in runs.values())
+    return lo / 2, 1
 
 
 def movie(runs, mode, out, events, fps=12, hold=30, dpi=80):
     sys_run = runs["sys"]
     cuts = list(sys_run.config["opt_cuts"])
-    shape, size = ((2, 2), (13, 8.6)) if cuts else ((1, 2), (13, 4.9))
-    fig, axes = plt.subplots(*shape, figsize=size, layout="constrained")
+    n_panels = 2 + len(cuts)
+    fig, axes = plt.subplots(1, n_panels, figsize=(6.5 * n_panels, 4.9), layout="constrained")
     frames = sys_run.frames + [sys_run.steps - 1] * hold
+    ylim_sel, ylim_cls = sys_run.ylim(), cls_ylim(runs)
 
     def draw(step):
-        for ax in axes.flat:
+        for ax in axes:
             ax.clear()
-        panels = list(axes.flat)
-        selection_panel(panels[0], sys_run, step, mode)
-        z_panel(panels[1], runs, step)
-        for ax, var in zip(panels[2:], cuts):
+        selection_panel(axes[0], sys_run, step, ylim_sel)
+        cls_panel(axes[1], runs, step, ylim_cls)
+        for ax, var in zip(axes[2:], cuts):
             cut_panel(ax, runs, step, var, events)
         fig.suptitle(f"{TITLES[mode]}   ·   step {step:3d}", x=0.01, ha="left", fontsize=13, color=INK)
 
@@ -183,29 +207,28 @@ def inputs(events, out, dpi=130):
     b, s = events["bkg"], events["sig"]
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.4), layout="constrained")
 
-    ax, bins = axes[0], np.linspace(50, 250, 81)
-    onset = toy.bkg_modelling_pars[1]
-    m, pt, w = b["h_m"] / 1e3, b["j1_pt"] / 1e3, b["weight"]
-    hard = pt > onset
-    h = np.histogram(m, bins, weights=w)[0]
-    h_hard = np.histogram(m[hard], bins, weights=w[hard])[0]
-    unc = np.histogram(m, bins, weights=w * (b["bkg_mod_up"] - 1))[0]
+    ax, bins = axes[0], np.linspace(*toy.m_range, 71)
+    onset = toy.bkg_mod_pars[1]
+    hard = b["pt1"] > onset
+    w = b["weight"]
+    h = np.histogram(b["m"], bins, weights=w)[0]
+    h_hard = np.histogram(b["m"][hard], bins, weights=w[hard])[0]
+    unc = np.histogram(b["m"], bins, weights=w * (b["bkg_mod_up"] - 1))[0]
     ax.stairs(h, bins, fill=True, color=BKG, alpha=0.55, label="background")
-    ax.stairs(h_hard, bins, fill=True, color=BLUE, alpha=0.8, label=f"… with $p_{{T,1}}$ > {onset:.0f} GeV")
-    ax.stairs(h_hard + unc, bins, baseline=h_hard - unc, fill=True, color="none", hatch="////",
+    ax.stairs(h_hard, bins, fill=True, color=BLUE, alpha=0.8, label=f"… with $p_T$ > {onset:.0f} GeV")
+    ax.stairs(h_hard + unc, bins, baseline=np.maximum(h_hard - unc, 0), fill=True, color="none", hatch="////",
               edgecolor=INK, lw=0, label="its uncertainty")
-    ax.hist(s["h_m"] / 1e3, bins, weights=20 * s["weight"], histtype="step", color=TOMATO, lw=2, label="signal ×20")
-    ax.set(xlim=(bins[0], bins[-1]), xlabel="$m_{bb}$ [GeV]", ylabel="events")
+    ax.hist(s["m"], bins, weights=10 * s["weight"], histtype="step", color=TOMATO, lw=2, label="signal ×10")
+    ax.set(xlim=(bins[0], bins[-1]), xlabel=LABELS["m"], ylabel="events")
     ax.set_title("Mass spectrum")
     ax.legend(loc="upper right")
 
     ax, bins = axes[1], np.linspace(30, 300, 55)
-    ax.hist(pt, bins, weights=w, density=True, color=BKG, alpha=0.8, label="background")
-    ax.hist(s["j1_pt"] / 1e3, bins, weights=s["weight"], density=True, histtype="step", color=TOMATO, lw=2,
-            label="signal")
+    ax.hist(b["pt1"], bins, weights=w, density=True, color=BKG, alpha=0.8, label="background")
+    ax.hist(s["pt1"], bins, weights=s["weight"], density=True, histtype="step", color=TOMATO, lw=2, label="signal")
     ax.axvspan(onset, bins[-1], color=INK, alpha=0.07, lw=0)
     ax.text(onset + 4, 0.05, "background poorly\nknown under the peak", fontsize=8.5, color=INK, va="top")
-    ax.set(yscale="log", xlim=(bins[0], bins[-1]), ylim=(1e-5, 0.1), xlabel=CUT_LABELS["j1_pt"], ylabel="a.u.")
+    ax.set(yscale="log", xlim=(bins[0], bins[-1]), ylim=(1e-5, 0.1), xlabel=LABELS["pt1"], ylabel="a.u.")
     ax.set_title("Leading-jet momentum")
     ax.legend(loc="lower left")
     fig.suptitle("The problem: a small peak on a large, partly unknown background", x=0.01, ha="left",
@@ -217,23 +240,24 @@ def inputs(events, out, dpi=130):
 
 def comparison(all_runs, out, dpi=130):
     fig, ax = plt.subplots(figsize=(7.5, 4.4), layout="constrained")
-    ymax = 0
+    values = []
     for g, (mode, runs) in enumerate(all_runs.items()):
-        claimed = runs["nosys"].final(runs["nosys"].z_claimed)
-        without = runs["nosys"].final(runs["nosys"].z)
-        with_ = runs["sys"].final(runs["sys"].z)
-        ymax = max(ymax, claimed, without, with_)
-        for dx, z, color, alpha in [(-0.27, claimed, BLUE, 0.3), (0.0, without, BLUE, 1.0), (0.27, with_, TOMATO, 1.0)]:
-            ax.bar(g + dx, z, 0.25, color=color, alpha=alpha)
-            ax.text(g + dx, z, f"{z:.1f}", ha="center", va="bottom", fontsize=9.5,
+        claimed = runs["nosys"].final(runs["nosys"].cls_claimed)
+        without = runs["nosys"].final(runs["nosys"].cls)
+        with_ = runs["sys"].final(runs["sys"].cls)
+        values += [claimed, without, with_]
+        for dx, v, color, alpha in [(-0.27, claimed, BLUE, 0.3), (0.0, without, BLUE, 1.0), (0.27, with_, TOMATO, 1.0)]:
+            ax.bar(g + dx, v, 0.25, color=color, alpha=alpha)
+            ax.text(g + dx, v * 1.15, f"{v:.2g}", ha="center", va="bottom", fontsize=9.5,
                     fontweight="bold" if alpha == 1 else None)
+    ax.axhline(EXCLUSION, color=INK, lw=0.8, ls="--")
     handles = [
         Patch(color=BLUE, alpha=0.3, label="without uncertainties: claimed"),
         Patch(color=BLUE, label="without uncertainties: delivered"),
         Patch(color=TOMATO, label="with uncertainties: delivered"),
     ]
     ax.set_xticks(range(len(all_runs)), [TITLES[m] for m in all_runs])
-    ax.set(ylabel="discovery significance Z  [σ]", ylim=(0, 1.35 * ymax))
+    ax.set(yscale="log", ylim=(min(values) / 5, 1), ylabel="expected $CL_s$ (lower = more sensitive)")
     ax.set_title("Ignoring uncertainties overpromises")
     ax.legend(handles=handles, loc="upper right")
     fig.savefig(out, dpi=dpi)

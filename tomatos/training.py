@@ -30,7 +30,8 @@ def init_opt_pars(config, nn_pars):
     # build opt_pars
     opt_pars = {}
     opt_pars["nn"] = nn_pars
-    opt_pars["bw"] = jnp.array(config.bw_init)
+    # placeholder, set by the scan in train_init
+    opt_pars["bw"] = jnp.array(1.0)
     if config.include_bins:
         # exclude boundaries
         opt_pars["bins"] = jnp.array(config.bins[1:-1])
@@ -70,6 +71,14 @@ def train_init(config):
     # solver
     solver = tomatos.solver.setup(config, opt_pars)
     train_data, train_sf = next(batch["train"])
+    # bandwidth start value, see constraints
+    kde_hists_fn = tomatos.pipeline.jit_make_hists(config, validate_only=False)
+    opt_pars["bw"] = jnp.array(
+        tomatos.constraints.find_bw_init(
+            config, opt_pars, train_data, train_sf, kde_hists_fn
+        )
+    )
+    logging.info(f"bw init: {opt_pars['bw']:.4f}")
     state = solver.init_state(
         opt_pars,
         data=train_data,
@@ -132,11 +141,11 @@ def run(config):
 
         # gradient update
         train_data, train_sf = next(batch["train"])
-        if config.bw_controller:
-            # counted hists before the update, state.aux after it holds the
-            # kde hists of the same parameters and batch
-            sharp_train = sharp_hists_fn(opt_pars, train_data, train_sf)
-            bw_before = opt_pars["bw"]
+        bw_before = opt_pars["bw"]
+        if i == 0:
+            bw_start = bw_before
+        prev_loss = state.value
+        sharp_train = sharp_hists_fn(opt_pars, train_data, train_sf)
         opt_pars, state = solver.update(
             opt_pars,
             state,
@@ -145,12 +154,17 @@ def run(config):
         )
         # apply limitations
         opt_pars = tomatos.constraints.opt_pars(config, opt_pars)
-        if config.bw_controller:
-            opt_pars["bw"], bw_state, mismatch = tomatos.constraints.bw_controller(
-                config, bw_before, state.aux, sharp_train
+        # the first step has no previous loss
+        if i > 0:
+            opt_pars["bw"], bw_state = tomatos.constraints.bw_controller(
+                config,
+                bw_before,
+                sharp_train,
+                float(state.value),
+                float(prev_loss),
+                bw_start,
             )
-            metrics["bw_mismatch"] = mismatch
-            logging.info(f"bw controller: {bw_state}, kde mismatch {mismatch:.3f}")
+            logging.info(f"bw controller: {bw_state}")
 
         ###### excessive logging, turn off as you please ######
         hists = state.aux

@@ -26,18 +26,6 @@ import tomatos.utils
 import tomatos.workspace
 
 
-def binary_cross_entropy(preds, labels):
-    epsilon = 1e-15  # To avoid log(0)
-    preds = jnp.clip(preds, epsilon, 1 - epsilon)
-    return -jnp.mean(labels * jnp.log(preds) + (1 - labels) * jnp.log(1 - preds))
-
-
-def bce(ones, zeros):
-    labels = jnp.concatenate([jnp.ones_like(ones), jnp.zeros_like(zeros)])
-    preds = jnp.concatenate((ones, zeros))
-    return binary_cross_entropy(preds, labels)
-
-
 def log_bw(metrics, opt_pars):
     metrics["bw"] = opt_pars["bw"]
     logging.info(f"bw: {opt_pars['bw']}")
@@ -84,10 +72,7 @@ def log_hists(config, metrics, test_hists, hists):
 
 
 def log_bins(config, metrics, bins, infer_metrics_i):
-    if config.objective == "cls_var" and config.fit_range is not None:
-        lo, hi = config.fit_range
-        scaled_bins = np.asarray(bins) * (hi - lo) + lo
-    elif config.objective == "cls_var":
+    if config.objective == "cls_var":
         scaled_bins = tomatos.utils.inverse_min_max_scale(
             config, np.copy(bins), config.cls_var_idx
         )

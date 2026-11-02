@@ -34,25 +34,17 @@ class Setup:
         with open(args.config, "r") as f:
             yml = yaml.safe_load(f)
 
-        # optional keys, defaults keep the original behaviour
+        # optional keys
         defaults = {
-            "test": "cls",
+            # false: train on stat uncertainties only, valid/test always use all
             "train_systematics": True,
-            "bw_controller": False,
-            "bw_rates": [0.97, 1.08],  # shrink, grow
-            "bw_max": 0.4,
-            "max_mismatch": 0.025,
+            "bkg_sample": "bkg",
+            # bkg events wanted in every bin, see constraints.bw_controller
             "min_bkg": 10,
-            "penalty_intensity": 0.1,
-            # mass windows of the regions (same units as the ntuples)
-            "regions": {
-                "SR": [[110e3, 130e3]],
-                "VR": [[100e3, 110e3], [130e3, 150e3]],
-                "CR": [[80e3, 100e3], [150e3, 170e3]],
-            },
-            # cls_var: range mapped onto the [0, 1] binning, default is the
-            # full min max range, which leaves bins outside of the SR empty
-            "fit_range": None,
+            # {name: {sample, up, down}}, up/down are per event weight vars
+            "weight_systematics": {},
+            # {sample: relative normalization uncertainty}
+            "norm_systematics": {},
         }
         for k, v in {**defaults, **yml}.items():
             setattr(self, k, v)
@@ -102,10 +94,8 @@ class Setup:
             yml["n_k_folds"] / (yml["n_k_folds"] - 1) if yml["n_k_folds"] > 1 else 1
         )
 
-        # some global settings
-        self.fit_region = "SR_btag_2"
         # hists that contain these strings will be plotted
-        self.plot_hists_filter = [self.signal_sample, "bkg_estimate"]
+        self.plot_hists_filter = self.samples
 
         # Create output directories
         self._setup_paths(args, yml)

@@ -1,8 +1,8 @@
 VENV := .venv
 BIN := $(VENV)/bin
-DEMOS := demo_cls_var demo_cls_nn
+DEMOS := toy_mass toy_mass_nosys toy_nn toy_nn_nosys
 
-.PHONY: install demo gif test data
+.PHONY: install demo plots test data
 
 # jaxopt (used for the likelihood fit) pins the stack to jax 0.3.14 / Python 3.9
 install:
@@ -12,19 +12,20 @@ install:
 	$(BIN)/pip install jaxlib==0.3.14 -f https://storage.googleapis.com/jax-releases/jax_releases.html
 	$(BIN)/pip install pytest
 
-# preprocess, train and plot both demos, then render the GIFs
-demo:
-	for d in $(DEMOS); do $(BIN)/tomatos --config configs/$$d.yaml --prep --train --plot || exit 1; done
-	$(MAKE) gif
+# toy ntuples in tests/toy_files
+data:
+	$(BIN)/python tests/generate_toy_files.py
 
-gif:
-	mkdir -p assets
-	$(BIN)/python scripts/make_gif.py --config configs/demo_cls_var.yaml --out assets/cls_var.gif
-	$(BIN)/python scripts/make_gif.py --config configs/demo_cls_nn.yaml --out assets/cls_nn.gif
+# train both demos with and without systematics (one at a time, memory)
+demo: data
+	for d in $(DEMOS); do $(BIN)/tomatos --config configs/$$d.yaml --prep --train --plot || exit 1; done
+	$(MAKE) plots
+
+# README figures in assets/
+plots:
+	$(BIN)/python scripts/readme_plots.py \
+		--mass results/tomatos_cls_var_steps_300_bins_5_mass results/tomatos_cls_var_steps_300_bins_5_mass_nosys \
+		--nn results/tomatos_cls_nn_steps_300_bins_5_nn results/tomatos_cls_nn_steps_300_bins_5_nn_nosys
 
 test:
 	$(BIN)/python -m pytest tests -q
-
-# regenerate tests/files from CERN Open Data (several GB download)
-data:
-	$(BIN)/python tests/generate_test_files.py --download
