@@ -3,10 +3,9 @@
 # Toy ntuples, ntuple_path/SAMPLE/SYSTEMATIC.root: a resonance on a falling
 # background, designed around one effect. The signal jets are hard, the
 # background falls steeply, so S/sqrt(B) says: cut hard. But the
-# background is a data driven estimate, extrapolated from soft jets, and
-# runs out of statistics for hard jets and high masses: its uncertainty
-# grows exactly where the hard cut goes (bkg_est), bin by bin uncorrelated.
-# Knowing about it, cut and bins together settle for a looser cut.
+# background uncertainty grows with jet pT and mass, exactly where the hard
+# cut goes (bkg_unc), uncorrelated between bins. Knowing about it, cut and
+# bins together settle for a looser cut.
 
 import os
 
@@ -22,16 +21,16 @@ yields = {"sig": 70.0, "bkg": 10_000.0}
 n_events = {"sig": 20_000, "bkg": 100_000}
 # signal pt1 peak and width [GeV]
 sig_pt_pars = (100.0, 30.0)
-# background estimate uncertainty, relative: at pt1 = 30 GeV and the
+# background uncertainty, relative: at pt1 = 30 GeV and the
 # lowest mass, the pt1 scale [GeV] it grows with, and how much larger it
 # is at the highest mass
-bkg_est_pars = (0.006, 25.0, 2.0)
+bkg_unc_pars = (0.006, 25.0, 2.0)
 
 
-def bkg_est(m, pt1):
-    # relative 1 sigma uncertainty of the background estimate, capped so
+def bkg_unc(m, pt1):
+    # relative 1 sigma background uncertainty, capped so
     # the down variation stays positive
-    rel_30, scale, high_mass = bkg_est_pars
+    rel_30, scale, high_mass = bkg_unc_pars
     in_mass = (m - m_range[0]) / (m_range[1] - m_range[0])
     return np.minimum(rel_30 * np.exp((pt1 - 30) / scale) * (1 + (high_mass - 1) * in_mass), 0.9)
 
@@ -56,12 +55,12 @@ def sample(rng, n, kind):
 def to_ntuple(ev, total, is_bkg):
     n = len(ev["m"])
     # only defined for bkg, neutral for signal
-    rel = bkg_est(ev["m"], ev["pt1"]) if is_bkg else np.zeros(n)
+    rel = bkg_unc(ev["m"], ev["pt1"]) if is_bkg else np.zeros(n)
     return {
         **ev,
         "weight": np.full(n, total / n),
-        "bkg_est_up": 1 + rel,
-        "bkg_est_down": 1 - rel,
+        "bkg_unc_up": 1 + rel,
+        "bkg_unc_down": 1 - rel,
     }
 
 

@@ -32,6 +32,7 @@ import tomatos.histograms
 import tomatos.pipeline
 import tomatos.preprocess
 import tomatos.train_utils
+import tomatos.select
 import tomatos.training
 
 HIST_KEYS = ["sig_NOSYS", "bkg_NOSYS"]
@@ -72,8 +73,6 @@ class Stepwise:
         # the config is closed over, recompile when it changes
         self.hists_fn = tomatos.pipeline.jit_make_hists(self.config, validate_only=True)
         self.cls_fn = tomatos.pipeline.jit_loss_fn(self.config, validate_only=True, stat_only=False)
-        # what the analysis would claim without the uncertainties
-        self.cls_stat_fn = tomatos.pipeline.jit_loss_fn(self.config, validate_only=True, stat_only=True)
 
     def hists(self, pars, split="train"):
         data, scale = self.train if split == "train" else self.test
@@ -89,9 +88,8 @@ class Stepwise:
 
     def finish_stage(self, name):
         cls = float(self.cls_fn(self.pars, *self.test)[0])
-        claimed = float(self.cls_stat_fn(self.pars, *self.test)[0])
-        self.stages.append((name, cls, claimed))
-        print(f"after {name:5s}: expected CLs (test) {cls:.4f}, claimed without uncertainties {claimed:.2e}")
+        self.stages.append((name, cls))
+        print(f"after {name:5s}: expected CLs (test) {cls:.4f}")
 
     def physical_cut(self, var, u):
         i = self.config.vars.index(var)
@@ -248,7 +246,7 @@ class Stepwise:
             i = config.sample_sys.index(f"{sample}_{config.nominal}")
             res[f"event_weight_{key}"] = np.asarray(data[i, :, config.weight_idx]) * float(scale[i])
         res["event_mod_bkg"] = np.stack([
-            np.asarray(data[i, :, config.vars.index(d["up"])]) - 1 for d in config.weight_systematics.values()
+            np.asarray(data[i, :, config.vars.index(d["up"])]) - 1 for d in tomatos.select.WEIGHT_VARIATIONS.values()
         ])
         return res
 
@@ -270,7 +268,6 @@ class Stepwise:
             out,
             stage_names=np.array([s[0] for s in self.stages]),
             stage_cls=np.array([s[1] for s in self.stages]),
-            stage_cls_claimed=np.array([s[2] for s in self.stages]),
             **stacked,
             **extra,
         )

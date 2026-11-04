@@ -13,23 +13,24 @@ bottom  Automated Optimization: all boxes at once on the expected CLs with
         --stepwise results/stepwise/mass.npz --out assets/pipeline_mass.gif
 """
 import argparse
+import json
 import os
 import sys
 
+import h5py
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import uproot
 from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.colors import LinearSegmentedColormap, LogNorm
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 here = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, here)
 sys.path.insert(0, os.path.join(here, "..", "tests"))
 import generate_toy_files as toy  # noqa: E402
-from readme_plots import Run, load_events  # noqa: E402
 
 # own palette: tomato signal on a blue background, what we don't know is a
 # grey layer on top, leaf green for the automated part
@@ -71,6 +72,50 @@ plt.rcParams.update(
         "hatch.linewidth": 0.6,
     }
 )
+
+
+class Run:
+    """What the gif needs from one training, loaded once."""
+
+    def __init__(self, path):
+        with open(os.path.join(path, "train_config.json")) as f:
+            self.config = json.load(f)
+        with open(os.path.join(path, "preprocess_md.json")) as f:
+            self.md = json.load(f)
+        with h5py.File(os.path.join(path, "metrics.h5"), "r") as m:
+            self.m = {k: m[k][:] for k in m}
+        # step 0 holds the solver init
+        self.cls = self.m["test_loss"]
+        self.steps = len(self.cls)
+        self.modulo = self.config["movie_batch_modulo"]
+        self.is_var = self.config["objective"] == "cls_var"
+
+    def to_x(self, u):
+        # kde grid and bins live in the min max scaled [0, 1]
+        if self.is_var:
+            i = self.config["cls_var_idx"]
+            return (np.asarray(u) - self.md["scaler_min"][i]) / self.md["scaler_scale"][i]
+        return np.asarray(u)
+
+    def edges(self, step):
+        # bins are logged in physical units for cls_var, see train_utils.log_bins
+        return np.asarray(self.m["bins"][step])
+
+    def kde(self, step, key):
+        # kde per unit x of the closest logged frame, scaled like
+        # train_utils.rescale_kde: matched to the largest train bin, so
+        # divide by that bin's width
+        width = np.diff(self.edges(step))
+        k = step - step % self.modulo
+        return self.m["kde_" + key][k] / width[np.argmax(self.m["h_" + key][k])]
+
+
+def load_events(ntuples):
+    events = {}
+    for sample in ("sig", "bkg"):
+        with uproot.open(os.path.join(ntuples, sample, "NOSYS.root")) as f:
+            events[sample] = f["FilteredTree"].arrays(library="np")
+    return events
 
 
 def resample(n_src, n):
@@ -126,7 +171,7 @@ def from_run(run, n):
     # smooth (kde) histograms the optimizer sees, per unit x like the counts
     grid = run.to_x(run.config["kde_bins"][:-1])
     src.kde = [
-        (grid, *[UNIT[run.is_var] * run.densities(s)[3][k] for k in ("sig_NOSYS", "bkg_NOSYS")]) for s in steps
+        (grid, *[UNIT[run.is_var] * run.kde(s, k) for k in ("sig_NOSYS", "bkg_NOSYS")]) for s in steps
     ]
     src.mode = ["bins"] * n
     src.edge_alpha = np.ones(n)
@@ -200,7 +245,7 @@ class Pipeline:
             sel = {k: ev[k]["pt1"] > cut for k in ("sig", "bkg")}
             x = {k: ev[k]["m"][sel[k]] for k in sel}
             w = {k: ev[k]["weight"][sel[k]] for k in sel}
-            mods = [toy.bkg_est(x["bkg"], ev["bkg"]["pt1"][sel["bkg"]])]
+            mods = [toy.bkg_unc(x["bkg"], ev["bkg"]["pt1"][sel["bkg"]])]
         else:
             sw = self.sw
             x = {k: sw[f"frame_score_{k}"][frame] for k in ("sig", "bkg")}

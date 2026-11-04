@@ -6,6 +6,8 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import relaxed
 
+import tomatos.select
+
 
 
 # modified from relaxed and added weights, its nice to have it here to see
@@ -200,7 +202,7 @@ def fill_hists(
         hists[sample]["STAT_1DOWN"] = hists[sample][config.nominal] - sigma
 
     # weight based systematics, e.g. scale factors or modelling
-    for sys, sys_dict in config.weight_systematics.items():
+    for sys, sys_dict in tomatos.select.WEIGHT_VARIATIONS.items():
         i = config.sample_sys.index(f"{sys_dict['sample']}_{config.nominal}")
         for direction in ["up", "down"]:
             hists[sys_dict["sample"]][f"{sys}_1{direction.upper()}"] = compute_hist(

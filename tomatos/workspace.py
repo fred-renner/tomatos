@@ -14,26 +14,23 @@ def zero_protect(hists, thresh=0.001):
         return jnp.where(hists < thresh, thresh, hists)
 
 
+def per_bin(name, nom, hi, lo):
+    # one histosys per bin, uncorrelated between bins. an ad-hoc stand-in
+    # until there is a differentiable staterror/shapesys modifier, costs one
+    # fit parameter per bin and uncertainty
+    return [
+        {
+            "name": f"{name}_{i+1}",
+            "type": "histosys",
+            "data": {"hi_data": nom.at[i].set(hi[i]), "lo_data": nom.at[i].set(lo[i])},
+        }
+        for i in range(len(nom))
+    ]
+
+
 def stat_modifiers(hists, config, sample):
-    # this an ad-hoc hack for stat uncertainty, and nothing more than
-    # that until we have the diffable modifier. Blows up the number of fit
-    # parameters unnecessarily for stat unc, which instead of having one
-    # parameter per bin, histosy makes a parameter for each bin per
-    # modifier
-    nom = hists[sample][config.nominal]
-    modifiers = []
-    for i in range(len(nom)):
-        modifiers += [
-            {
-                "name": f"STAT_{sample}_{i+1}",
-                "type": "histosys",
-                "data": {
-                    "hi_data": nom.at[i].set(hists[sample]["STAT_1UP"][i]),
-                    "lo_data": nom.at[i].set(hists[sample]["STAT_1DOWN"][i]),
-                },
-            }
-        ]
-    return modifiers
+    h = hists[sample]
+    return per_bin(f"STAT_{sample}", h[config.nominal], h["STAT_1UP"], h["STAT_1DOWN"])
 
 
 def sys_modifiers(hists, config, sample):
@@ -43,18 +40,10 @@ def sys_modifiers(hists, config, sample):
         if sys.endswith("_1UP") and not sys.startswith("STAT"):
             name = sys.removesuffix("_1UP")
             hi, lo = hists[sample][name + "_1UP"], hists[sample][name + "_1DOWN"]
-            if config.weight_systematics.get(name, {}).get("bin_by_bin"):
-                # uncorrelated between bins, e.g. the statistics of a data
-                # driven estimate: one parameter per bin, as for stat
-                nom = hists[sample][config.nominal]
-                modifiers += [
-                    {
-                        "name": f"{name}_{sample}_{i+1}",
-                        "type": "histosys",
-                        "data": {"hi_data": nom.at[i].set(hi[i]), "lo_data": nom.at[i].set(lo[i])},
-                    }
-                    for i in range(len(nom))
-                ]
+            if name == "BKG_UNC":
+                # example: the toy's background uncertainty is uncorrelated
+                # between bins, one parameter per bin like stat
+                modifiers += per_bin(f"{name}_{sample}", hists[sample][config.nominal], hi, lo)
                 continue
             modifiers += [
                 {

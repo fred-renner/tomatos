@@ -41,8 +41,6 @@ class Setup:
             "bkg_sample": "bkg",
             # bkg events wanted in every bin, see constraints.bw_controller
             "min_bkg": 10,
-            # {name: {sample, up, down}}, up/down are per event weight vars
-            "weight_systematics": {},
             # {sample: relative normalization uncertainty}
             "norm_systematics": {},
         }

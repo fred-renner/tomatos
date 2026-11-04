@@ -4,10 +4,13 @@ import jax
 import jax.numpy as jnp
 import relaxed
 
+# weight variations: the same events with other weights, from branches in
+# the nominal ntuples. example: the toy's background uncertainty
+WEIGHT_VARIATIONS = {
+    "BKG_UNC": {"sample": "bkg", "up": "bkg_unc_up", "down": "bkg_unc_down"},
+}
 
 
-# @partial(jax.jit, static_argnames=["config", "validate_only"])
-# @jax.jit
 def cuts(pars, data, config, validate_only):
     # remove approximation with large slope for validation --> sharp cuts
     # in training the sigmoid width is the kde bandwidth (both act on min max
@@ -39,7 +42,7 @@ def events(data, config, base_weights):
     # the cuts. weight based systematics are just other weights of the same
     # events
     weights = {"nominal": base_weights}
-    for sys, sys_dict in config.weight_systematics.items():
+    for sys, sys_dict in WEIGHT_VARIATIONS.items():
         for direction in ["up", "down"]:
             var_idx = config.vars.index(sys_dict[direction])
             weights[f"{sys}_{direction}"] = base_weights * data[:, :, var_idx]
