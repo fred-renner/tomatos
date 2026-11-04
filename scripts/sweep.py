@@ -3,7 +3,7 @@
 # Quick hyperparameter loop: run configs with overrides one after another
 # (memory) and print one summary line per run.
 #
-#   python scripts/sweep.py configs/toy_mass.yaml configs/toy_mass_nosys.yaml \
+#   python scripts/sweep.py configs/toy_mass.yaml configs/toy_nn.yaml \
 #       --set lr=0.002,0.005 --steps 300
 
 import argparse

@@ -1,6 +1,6 @@
 VENV := .venv
 BIN := $(VENV)/bin
-DEMOS := toy_mass toy_mass_nosys toy_nn toy_nn_nosys
+DEMOS := toy_mass toy_nn
 
 .PHONY: install demo plots test data
 
@@ -16,16 +16,20 @@ install:
 data:
 	$(BIN)/python tests/generate_toy_files.py
 
-# train both demos with and without systematics (one at a time, memory)
+# train both demos (one at a time, memory)
 demo: data
 	for d in $(DEMOS); do $(BIN)/tomatos --config configs/$$d.yaml --prep --train --plot || exit 1; done
 	$(MAKE) plots
 
-# README figures in assets/
+# README gifs in assets/: the manual, stepwise optimization, then both
+# pipelines manual vs automated
 plots:
-	$(BIN)/python scripts/readme_plots.py \
-		--mass results/tomatos_cls_var_steps_300_bins_5_mass results/tomatos_cls_var_steps_300_bins_5_mass_nosys \
-		--nn results/tomatos_cls_nn_steps_300_bins_5_nn results/tomatos_cls_nn_steps_300_bins_5_nn_nosys
+	$(BIN)/python scripts/stepwise.py configs/toy_mass.yaml
+	$(BIN)/python scripts/stepwise.py configs/toy_nn.yaml
+	$(BIN)/python scripts/pipeline_gif.py --run results/tomatos_cls_var_steps_300_bins_5_mass \
+		--stepwise results/stepwise/mass.npz --out assets/pipeline_mass.gif
+	$(BIN)/python scripts/pipeline_gif.py --run results/tomatos_cls_nn_steps_300_bins_5_nn \
+		--stepwise results/stepwise/nn.npz --out assets/pipeline_nn.gif
 
 test:
 	$(BIN)/python -m pytest tests -q

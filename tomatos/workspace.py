@@ -42,14 +42,25 @@ def sys_modifiers(hists, config, sample):
     for sys in hists[sample]:
         if sys.endswith("_1UP") and not sys.startswith("STAT"):
             name = sys.removesuffix("_1UP")
+            hi, lo = hists[sample][name + "_1UP"], hists[sample][name + "_1DOWN"]
+            if config.weight_systematics.get(name, {}).get("bin_by_bin"):
+                # uncorrelated between bins, e.g. the statistics of a data
+                # driven estimate: one parameter per bin, as for stat
+                nom = hists[sample][config.nominal]
+                modifiers += [
+                    {
+                        "name": f"{name}_{sample}_{i+1}",
+                        "type": "histosys",
+                        "data": {"hi_data": nom.at[i].set(hi[i]), "lo_data": nom.at[i].set(lo[i])},
+                    }
+                    for i in range(len(nom))
+                ]
+                continue
             modifiers += [
                 {
                     "name": name,
                     "type": "histosys",
-                    "data": {
-                        "hi_data": hists[sample][name + "_1UP"],
-                        "lo_data": hists[sample][name + "_1DOWN"],
-                    },
+                    "data": {"hi_data": hi, "lo_data": lo},
                 }
             ]
     # normalization uncertainties, e.g. cross sections

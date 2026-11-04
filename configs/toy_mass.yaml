@@ -18,8 +18,8 @@ vars:
   - "pt1"
 event_weight_var: weight
 aux_vars:
-  - "bkg_mod_up"
-  - "bkg_mod_down"
+  - "bkg_est_up"
+  - "bkg_est_down"
 
 # ratio need to add up to one
 train_ratio: 0.8
@@ -35,12 +35,19 @@ n_bins: 5
 # includes bin edges in optimization
 include_bins: true
 
-# uncertainties, the bkg modelling one is the catch of the toy
+# uncertainties: the background is a data driven estimate, extrapolated
+# from soft jets, the less certain the harder the jets and the higher the
+# mass. bin_by_bin: uncorrelated between bins like statistics, the mass
+# sidebands cannot pin it down
 weight_systematics:
-  BKG_MOD:
+  BKG_EST:
     sample: "bkg"
-    up: "bkg_mod_up"
-    down: "bkg_mod_down"
+    up: "bkg_est_up"
+    down: "bkg_est_down"
+    bin_by_bin: true
+# every bin keeps at least this much background (weighted), the bandwidth
+# controller and the manual binning both respect it
+min_bkg: 10
 # false: train on stat uncertainties only, valid/test always use all
 train_systematics: true
 
@@ -61,7 +68,8 @@ update_limit_cuts: 0.001 # for min max scaled between (0,1)
 opt_cuts:
   pt1:
     keep: "above"
-    init: 35
+    # start hard, where S/sqrt(B) would cut, the uncertainty pulls it looser
+    init: 110
 
 # applies a scale factor to the histograms accordingly
 n_k_folds: 1

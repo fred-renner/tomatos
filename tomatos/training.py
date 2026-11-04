@@ -178,6 +178,8 @@ def run(config):
             tomatos.train_utils.log_kde(
                 config, metrics, opt_pars, train_data, train_sf, hists, bins, kde_hists_fn
             )
+            if config.objective == "cls_nn":
+                tomatos.train_utils.log_nn_map(config, metrics, opt_pars)
 
         if "cls" in config.objective:
             tomatos.train_utils.log_sharp_hists(

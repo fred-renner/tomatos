@@ -58,6 +58,18 @@ def log_kde(config, metrics, opt_pars, train_data, train_sf, hists, bins, kde_hi
         metrics["kde_" + key] = h
 
 
+def log_nn_map(config, metrics, opt_pars, n=40):
+    # nn output on a grid of the first two (min max scaled) inputs, further
+    # inputs fixed at 0.5, flattened (n*n). shows where in the input plane
+    # the nn puts signal
+    u = jnp.linspace(0, 1, n)
+    grid = jnp.stack(jnp.meshgrid(u, u, indexing="ij"), axis=-1).reshape(-1, 2)
+    rest = jnp.full((grid.shape[0], config.nn_inputs_idx_end - 2), 0.5)
+    inputs = jnp.concatenate([grid, rest], axis=1)
+    nn = eqx.combine(opt_pars["nn"], config.nn_arch)
+    metrics["nn_map"] = jax.vmap(nn)(inputs).ravel()
+
+
 def log_hists(config, metrics, test_hists, hists):
     for h_key, h in hists.items():
         metrics["h_" + h_key] = h
