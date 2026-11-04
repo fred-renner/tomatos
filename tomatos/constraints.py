@@ -76,7 +76,6 @@ def bw_controller(config, bw, sharp_hists, loss, prev_loss, bw_start):
 
 
 def opt_pars(config, opt_pars):
-    # stay in jax types, numpy ones would retrigger compilation of the update
     if config.include_bins:
         # maintain order and avoid going out of 0, 1 range
         opt_pars["bins"] = jnp.clip(jnp.sort(jnp.abs(opt_pars["bins"])), 1e-6, 1 - 1e-6)

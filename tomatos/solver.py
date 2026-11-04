@@ -47,8 +47,8 @@ def setup(config, pars):
         return {key: key in vars for key in pars}
 
     # limiting cut updates is important to avoid gradient explosion
-    # bw is set from outside (constraints.bw_controller) and must not move
-    # with gradients
+    # bw needs to be sent through the pipeline as an arg, but it is an
+    # externally optimized parameter, i.e. its updates are blocked
     optimizer = optax.chain(
         optax.zero_nans(),  # if nans, zero out, otherwise opt breaks entirely
         optax.adam(lr_schedule),
@@ -62,11 +62,6 @@ def setup(config, pars):
 
     # has_aux allows, to return additional values from loss_fn than just the
     # loss value
-    # config is not a jax type (pytree), so it can't be an argument of a
-    # jitted function. Closing over it instead makes it a constant at trace
-    # time, all python logic on it (strings, dicts, ifs) runs once while
-    # tracing and the whole loss compiles into one function. ~100x faster
-    # than op by op execution
     def loss(pars, data, scale):
         return tomatos.pipeline.loss_fn(pars, data, config, scale)
 

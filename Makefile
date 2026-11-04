@@ -21,15 +21,15 @@ demo: data
 	for d in $(DEMOS); do $(BIN)/tomatos --config configs/$$d.yaml --prep --train --plot || exit 1; done
 	$(MAKE) plots
 
-# README gifs in assets/: the manual, stepwise optimization, then both
+# README gifs in assets/: the manual optimization, then both
 # pipelines manual vs automated
 plots:
-	$(BIN)/python scripts/stepwise.py configs/toy_mass.yaml
-	$(BIN)/python scripts/stepwise.py configs/toy_nn.yaml
+	$(BIN)/python scripts/manual_opt.py configs/toy_mass.yaml
+	$(BIN)/python scripts/manual_opt.py configs/toy_nn.yaml
 	$(BIN)/python scripts/pipeline_gif.py --run results/tomatos_cls_var_steps_300_bins_5_mass \
-		--stepwise results/stepwise/mass.npz --out assets/pipeline_mass.gif
+		--manual results/manual/mass.npz --out assets/pipeline_mass.gif
 	$(BIN)/python scripts/pipeline_gif.py --run results/tomatos_cls_nn_steps_300_bins_5_nn \
-		--stepwise results/stepwise/nn.npz --out assets/pipeline_nn.gif
+		--manual results/manual/nn.npz --out assets/pipeline_nn.gif
 
 test:
 	$(BIN)/python -m pytest tests -q

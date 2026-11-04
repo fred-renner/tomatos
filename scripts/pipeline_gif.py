@@ -2,7 +2,7 @@
 """Hero gifs: the analysis as a chain of boxes, optimized two ways.
 
 top     Manual Optimization: one box after the other, each on S/sqrt(B) or a
-        classifier loss (scripts/stepwise.py), the CLs is only seen at the end.
+        classifier loss (scripts/manual_opt.py), the CLs is only seen at the end.
         The middle box first shows the fine distribution while the box before
         it is tuned, then the fine bars flow together into the binned
         histogram whose edges get optimized
@@ -10,7 +10,7 @@ bottom  Automated Optimization: all boxes at once on the expected CLs with
         all uncertainties, from a tomatos training run
 
     python scripts/pipeline_gif.py --run results/tomatos_cls_var_..._mass \
-        --stepwise results/stepwise/mass.npz --out assets/pipeline_mass.gif
+        --manual results/manual/mass.npz --out assets/pipeline_mass.gif
 """
 import argparse
 import json
@@ -192,8 +192,8 @@ def from_run(run, n):
     return src
 
 
-def stepwise_phases(sw, is_var, n):
-    """Per frame: the box being tuned, the stepwise frame shown, the frame
+def manual_phases(sw, is_var, n):
+    """Per frame: the box being tuned, the manual frame shown, the frame
     of the first box shown and what the middle box draws."""
     stage = sw["frame_stage"]
     idx_first = np.where(stage == ("cut" if is_var else "nn"))[0]
@@ -222,7 +222,7 @@ class Pipeline:
         self.sw = sw
         self.n, self.hold = n, hold
         self.fine_edges = FINE["mass" if self.is_var else "nn"]
-        self.top = self.from_stepwise(sw, n)
+        self.top = self.from_manual(sw, n)
         self.bottom = from_run(run, n)
         self.md = run.md
         self.vars = run.config["vars"]
@@ -257,9 +257,9 @@ class Pipeline:
         width = np.diff(edges) / UNIT[self.is_var]
         return b / width, s / width, d / width
 
-    def from_stepwise(self, sw, n):
+    def from_manual(self, sw, n):
         src = Source(n)
-        src.active, shown, first, src.mode, src.edge_alpha, src.flow = stepwise_phases(sw, self.is_var, n)
+        src.active, shown, first, src.mode, src.edge_alpha, src.flow = manual_phases(sw, self.is_var, n)
         src.edges = [np.asarray(sw["frame_edges"][i], dtype=float) for i in shown]
         src.cut = [sw["frame_cut"][i] for i in first] if "frame_cut" in sw else None
         src.nn_map = [sw["frame_nn_map"][i] for i in first] if "frame_nn_map" in sw else None
@@ -532,12 +532,12 @@ class Pipeline:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True)
-    parser.add_argument("--stepwise", required=True)
+    parser.add_argument("--manual", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--ntuples", default="tests/toy_files")
     parser.add_argument("--frames", type=int, default=120)
     args = parser.parse_args()
 
     run = Run(args.run)
-    sw = dict(np.load(args.stepwise))
+    sw = dict(np.load(args.manual))
     Pipeline(run, sw, load_events(args.ntuples), n=args.frames).save(args.out)

@@ -38,8 +38,6 @@ include_bins: false
 # every bin keeps at least this much background (weighted), the bandwidth
 # controller and the manual binning both respect it
 min_bkg: 10
-# false: train on stat uncertainties only, valid/test always use all
-train_systematics: true
 
 # results folder suffix
 suffix: "nn"
@@ -52,7 +50,6 @@ lr_schedule: "linear_cycle"
 # need to limit these updates to avoid gradient explosion
 update_limit_cuts: 0.001 # for min max scaled between (0,1)
 
-# no cuts: the nn learns the selection itself
 # cuts on vars to be optimized, keep variables either "above", "below"
 # or below, start somewhere where the cut actually does something to
 # find a gradient

@@ -65,18 +65,15 @@ def sys_modifiers(hists, config, sample):
     return modifiers
 
 
-def pyhf_model(hists, config, stat_only=False):
+def pyhf_model(hists, config):
     # here you build the json workspace structure with hists
-    # stat_only: what an analysis ignoring the systematics would see, the
-    # A/B check of what that costs
     samples = []
     for sample in config.samples:
         modifiers = []
         if sample == config.signal_sample:
             # signal strength modifier (parameter of interest)
             modifiers += [{"name": "mu", "type": "normfactor", "data": None}]
-        if not stat_only:
-            modifiers += sys_modifiers(hists, config, sample)
+        modifiers += sys_modifiers(hists, config, sample)
         modifiers += stat_modifiers(hists, config, sample)
         samples += [
             {

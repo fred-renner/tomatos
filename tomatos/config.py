@@ -36,8 +36,6 @@ class Setup:
 
         # optional keys
         defaults = {
-            # false: train on stat uncertainties only, valid/test always use all
-            "train_systematics": True,
             "bkg_sample": "bkg",
             # bkg events wanted in every bin, see constraints.bw_controller
             "min_bkg": 10,

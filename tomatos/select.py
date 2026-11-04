@@ -13,9 +13,6 @@ WEIGHT_VARIATIONS = {
 
 def cuts(pars, data, config, validate_only):
     # remove approximation with large slope for validation --> sharp cuts
-    # in training the sigmoid width is the kde bandwidth (both act on min max
-    # scaled vars), one smoothness knob for cuts and histograms, see
-    # constraints.bw_controller
     slope = 1e20 if validate_only else 1 / pars["bw"]
     # init with shape (samples, events)
     cut_weights = jnp.ones(data.shape[:2])
@@ -38,9 +35,7 @@ def cuts(pars, data, config, validate_only):
 
 
 def events(data, config, base_weights):
-    # apply selections via weights, one fit region: everything that passes
-    # the cuts. weight based systematics are just other weights of the same
-    # events
+    # apply selections via weights, for instance for weight based systematics
     weights = {"nominal": base_weights}
     for sys, sys_dict in WEIGHT_VARIATIONS.items():
         for direction in ["up", "down"]:

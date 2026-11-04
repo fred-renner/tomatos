@@ -38,8 +38,6 @@ include_bins: true
 # every bin keeps at least this much background (weighted), the bandwidth
 # controller and the manual binning both respect it
 min_bkg: 10
-# false: train on stat uncertainties only, valid/test always use all
-train_systematics: true
 
 # results folder suffix
 suffix: "mass"
@@ -58,7 +56,6 @@ update_limit_cuts: 0.001 # for min max scaled between (0,1)
 opt_cuts:
   pt1:
     keep: "above"
-    # start hard, where S/sqrt(B) would cut, the uncertainty pulls it looser
     init: 110
 
 # applies a scale factor to the histograms accordingly

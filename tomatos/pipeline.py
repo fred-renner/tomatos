@@ -35,16 +35,11 @@ def loss_fn(
     scale,
     validate_only=False,
     filter_return_hists=True,
-    stat_only=None,
 ):
     # config is not a jax compatible type (pytree), it is closed over when
     # jitting instead, see jit_loss_fn and solver.setup
     hists = make_hists(pars, data, config, scale, validate_only)
-    # training ignores the systematics only in the A/B check, validation
-    # always uses all of them unless asked
-    if stat_only is None:
-        stat_only = not validate_only and not config.train_systematics
-    model = tomatos.workspace.pyhf_model(hists, config, stat_only)
+    model = tomatos.workspace.pyhf_model(hists, config)
     loss_value = neos.loss_from_model(model, loss="cls")
 
     # flatten and reduces to the configured filter
@@ -53,12 +48,8 @@ def loss_fn(
 
 
 # jitted versions with config closed over, compile once per data shape
-def jit_loss_fn(config, validate_only, stat_only=None):
-    return jax.jit(
-        lambda pars, data, scale: loss_fn(
-            pars, data, config, scale, validate_only, stat_only=stat_only
-        )
-    )
+def jit_loss_fn(config, validate_only):
+    return jax.jit(lambda pars, data, scale: loss_fn(pars, data, config, scale, validate_only))
 
 
 def jit_make_hists(config, validate_only):

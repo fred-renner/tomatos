@@ -107,10 +107,6 @@ def run(config):
     solver, state, opt_pars, batch, best_test_loss = train_init(config)
     # sharp evaluation and kde sampling, compiled once
     eval_fn = tomatos.pipeline.jit_loss_fn(config, validate_only=True)
-    # what an analysis ignoring the systematics would claim on the test set
-    eval_stat_only_fn = tomatos.pipeline.jit_loss_fn(
-        config, validate_only=True, stat_only=True
-    )
     sharp_hists_fn = tomatos.pipeline.jit_make_hists(config, validate_only=True)
     kde_hists_fn = tomatos.train_utils.jit_kde_hists(config)
 
@@ -133,8 +129,6 @@ def run(config):
         valid_loss, valid_hists, test_loss, test_hists = evaluate_losses(
             opt_pars, batch, eval_fn
         )
-        test_data, test_sf = next(batch["test"])
-        metrics["test_loss_stat_only"] = eval_stat_only_fn(opt_pars, test_data, test_sf)[0]
         metrics["train_loss"] = state.value
         metrics["valid_loss"] = valid_loss
         metrics["test_loss"] = test_loss

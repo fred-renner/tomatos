@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""The manual, stepwise way: optimize one box after the other, each on its
+"""The manual way: optimize one box after the other, each on its
 own simple proxy that knows nothing about uncertainties, and only look at
 the expected CLs at the very end.
 
@@ -12,10 +12,10 @@ the expected CLs at the very end.
 Everything runs through the real pipeline (sharp cuts and histograms), the
 final CLs is the same full model (all uncertainties, test set) the
 automated training reports. Frames for the pipeline gif and the CLs after
-every stage go to results/stepwise/<suffix>.npz
+every stage go to results/manual/<suffix>.npz
 
-    python scripts/stepwise.py configs/toy_mass.yaml
-    python scripts/stepwise.py configs/toy_nn.yaml
+    python scripts/manual_opt.py configs/toy_mass.yaml
+    python scripts/manual_opt.py configs/toy_nn.yaml
 """
 import argparse
 import os
@@ -72,7 +72,7 @@ class Stepwise:
     def compile(self):
         # the config is closed over, recompile when it changes
         self.hists_fn = tomatos.pipeline.jit_make_hists(self.config, validate_only=True)
-        self.cls_fn = tomatos.pipeline.jit_loss_fn(self.config, validate_only=True, stat_only=False)
+        self.cls_fn = tomatos.pipeline.jit_loss_fn(self.config, validate_only=True)
 
     def hists(self, pars, split="train"):
         data, scale = self.train if split == "train" else self.test
@@ -277,7 +277,7 @@ class Stepwise:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config")
-    parser.add_argument("--out", default="results/stepwise/")
+    parser.add_argument("--out", default="results/manual/")
     args = parser.parse_args()
 
     config, pars, batch = setup(args.config)
