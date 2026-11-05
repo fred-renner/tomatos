@@ -524,8 +524,6 @@ class Pipeline:
     def save(self, out, fps=10):
         anim = FuncAnimation(self.fig, self.draw, frames=self.n + self.hold)
         anim.save(out, writer=PillowWriter(fps=fps))
-        self.draw(self.n + self.hold - 1)
-        self.fig.savefig(out.replace(".gif", "_final.png"), dpi=110)
         print(f"wrote {out}")
 
 
