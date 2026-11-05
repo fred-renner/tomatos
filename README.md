@@ -2,22 +2,18 @@
 
 End-to-end differentiable optimization of a particle-physics analysis in JAX.
 
-A search for new physics is a chain of steps: event selection, a classifier, histogram binning and a statistical fit. Usually each step is optimized separately, on its own proxy objective such as S/√B or cross-entropy, and without the systematic uncertainties of the final fit. This takes many iterations and gives a suboptimal sensitivity.
+A particle-physics analysis at the LHC is typically optimized iteratively in parts with varying objectives. Uncertainties often have a large impact on the overall sensitivity but only enter fully in the final statistical fit. tomatos is a framework that turns such a chain into a single differentiable procedure and optimizes it directly on the final sensitivity.
 
-tomatos makes the chain differentiable and optimizes all steps together on the expected sensitivity of the fit, systematic uncertainties included.
+## Toy example
+Find a small signal in a large background using 2 kinematic features and a background uncertainty with two different analysis strategies. Each GIF shows the manual iterative procedure on top and the automated chain below.
 
-## Neural network
-
-The data is a toy: a small signal on a large background, with a background uncertainty that grows where there are few events.
-
-- **Top:** the classifier is trained on cross-entropy, then the bins are chosen. The sensitivity is only known after the fit.
-- **Bottom:** tomatos trains the network on the fit result. It avoids the region where the background is poorly known.
+### Neural Network 
+Manual optimization uses the features to train a signal/background classifier and optimizes the histogram bins to increase the overall signal-to-background ratio. The sensitivity, including uncertainties, is then obtained in the final hypothesis test. The classifier favours the highest signal-to-background ratio towards the top in the 2D plane, where the background uncertainty increases. The automated optimization instead learns to avoid higher uncertainty regions and reaches a better sensitivity. 
 
 ![neural network](assets/pipeline_nn.gif)
 
-## Cut and mass
-
-The same problem without a network: a cut on jet momentum and the bin edges of the mass distribution. All parameters stay physical quantities, so the result is a standard, interpretable analysis.
+### Event Selection
+The same data but now using a selection on jet pT and a fit in the mass variable. The automated chain optimizes the selection and the histogram bins together on the final sensitivity. It selects more inclusively, where the background is better known, and reaches a better sensitivity than the manual one.
 
 ![cut and mass](assets/pipeline_mass.gif)
 
@@ -33,10 +29,5 @@ make test      # smoke test
 tomatos --config configs/toy_nn.yaml --prep --train --plot
 ```
 
-Outputs go to `results/`. The stack is pinned to `jax==0.3.14` because the fit uses `jaxopt`, which needs Python 3.9.
+Built on [JAX](https://github.com/jax-ml/jax), [equinox](https://github.com/patrick-kidger/equinox), [optax](https://github.com/google-deepmind/optax), [pyhf](https://github.com/scikit-hep/pyhf) and [neos](https://github.com/gradhep/neos).
 
-Built on JAX, equinox, optax, pyhf and neos.
-
-## License
-
-Apache 2.0
