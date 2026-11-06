@@ -24,6 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import uproot
+from matplotlib import patheffects
 from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.colors import LinearSegmentedColormap, LogNorm
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
@@ -37,6 +38,8 @@ import generate_toy_files as toy  # noqa: E402
 SIG, BKG, UNC, AUTO = "#e5533d", "#6f9bc4", "#3d3d3d", "#4c9a5b"
 # the smooth background the optimizer sees, darker than the fill
 KDE = "#1f4e79"
+# the background uncertainty contours in the plane
+UNC_LINE = "#4a4a4a"
 INK, MUTED, PANEL, EDGE = "#2b2b2b", "#8a8f98", "#fbfaf8", "#d9d6d0"
 TOP_TITLE = "Manual Optimization"
 BOTTOM_TITLE = "Automated Optimization"
@@ -361,7 +364,7 @@ class Pipeline:
         i = self.vars.index(var)
         return (np.asarray(u) - self.md["scaler_min"][i]) / self.md["scaler_scale"][i]
 
-    def plane(self, ax, cut=None, nn_map=None, edges=None):
+    def plane(self, ax, cut=None, nn_map=None, edges=None, edge_alpha=1.0):
         ev = self.events
         # background as a density, signal as points on top
         ax.hist2d(ev["bkg"]["m"], ev["bkg"]["pt1"], bins=[48, 48], range=[M_RANGE, PT_RANGE],
@@ -373,6 +376,16 @@ class Pipeline:
                 color=SIG, fontsize=7.5, fontweight="bold", zorder=7)
         ax.text(0.97, 0.86, "background", transform=ax.transAxes, ha="right", va="top",
                 color="#2f5f8a", fontsize=7.5, fontweight="bold", zorder=7)
+        # the toy's background uncertainty, it grows mostly with pT
+        gm, gp = np.meshgrid(np.linspace(*M_RANGE, 100), np.linspace(*PT_RANGE, 100))
+        lines = ax.contour(gm, gp, toy.bkg_unc(gm, gp), levels=[0.05, 0.2, 0.5], colors=[UNC_LINE],
+                           linewidths=0.9, linestyles="--", zorder=1.5)
+        halo = [patheffects.withStroke(linewidth=2, foreground="white")]
+        for label in ax.clabel(lines, fmt=lambda v: f"{v:.0%}", fontsize=6, inline_spacing=2,
+                               manual=[(75, 85), (75, 115), (75, 135)]):
+            label.set_path_effects(halo)
+        ax.text(0.97, 0.77, "bkg. uncertainty", transform=ax.transAxes, ha="right", va="top",
+                color=UNC_LINE, fontsize=7.5, fontweight="bold", zorder=7, path_effects=halo)
         if cut is not None:
             ax.axhspan(PT_RANGE[0], cut, color="white", alpha=0.75, lw=0, zorder=4)
             ax.axhline(cut, color=INK, lw=2, zorder=5)
@@ -385,6 +398,9 @@ class Pipeline:
             score = np.asarray(nn_map).reshape(n, n)
             ax.contourf(gm, gp, score, levels=edges, cmap="Greens", alpha=0.3, zorder=3)
             ax.contour(gm, gp, score, levels=edges[1:-1], colors=[AUTO], linewidths=1.0, zorder=3)
+        elif cut is not None:
+            # the mass bins, inside the selection
+            ax.vlines(edges[1:-1], cut, PT_RANGE[1], color=AUTO, lw=1.0, alpha=edge_alpha, zorder=3)
         ax.set(xlim=M_RANGE, ylim=PT_RANGE, xlabel="mass [GeV]", ylabel="jet $p_T$ [GeV]")
 
     def scan(self, ax, src, k):
@@ -492,7 +508,8 @@ class Pipeline:
                 self.scan_axes[row].axis("off")
         cut = src.cut[k] if src.cut is not None else None
         nn_map = src.nn_map[k] if src.nn_map is not None else None
-        self.plane(axes[0], cut=cut, nn_map=nn_map, edges=np.asarray(src.edges[k], dtype=float))
+        self.plane(axes[0], cut=cut, nn_map=nn_map, edges=np.asarray(src.edges[k], dtype=float),
+                   edge_alpha=src.edge_alpha[k])
         self.middle(axes[1], src, k)
         if row == 0:
             active = src.active[k]

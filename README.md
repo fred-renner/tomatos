@@ -1,14 +1,13 @@
 # TOMATOS: auTOMATed Optimization of Sensitivity
 
-End-to-end differentiable optimization of a particle-physics analysis in JAX.
+Particle physics analyses at the LHC are typically optimized step by step, using proxy objectives aiming to improve the final sensitivity. Systematic uncertainties often play a large role in that sensitivity, but only enter fully in the last statistical fit. tomatos is a framework that turns the whole chain into a single differentiable procedure and optimizes it end-to-end on the final, uncertainty-aware sensitivity.
 
-A particle-physics analysis at the LHC is typically optimized iteratively in parts with varying objectives. Uncertainties often have a large impact on the overall sensitivity but only enter fully in the final statistical fit. tomatos is a framework that turns such a chain into a single differentiable procedure and optimizes it directly on the final sensitivity.
 
 ## Toy example
-Find a small signal in a large background using 2 kinematic features and a background uncertainty with two different analysis strategies. Each GIF shows the manual iterative procedure on top and the automated chain below.
+Find a small signal in a large background using 2 kinematic features and a background uncertainty with two different analysis strategies. Each GIF shows the manual iterative procedure on top and the automated version below.
 
 ### Neural Network 
-Manual optimization uses the features to train a signal/background classifier and optimizes the histogram bins to increase the overall signal-to-background ratio. The sensitivity, including uncertainties, is then obtained in the final hypothesis test. The classifier favours the highest signal-to-background ratio towards high jet pT (the top of the 2D plane), where the background uncertainty increases. The automated optimization instead learns to avoid regions of higher uncertainty and reaches a better sensitivity. 
+Manual optimization uses the features to train a signal/background classifier and optimizes the histogram bins to increase the overall signal-to-background ratio. The final sensitivity that includes uncertainties is then obtained in the hypothesis test. The classifier favours the highest signal-to-background ratio towards high jet pT, the top of the 2D plane, where the background uncertainty increases. The automated optimization instead learns to avoid regions of higher uncertainty and reaches a better sensitivity. 
 
 ![neural network](assets/pipeline_nn.gif)
 
